@@ -340,25 +340,25 @@ Mục tiêu: tạo nền Express + TypeScript chuẩn để các module khác ph
 
 Checklist:
 
-- [ ] Khởi tạo backend project Node.js + TypeScript.
-- [ ] Cấu hình Express app.
-- [ ] Cấu hình environment variables.
-- [ ] Cấu hình Prisma client.
-- [ ] Cấu hình global error handler.
-- [ ] Cấu hình request validation middleware.
-- [ ] Cấu hình auth middleware placeholder.
-- [ ] Cấu hình RBAC middleware placeholder.
-- [ ] Cấu hình logger.
-- [ ] Cấu hình CORS.
-- [ ] Cấu hình health check endpoint `GET /health`.
-- [ ] Thêm lint/typecheck/test script.
+- [x] Khởi tạo backend project Node.js + TypeScript.
+- [x] Cấu hình Express app.
+- [x] Cấu hình environment variables.
+- [x] Cấu hình Prisma client.
+- [x] Cấu hình global error handler.
+- [x] Cấu hình request validation middleware.
+- [x] Cấu hình auth middleware placeholder.
+- [x] Cấu hình RBAC middleware placeholder.
+- [x] Cấu hình logger.
+- [x] Cấu hình CORS.
+- [x] Cấu hình health check endpoint `GET /health`.
+- [x] Thêm lint/typecheck/test script.
 
 Acceptance criteria:
 
-- [ ] Backend start được local.
-- [ ] `GET /health` trả về OK.
-- [ ] `npm run typecheck` pass.
-- [ ] `npm run lint` pass.
+- [x] Backend start được local.
+- [x] `GET /health` trả về OK.
+- [x] `npm run typecheck` pass.
+- [x] `npm run lint` pass.
 
 ---
 
@@ -1090,7 +1090,7 @@ Acceptance criteria:
 
 ### Sprint 0 — Foundation
 
-- [ ] Backend foundation.
+- [x] Backend foundation.
 - [ ] Frontend foundation.
 - [ ] Prisma schema baseline.
 - [ ] Seed data.
@@ -1191,7 +1191,7 @@ Một module được coi là hoàn thành khi:
 
 | Module | Owner | Status | Notes |
 |---|---|---|---|
-| Backend foundation |  | TODO |  |
+| Backend foundation | Codex | DONE | Express + TypeScript foundation verified: build/typecheck/lint/test/health |
 | Database & Prisma |  | TODO |  |
 | Auth |  | TODO |  |
 | RBAC & Users |  | TODO |  |
@@ -1252,4 +1252,3 @@ Luồng demo tối thiểu:
 15. Manager complete booking.
 16. Booking chuyển `COMPLETED`.
 17. Admin xem báo cáo lượt đặt/doanh thu.
-
