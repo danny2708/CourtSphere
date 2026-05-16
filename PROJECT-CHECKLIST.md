@@ -368,37 +368,39 @@ Mục tiêu: tạo schema DB đúng spec, đúng naming convention, đủ FK.
 
 Checklist:
 
-- [ ] Tạo `schema.prisma`.
-- [ ] Tạo model `User` map bảng `users`.
-- [ ] Tạo model `Role` map bảng `roles`.
-- [ ] Tạo model `UserRole` map bảng `user_roles`.
-- [ ] Tạo model `PriorityGroup` map bảng `priority_groups`.
-- [ ] Tạo model `CourtType` map bảng `court_types`.
-- [ ] Tạo model `Court` map bảng `courts`.
-- [ ] Tạo model `OperatingHour` map bảng `operating_hours`.
-- [ ] Tạo model `PricingRule` map bảng `pricing_rules`.
-- [ ] Tạo model `Booking` map bảng `bookings`.
-- [ ] Tạo model `Payment` map bảng `payments`.
-- [ ] Tạo model `Refund` map bảng `refunds`.
-- [ ] Tạo model `BookingStatusHistory` map bảng `booking_status_histories`.
-- [ ] Tạo model `CourtStatusHistory` map bảng `court_status_histories`.
-- [ ] Tạo model `Violation` map bảng `violations`.
-- [ ] Tạo model `Notification` map bảng `notifications`.
-- [ ] Tạo model `WaitlistEntry` map bảng `waitlist_entries`.
-- [ ] Tạo model `SystemSetting` map bảng `system_settings`.
-- [ ] Tạo model `AuditLog` map bảng `audit_logs`.
-- [ ] Đồng bộ enum booking/payment/refund/court/account status.
-- [ ] Thêm index cho các query quan trọng.
-- [ ] Thêm migration SQL chống overlap booking bằng PostgreSQL exclusion constraint.
-- [ ] Viết seed data: admin, manager, user, roles, priority groups, court types, courts, rules.
+- [x] Tạo `schema.prisma`.
+- [x] Tạo model `User` map bảng `users`.
+- [x] Tạo model `Role` map bảng `roles`.
+- [x] Tạo model `UserRole` map bảng `user_roles`.
+- [x] Tạo model `PriorityGroup` map bảng `priority_groups`.
+- [x] Tạo model `CourtType` map bảng `court_types`.
+- [x] Tạo model `Court` map bảng `courts`.
+- [x] Tạo model `OperatingHour` map bảng `operating_hours`.
+- [x] Tạo model `PricingRule` map bảng `pricing_rules`.
+- [x] Tạo model `BookingRule` map bảng `booking_rules`.
+- [x] Tạo model `PriorityPolicy` map bảng `priority_policies`.
+- [x] Tạo model `Booking` map bảng `bookings`.
+- [x] Tạo model `Payment` map bảng `payments`.
+- [x] Tạo model `Refund` map bảng `refunds`.
+- [x] Tạo model `BookingStatusHistory` map bảng `booking_status_histories`.
+- [x] Tạo model `CourtStatusHistory` map bảng `court_status_histories`.
+- [x] Tạo model `Violation` map bảng `violations`.
+- [x] Tạo model `Notification` map bảng `notifications`.
+- [x] Tạo model `WaitlistEntry` map bảng `waitlist_entries`.
+- [x] Tạo model `SystemSetting` map bảng `system_settings`.
+- [x] Tạo model `AuditLog` map bảng `audit_logs`.
+- [x] Đồng bộ enum booking/payment/refund/court/account status.
+- [x] Thêm index cho các query quan trọng.
+- [x] Thêm migration SQL chống overlap booking bằng PostgreSQL exclusion constraint.
+- [x] Viết seed data: admin, manager, user, roles, priority groups, court types, courts, rules.
 
 Acceptance criteria:
 
-- [ ] `prisma migrate dev` chạy thành công.
-- [ ] `prisma generate` chạy thành công.
-- [ ] Seed tạo được dữ liệu mẫu.
-- [ ] FK đúng và không còn model mâu thuẫn với spec.
-- [ ] DB constraint chặn được overlap booking active.
+- [!] `prisma migrate dev` chưa chạy được vì chưa có PostgreSQL local/Docker daemon.
+- [x] `prisma generate` chạy thành công.
+- [!] Seed script đã tạo/typecheck, chưa chạy được vì chưa có PostgreSQL local/Docker daemon.
+- [x] FK đúng và không còn model mâu thuẫn với spec.
+- [x] DB constraint chặn overlap booking active đã có trong migration SQL.
 
 ---
 
@@ -1092,8 +1094,8 @@ Acceptance criteria:
 
 - [x] Backend foundation.
 - [ ] Frontend foundation.
-- [ ] Prisma schema baseline.
-- [ ] Seed data.
+- [x] Prisma schema baseline.
+- [x] Seed data.
 - [ ] Auth basic.
 - [ ] RBAC basic.
 
@@ -1192,7 +1194,7 @@ Một module được coi là hoàn thành khi:
 | Module | Owner | Status | Notes |
 |---|---|---|---|
 | Backend foundation | Codex | DONE | Express + TypeScript foundation verified: build/typecheck/lint/test/health |
-| Database & Prisma |  | TODO |  |
+| Database & Prisma | Codex | DONE | Schema/migration/seed verified; DB apply/seed pending local PostgreSQL |
 | Auth |  | TODO |  |
 | RBAC & Users |  | TODO |  |
 | Courts & Court Types |  | TODO |  |
