@@ -28,6 +28,47 @@ npm test
 npm run build
 ```
 
+Prisma checks:
+
+```bash
+cd backend
+npx prisma format
+npx prisma generate
+```
+
+### Local PostgreSQL
+
+If PostgreSQL is not already running locally, start one with Docker:
+
+```bash
+docker run --name courtsphere-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=courtsphere \
+  -p 5432:5432 \
+  -d postgres:16-alpine
+```
+
+On Windows PowerShell:
+
+```powershell
+docker run --name courtsphere-postgres `
+  -e POSTGRES_USER=postgres `
+  -e POSTGRES_PASSWORD=postgres `
+  -e POSTGRES_DB=courtsphere `
+  -p 5432:5432 `
+  -d postgres:16-alpine
+```
+
+Then apply migrations and seed sample data:
+
+```bash
+cd backend
+copy .env.example .env
+npx prisma migrate deploy
+npx prisma db seed
+```
+
 To run locally:
 
 ```bash
@@ -35,6 +76,8 @@ cd backend
 copy .env.example .env
 npm run dev
 ```
+
+Auth uses stateless JWT access tokens. Set `JWT_ACCESS_SECRET` to a strong secret in `.env`; the `.env.example` value is only for local development.
 
 Health check:
 

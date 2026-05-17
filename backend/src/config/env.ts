@@ -9,7 +9,9 @@ const envSchema = z.object({
     .url()
     .default("postgresql://postgres:postgres@localhost:5432/courtsphere?schema=public"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
-  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info")
+  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  JWT_ACCESS_SECRET: z.string().min(32).default("local-development-jwt-secret-change-me"),
+  JWT_ACCESS_EXPIRES_IN: z.string().default("1h")
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

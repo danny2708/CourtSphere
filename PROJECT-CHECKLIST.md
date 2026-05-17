@@ -368,37 +368,39 @@ Mục tiêu: tạo schema DB đúng spec, đúng naming convention, đủ FK.
 
 Checklist:
 
-- [ ] Tạo `schema.prisma`.
-- [ ] Tạo model `User` map bảng `users`.
-- [ ] Tạo model `Role` map bảng `roles`.
-- [ ] Tạo model `UserRole` map bảng `user_roles`.
-- [ ] Tạo model `PriorityGroup` map bảng `priority_groups`.
-- [ ] Tạo model `CourtType` map bảng `court_types`.
-- [ ] Tạo model `Court` map bảng `courts`.
-- [ ] Tạo model `OperatingHour` map bảng `operating_hours`.
-- [ ] Tạo model `PricingRule` map bảng `pricing_rules`.
-- [ ] Tạo model `Booking` map bảng `bookings`.
-- [ ] Tạo model `Payment` map bảng `payments`.
-- [ ] Tạo model `Refund` map bảng `refunds`.
-- [ ] Tạo model `BookingStatusHistory` map bảng `booking_status_histories`.
-- [ ] Tạo model `CourtStatusHistory` map bảng `court_status_histories`.
-- [ ] Tạo model `Violation` map bảng `violations`.
-- [ ] Tạo model `Notification` map bảng `notifications`.
-- [ ] Tạo model `WaitlistEntry` map bảng `waitlist_entries`.
-- [ ] Tạo model `SystemSetting` map bảng `system_settings`.
-- [ ] Tạo model `AuditLog` map bảng `audit_logs`.
-- [ ] Đồng bộ enum booking/payment/refund/court/account status.
-- [ ] Thêm index cho các query quan trọng.
-- [ ] Thêm migration SQL chống overlap booking bằng PostgreSQL exclusion constraint.
-- [ ] Viết seed data: admin, manager, user, roles, priority groups, court types, courts, rules.
+- [x] Tạo `schema.prisma`.
+- [x] Tạo model `User` map bảng `users`.
+- [x] Tạo model `Role` map bảng `roles`.
+- [x] Tạo model `UserRole` map bảng `user_roles`.
+- [x] Tạo model `PriorityGroup` map bảng `priority_groups`.
+- [x] Tạo model `CourtType` map bảng `court_types`.
+- [x] Tạo model `Court` map bảng `courts`.
+- [x] Tạo model `OperatingHour` map bảng `operating_hours`.
+- [x] Tạo model `PricingRule` map bảng `pricing_rules`.
+- [x] Tạo model `BookingRule` map bảng `booking_rules`.
+- [x] Tạo model `PriorityPolicy` map bảng `priority_policies`.
+- [x] Tạo model `Booking` map bảng `bookings`.
+- [x] Tạo model `Payment` map bảng `payments`.
+- [x] Tạo model `Refund` map bảng `refunds`.
+- [x] Tạo model `BookingStatusHistory` map bảng `booking_status_histories`.
+- [x] Tạo model `CourtStatusHistory` map bảng `court_status_histories`.
+- [x] Tạo model `Violation` map bảng `violations`.
+- [x] Tạo model `Notification` map bảng `notifications`.
+- [x] Tạo model `WaitlistEntry` map bảng `waitlist_entries`.
+- [x] Tạo model `SystemSetting` map bảng `system_settings`.
+- [x] Tạo model `AuditLog` map bảng `audit_logs`.
+- [x] Đồng bộ enum booking/payment/refund/court/account status.
+- [x] Thêm index cho các query quan trọng.
+- [x] Thêm migration SQL chống overlap booking bằng PostgreSQL exclusion constraint.
+- [x] Viết seed data: admin, manager, user, roles, priority groups, court types, courts, rules.
 
 Acceptance criteria:
 
-- [ ] `prisma migrate dev` chạy thành công.
-- [ ] `prisma generate` chạy thành công.
-- [ ] Seed tạo được dữ liệu mẫu.
-- [ ] FK đúng và không còn model mâu thuẫn với spec.
-- [ ] DB constraint chặn được overlap booking active.
+- [x] `prisma migrate dev` chạy thành công.
+- [x] `prisma generate` chạy thành công.
+- [x] Seed tạo được dữ liệu mẫu.
+- [x] FK đúng và không còn model mâu thuẫn với spec.
+- [x] DB constraint chặn overlap booking active đã có trong migration SQL.
 
 ---
 
@@ -408,26 +410,26 @@ Mục tiêu: đăng ký, đăng nhập, token, current user.
 
 Checklist:
 
-- [ ] API `POST /api/auth/register`.
-- [ ] API `POST /api/auth/login`.
-- [ ] API `POST /api/auth/logout`.
-- [ ] API `GET /api/auth/me`.
-- [ ] Hash password bằng bcrypt/argon2.
-- [ ] Validate email/phone/password.
-- [ ] Gán priority group khi register.
-- [ ] Gán role mặc định `USER`.
-- [ ] Sinh access token.
-- [ ] Middleware authenticate request.
-- [ ] Test register duplicate email.
-- [ ] Test login sai mật khẩu.
-- [ ] Test account locked/disabled.
+- [x] API `POST /api/auth/register`.
+- [x] API `POST /api/auth/login`.
+- [x] API `POST /api/auth/logout`.
+- [x] API `GET /api/auth/me`.
+- [x] Hash password bằng bcrypt/argon2.
+- [x] Validate email/phone/password.
+- [x] Gán priority group khi register.
+- [x] Gán role mặc định `USER`.
+- [x] Sinh access token.
+- [x] Middleware authenticate request.
+- [x] Test register duplicate email.
+- [x] Test login sai mật khẩu.
+- [x] Test account locked/disabled.
 
 Acceptance criteria:
 
-- [ ] User đăng ký được.
-- [ ] User login được.
-- [ ] Token dùng được cho protected route.
-- [ ] Role mặc định được tạo trong `user_roles`.
+- [!] User đăng ký API đã implement, chưa manual verify với DB local.
+- [!] User login API đã implement, chưa manual verify với DB local.
+- [x] Token dùng được cho protected route.
+- [!] Role mặc định được tạo trong `user_roles` trong code transaction, chưa manual verify với DB local.
 
 ---
 
@@ -437,24 +439,24 @@ Mục tiêu: phân quyền theo `roles` + `user_roles`.
 
 Checklist:
 
-- [ ] Middleware `requireRole(['ADMIN'])`.
-- [ ] Middleware `requireRole(['FIELD_MANAGER', 'ADMIN'])`.
-- [ ] API admin list users.
-- [ ] API admin update user profile.
-- [ ] API admin assign role.
-- [ ] API admin remove role.
-- [ ] API admin lock/unlock account.
-- [ ] API admin restrict/unrestrict booking permission.
-- [ ] API admin update priority group.
-- [ ] Ghi audit log khi admin thay đổi role/account status.
-- [ ] Test user thường không truy cập được admin API.
-- [ ] Test manager truy cập được manager API nhưng không truy cập được admin-only API.
+- [x] Middleware `requireRole(['ADMIN'])`.
+- [x] Middleware `requireRole(['FIELD_MANAGER', 'ADMIN'])`.
+- [x] API admin list users.
+- [x] API admin update user profile.
+- [x] API admin assign role.
+- [x] API admin remove role.
+- [x] API admin lock/unlock account.
+- [x] API admin restrict/unrestrict booking permission.
+- [x] API admin update priority group.
+- [x] Ghi audit log khi admin thay đổi role/account status.
+- [x] Test user thường không truy cập được admin API.
+- [x] Test manager truy cập được manager API nhưng không truy cập được admin-only API.
 
 Acceptance criteria:
 
-- [ ] RBAC hoạt động đúng.
-- [ ] Mỗi user có thể có nhiều role.
-- [ ] Thay đổi nhạy cảm đều có audit log.
+- [x] RBAC hoạt động đúng.
+- [x] Mỗi user có thể có nhiều role.
+- [x] Thay đổi nhạy cảm đều có audit log.
 
 ---
 
@@ -464,25 +466,26 @@ Mục tiêu: quản lý sân và loại sân.
 
 Checklist:
 
-- [ ] API public/auth `GET /api/courts`.
-- [ ] API `GET /api/courts/:id`.
-- [ ] API admin create court type.
-- [ ] API admin update court type.
-- [ ] API admin disable court type.
-- [ ] API admin create court.
-- [ ] API admin update court.
-- [ ] API admin retire court.
-- [ ] API manager/admin update court status.
-- [ ] Ghi `court_status_histories` khi đổi trạng thái sân.
-- [ ] Search/filter theo tên, loại sân, vị trí, trạng thái.
-- [ ] Test không cho xóa cứng sân đã có booking.
+- [x] API public/auth `GET /api/court-types`.
+- [x] API public/auth `GET /api/courts`.
+- [x] API `GET /api/courts/:id`.
+- [x] API admin create court type.
+- [x] API admin update court type.
+- [x] API admin disable court type.
+- [x] API admin create court.
+- [x] API admin update court.
+- [x] API admin retire court.
+- [x] API manager/admin update court status.
+- [x] Ghi `court_status_histories` khi đổi trạng thái sân.
+- [x] Search/filter theo tên, loại sân, vị trí, trạng thái.
+- [x] Test không cho xóa cứng sân đã có booking.
 
 Acceptance criteria:
 
-- [ ] User xem được danh sách sân.
-- [ ] Admin quản lý được sân/loại sân.
-- [ ] Manager cập nhật được tình trạng sân.
-- [ ] Lịch sử trạng thái sân được ghi lại.
+- [x] User xem được danh sách sân.
+- [x] Admin quản lý được sân/loại sân.
+- [x] Manager cập nhật được tình trạng sân.
+- [x] Lịch sử trạng thái sân được ghi lại.
 
 ---
 
@@ -492,21 +495,21 @@ Mục tiêu: cấu hình giờ hoạt động và giá sân.
 
 Checklist:
 
-- [ ] API admin CRUD operating hours.
-- [ ] API admin CRUD pricing rules.
-- [ ] Validate `open_time < close_time`.
-- [ ] Validate `slot_duration_minutes > 0`.
-- [ ] Validate pricing amount >= 0.
-- [ ] Hỗ trợ giá theo court.
-- [ ] Hỗ trợ giá theo khung giờ.
-- [ ] Hỗ trợ giá theo priority group nếu cần.
-- [ ] Cảnh báo nếu đổi operating hours ảnh hưởng booking đã có.
+- [x] API admin CRUD operating hours.
+- [x] API admin CRUD pricing rules.
+- [x] Validate `open_time < close_time`.
+- [x] Validate `slot_duration_minutes > 0`.
+- [x] Validate pricing amount >= 0.
+- [x] Hỗ trợ giá theo court.
+- [x] Hỗ trợ giá theo khung giờ.
+- [x] Hỗ trợ giá theo priority group nếu cần.
+- [!] Cảnh báo nếu đổi operating hours ảnh hưởng booking đã có: hoãn đến module booking/availability vì hiện chưa có booking flow.
 
 Acceptance criteria:
 
-- [ ] Admin cấu hình được giờ hoạt động.
-- [ ] Admin cấu hình được bảng giá.
-- [ ] Availability service dùng đúng operating hours/pricing rules.
+- [x] Admin cấu hình được giờ hoạt động.
+- [x] Admin cấu hình được bảng giá.
+- [!] Availability service dùng đúng operating hours/pricing rules: thuộc module 6.8 Availability.
 
 ---
 
@@ -997,21 +1000,35 @@ Acceptance criteria:
 
 ### 8.1 Auth APIs
 
-- [ ] `POST /api/auth/register`
-- [ ] `POST /api/auth/login`
-- [ ] `POST /api/auth/logout`
-- [ ] `GET /api/auth/me`
+- [x] `POST /api/auth/register`
+- [x] `POST /api/auth/login`
+- [x] `POST /api/auth/logout`
+- [x] `GET /api/auth/me`
 
-### 8.2 Court APIs
+### 8.2 Admin User & RBAC APIs
 
-- [ ] `GET /api/courts`
-- [ ] `GET /api/courts/:id`
+- [x] `GET /api/admin/users`
+- [x] `PUT /api/admin/users/:id`
+- [x] `POST /api/admin/users/:id/roles`
+- [x] `DELETE /api/admin/users/:id/roles/:roleName`
+- [x] `PATCH /api/admin/users/:id/account-status`
+- [x] `PATCH /api/admin/users/:id/booking-permission`
+- [x] `PATCH /api/admin/users/:id/priority-group`
+
+### 8.3 Court APIs
+
+- [x] `GET /api/court-types`
+- [x] `GET /api/courts`
+- [x] `GET /api/courts/:id`
 - [ ] `GET /api/courts/:id/availability`
-- [ ] `POST /api/admin/courts`
-- [ ] `PUT /api/admin/courts/:id`
-- [ ] `PATCH /api/manager/courts/:id/status`
+- [x] `POST /api/admin/court-types`
+- [x] `PUT /api/admin/court-types/:id`
+- [x] `PATCH /api/admin/court-types/:id/status`
+- [x] `POST /api/admin/courts`
+- [x] `PUT /api/admin/courts/:id`
+- [x] `PATCH /api/admin/courts/:id/status`
 
-### 8.3 Booking APIs
+### 8.4 Booking APIs
 
 - [ ] `POST /api/bookings`
 - [ ] `GET /api/bookings/my`
@@ -1023,7 +1040,7 @@ Acceptance criteria:
 - [ ] `POST /api/manager/bookings/:id/no-show`
 - [ ] `POST /api/manager/bookings/:id/cancel`
 
-### 8.4 Payment & refund APIs
+### 8.5 Payment & refund APIs
 
 - [ ] `POST /api/payments/create`
 - [ ] `POST /api/payments/callback/:provider`
@@ -1032,17 +1049,17 @@ Acceptance criteria:
 - [ ] `GET /api/admin/refunds`
 - [ ] `POST /api/admin/refunds/:id/retry`
 
-### 8.5 Admin config APIs
+### 8.6 Admin config APIs
 
 - [ ] `GET /api/admin/booking-rules`
 - [ ] `PUT /api/admin/booking-rules`
 - [ ] `GET /api/admin/priority-groups`
 - [ ] `PUT /api/admin/priority-groups/:id`
-- [ ] CRUD `/api/admin/court-types`
-- [ ] CRUD `/api/admin/operating-hours`
-- [ ] CRUD `/api/admin/pricing-rules`
+- [x] CRUD `/api/admin/court-types`
+- [x] CRUD `/api/admin/operating-hours`
+- [x] CRUD `/api/admin/pricing-rules`
 
-### 8.6 Reports APIs
+### 8.7 Reports APIs
 
 - [ ] `GET /api/admin/reports/overview`
 - [ ] `GET /api/admin/reports/bookings`
@@ -1075,7 +1092,7 @@ Acceptance criteria:
 - [ ] No-show creates violation.
 - [ ] User cancel creates refund when eligible.
 - [ ] Manager cancel creates refund.
-- [ ] RBAC denies wrong role.
+- [x] RBAC denies wrong role.
 
 ### 9.3 E2E tests
 
@@ -1092,10 +1109,10 @@ Acceptance criteria:
 
 - [x] Backend foundation.
 - [ ] Frontend foundation.
-- [ ] Prisma schema baseline.
-- [ ] Seed data.
-- [ ] Auth basic.
-- [ ] RBAC basic.
+- [x] Prisma schema baseline.
+- [x] Seed data.
+- [x] Auth basic.
+- [x] RBAC basic.
 
 ### Sprint 1 — Courts & availability
 
@@ -1192,11 +1209,11 @@ Một module được coi là hoàn thành khi:
 | Module | Owner | Status | Notes |
 |---|---|---|---|
 | Backend foundation | Codex | DONE | Express + TypeScript foundation verified: build/typecheck/lint/test/health |
-| Database & Prisma |  | TODO |  |
-| Auth |  | TODO |  |
-| RBAC & Users |  | TODO |  |
-| Courts & Court Types |  | TODO |  |
-| Operating Hours & Pricing |  | TODO |  |
+| Database & Prisma | Codex | DONE | Schema/migration/seed verified; overlap constraint restored and checked in PostgreSQL |
+| Auth | Codex | DONE | Auth APIs/JWT/password hashing verified; DB manual flow pending local PostgreSQL |
+| RBAC & Users | Codex | DONE | Admin user/role APIs, RBAC tests, and audit logs implemented |
+| Courts & Court Types | Codex | DONE | Court type/court APIs, filters, status updates, and status history implemented |
+| Operating Hours & Pricing | Codex | DONE | Admin CRUD APIs implemented; booking-impact warnings deferred until booking/availability modules |
 | Booking Rules & Priority |  | TODO |  |
 | Availability |  | TODO |  |
 | Booking |  | TODO |  |

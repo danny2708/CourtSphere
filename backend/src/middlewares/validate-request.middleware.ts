@@ -32,7 +32,12 @@ export function validateRequest(schemas: RequestSchemas): RequestHandler {
       }
 
       if (schemas.query) {
-        req.query = parseSchema(schemas.query, req.query, "query") as typeof req.query;
+        Object.defineProperty(req, "query", {
+          value: parseSchema(schemas.query, req.query, "query"),
+          configurable: true,
+          enumerable: true,
+          writable: true
+        });
       }
 
       if (schemas.params) {
