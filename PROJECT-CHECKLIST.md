@@ -396,9 +396,9 @@ Checklist:
 
 Acceptance criteria:
 
-- [!] `prisma migrate dev` chưa chạy được vì chưa có PostgreSQL local/Docker daemon.
+- [x] `prisma migrate dev` chạy thành công.
 - [x] `prisma generate` chạy thành công.
-- [!] Seed script đã tạo/typecheck, chưa chạy được vì chưa có PostgreSQL local/Docker daemon.
+- [x] Seed tạo được dữ liệu mẫu.
 - [x] FK đúng và không còn model mâu thuẫn với spec.
 - [x] DB constraint chặn overlap booking active đã có trong migration SQL.
 
@@ -1194,7 +1194,7 @@ Một module được coi là hoàn thành khi:
 | Module | Owner | Status | Notes |
 |---|---|---|---|
 | Backend foundation | Codex | DONE | Express + TypeScript foundation verified: build/typecheck/lint/test/health |
-| Database & Prisma | Codex | DONE | Schema/migration/seed verified; DB apply/seed pending local PostgreSQL |
+| Database & Prisma | Codex | DONE | Schema/migration/seed verified; overlap constraint restored and checked in PostgreSQL |
 | Auth | Codex | DONE | Auth APIs/JWT/password hashing verified; DB manual flow pending local PostgreSQL |
 | RBAC & Users | Codex | PARTIAL | Role middleware done; admin user/role APIs not started |
 | Courts & Court Types |  | TODO |  |

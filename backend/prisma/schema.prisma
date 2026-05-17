@@ -306,31 +306,32 @@ model PriorityPolicy {
 }
 
 model Booking {
-  bookingId            String        @id @default(uuid()) @map("booking_id") @db.Uuid
-  bookingCode          String        @unique @map("booking_code")
-  userId               String        @map("user_id") @db.Uuid
-  courtId              String        @map("court_id") @db.Uuid
-  startDatetime        DateTime      @map("start_datetime") @db.Timestamptz(3)
-  endDatetime          DateTime      @map("end_datetime") @db.Timestamptz(3)
-  participantCount     Int           @map("participant_count")
-  usagePurpose         String        @map("usage_purpose")
-  totalAmount          Decimal       @map("total_amount") @db.Decimal(12, 2)
-  bookingStatus        BookingStatus @default(PENDING_PAYMENT) @map("booking_status")
-  paymentStatus        PaymentStatus @default(INITIATED) @map("payment_status")
-  refundable           Boolean       @default(true)
-  holdExpiresAt        DateTime?     @map("hold_expires_at")
-  cancelReason         String?       @map("cancel_reason")
-  cancelledByUserId    String?       @map("cancelled_by_user_id") @db.Uuid
-  cancelledAt          DateTime?     @map("cancelled_at")
-  checkedInByUserId    String?       @map("checked_in_by_user_id") @db.Uuid
-  completedByUserId    String?       @map("completed_by_user_id") @db.Uuid
-  noShowMarkedByUserId String?       @map("no_show_marked_by_user_id") @db.Uuid
-  managerNote          String?       @map("manager_note")
-  noRefundReason       String?       @map("no_refund_reason")
-  checkinTime          DateTime?     @map("checkin_time")
-  checkoutTime         DateTime?     @map("checkout_time")
-  createdAt            DateTime      @default(now()) @map("created_at")
-  updatedAt            DateTime      @updatedAt @map("updated_at")
+  bookingId            String                    @id @default(uuid()) @map("booking_id") @db.Uuid
+  bookingCode          String                    @unique @map("booking_code")
+  userId               String                    @map("user_id") @db.Uuid
+  courtId              String                    @map("court_id") @db.Uuid
+  startDatetime        DateTime                  @map("start_datetime") @db.Timestamptz(3)
+  endDatetime          DateTime                  @map("end_datetime") @db.Timestamptz(3)
+  bookingTimeRange     Unsupported("tstzrange")? @default(dbgenerated("tstzrange(start_datetime, end_datetime, '[)'::text)")) @map("booking_time_range")
+  participantCount     Int                       @map("participant_count")
+  usagePurpose         String                    @map("usage_purpose")
+  totalAmount          Decimal                   @map("total_amount") @db.Decimal(12, 2)
+  bookingStatus        BookingStatus             @default(PENDING_PAYMENT) @map("booking_status")
+  paymentStatus        PaymentStatus             @default(INITIATED) @map("payment_status")
+  refundable           Boolean                   @default(true)
+  holdExpiresAt        DateTime?                 @map("hold_expires_at")
+  cancelReason         String?                   @map("cancel_reason")
+  cancelledByUserId    String?                   @map("cancelled_by_user_id") @db.Uuid
+  cancelledAt          DateTime?                 @map("cancelled_at")
+  checkedInByUserId    String?                   @map("checked_in_by_user_id") @db.Uuid
+  completedByUserId    String?                   @map("completed_by_user_id") @db.Uuid
+  noShowMarkedByUserId String?                   @map("no_show_marked_by_user_id") @db.Uuid
+  managerNote          String?                   @map("manager_note")
+  noRefundReason       String?                   @map("no_refund_reason")
+  checkinTime          DateTime?                 @map("checkin_time")
+  checkoutTime         DateTime?                 @map("checkout_time")
+  createdAt            DateTime                  @default(now()) @map("created_at")
+  updatedAt            DateTime                  @updatedAt @map("updated_at")
 
   user                   User                   @relation("BookingOwner", fields: [userId], references: [userId])
   court                  Court                  @relation(fields: [courtId], references: [courtId])
@@ -347,6 +348,7 @@ model Booking {
   @@index([userId])
   @@index([courtId, startDatetime, endDatetime])
   @@index([bookingStatus])
+  @@index([courtId(ops: raw("gist_uuid_ops")), bookingTimeRange], map: "bookings_time_range_idx", type: Gist)
   @@index([paymentStatus])
   @@map("bookings")
 }
