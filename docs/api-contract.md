@@ -149,6 +149,123 @@ Response `200`:
 
 Logout is stateless in the MVP. Token blacklist/revocation is not implemented yet.
 
+## Admin User & RBAC APIs
+
+All endpoints below require `Authorization: Bearer <accessToken>` and `ADMIN`.
+
+### `GET /api/admin/users`
+
+Lists users for administration. Supports optional filters: `keyword`, `accountStatus`, `bookingPermissionStatus`, `roleName`, `priorityGroupId`.
+
+Response `200`:
+
+```json
+{
+  "users": [
+    {
+      "id": "uuid",
+      "fullName": "Nguyen Van A",
+      "email": "user@example.com",
+      "phoneNumber": "0900000000",
+      "identityCode": "STUDENT001",
+      "accountStatus": "ACTIVE",
+      "bookingPermissionStatus": "ALLOWED",
+      "bookingLockedUntil": null,
+      "violationPoints": 0,
+      "reputationPoints": 100,
+      "roles": ["USER", "FIELD_MANAGER"],
+      "priorityGroup": {
+        "id": "uuid",
+        "code": "STUDENT",
+        "priorityLevel": 2,
+        "advanceBookingDays": 7
+      }
+    }
+  ]
+}
+```
+
+### `PUT /api/admin/users/:id`
+
+Updates profile fields. Accepts at least one field.
+
+Request:
+
+```json
+{
+  "fullName": "Nguyen Van B",
+  "email": "user2@example.com",
+  "phoneNumber": "0911111111",
+  "identityCode": "STUDENT002"
+}
+```
+
+`phoneNumber` and `identityCode` can be `null` to clear them. Email, phone number, and identity code remain unique.
+
+### `POST /api/admin/users/:id/roles`
+
+Assigns a role through `user_roles`. Existing roles are preserved, so a user can have multiple roles.
+
+Request:
+
+```json
+{
+  "roleName": "FIELD_MANAGER"
+}
+```
+
+Allowed roles: `USER`, `FIELD_MANAGER`, `ADMIN`.
+
+### `DELETE /api/admin/users/:id/roles/:roleName`
+
+Removes one role assignment from `user_roles`.
+
+### `PATCH /api/admin/users/:id/account-status`
+
+Locks, unlocks, or disables an account.
+
+Request:
+
+```json
+{
+  "accountStatus": "LOCKED",
+  "reason": "Policy violation"
+}
+```
+
+Allowed statuses: `ACTIVE`, `LOCKED`, `DISABLED`.
+
+### `PATCH /api/admin/users/:id/booking-permission`
+
+Restricts or restores booking permission.
+
+Request:
+
+```json
+{
+  "bookingPermissionStatus": "RESTRICTED",
+  "bookingLockedUntil": "2026-05-24T00:00:00.000Z",
+  "reason": "Too many violations"
+}
+```
+
+Allowed statuses: `ALLOWED`, `RESTRICTED`. Setting status to `ALLOWED` clears `bookingLockedUntil`.
+
+### `PATCH /api/admin/users/:id/priority-group`
+
+Updates the user's priority group.
+
+Request:
+
+```json
+{
+  "priorityGroupId": "uuid",
+  "reason": "Verified staff"
+}
+```
+
+Admin changes to profile, roles, account status, booking permission, and priority group create `audit_logs` records.
+
 ## Court APIs
 
 All endpoints below require `Authorization: Bearer <accessToken>`.

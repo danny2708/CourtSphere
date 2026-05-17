@@ -441,22 +441,22 @@ Checklist:
 
 - [x] Middleware `requireRole(['ADMIN'])`.
 - [x] Middleware `requireRole(['FIELD_MANAGER', 'ADMIN'])`.
-- [ ] API admin list users.
-- [ ] API admin update user profile.
-- [ ] API admin assign role.
-- [ ] API admin remove role.
-- [ ] API admin lock/unlock account.
-- [ ] API admin restrict/unrestrict booking permission.
-- [ ] API admin update priority group.
-- [ ] Ghi audit log khi admin thay đổi role/account status.
-- [ ] Test user thường không truy cập được admin API.
-- [ ] Test manager truy cập được manager API nhưng không truy cập được admin-only API.
+- [x] API admin list users.
+- [x] API admin update user profile.
+- [x] API admin assign role.
+- [x] API admin remove role.
+- [x] API admin lock/unlock account.
+- [x] API admin restrict/unrestrict booking permission.
+- [x] API admin update priority group.
+- [x] Ghi audit log khi admin thay đổi role/account status.
+- [x] Test user thường không truy cập được admin API.
+- [x] Test manager truy cập được manager API nhưng không truy cập được admin-only API.
 
 Acceptance criteria:
 
-- [ ] RBAC hoạt động đúng.
-- [ ] Mỗi user có thể có nhiều role.
-- [ ] Thay đổi nhạy cảm đều có audit log.
+- [x] RBAC hoạt động đúng.
+- [x] Mỗi user có thể có nhiều role.
+- [x] Thay đổi nhạy cảm đều có audit log.
 
 ---
 
@@ -1005,7 +1005,17 @@ Acceptance criteria:
 - [x] `POST /api/auth/logout`
 - [x] `GET /api/auth/me`
 
-### 8.2 Court APIs
+### 8.2 Admin User & RBAC APIs
+
+- [x] `GET /api/admin/users`
+- [x] `PUT /api/admin/users/:id`
+- [x] `POST /api/admin/users/:id/roles`
+- [x] `DELETE /api/admin/users/:id/roles/:roleName`
+- [x] `PATCH /api/admin/users/:id/account-status`
+- [x] `PATCH /api/admin/users/:id/booking-permission`
+- [x] `PATCH /api/admin/users/:id/priority-group`
+
+### 8.3 Court APIs
 
 - [x] `GET /api/court-types`
 - [x] `GET /api/courts`
@@ -1018,7 +1028,7 @@ Acceptance criteria:
 - [x] `PUT /api/admin/courts/:id`
 - [x] `PATCH /api/admin/courts/:id/status`
 
-### 8.3 Booking APIs
+### 8.4 Booking APIs
 
 - [ ] `POST /api/bookings`
 - [ ] `GET /api/bookings/my`
@@ -1030,7 +1040,7 @@ Acceptance criteria:
 - [ ] `POST /api/manager/bookings/:id/no-show`
 - [ ] `POST /api/manager/bookings/:id/cancel`
 
-### 8.4 Payment & refund APIs
+### 8.5 Payment & refund APIs
 
 - [ ] `POST /api/payments/create`
 - [ ] `POST /api/payments/callback/:provider`
@@ -1039,7 +1049,7 @@ Acceptance criteria:
 - [ ] `GET /api/admin/refunds`
 - [ ] `POST /api/admin/refunds/:id/retry`
 
-### 8.5 Admin config APIs
+### 8.6 Admin config APIs
 
 - [ ] `GET /api/admin/booking-rules`
 - [ ] `PUT /api/admin/booking-rules`
@@ -1049,7 +1059,7 @@ Acceptance criteria:
 - [x] CRUD `/api/admin/operating-hours`
 - [x] CRUD `/api/admin/pricing-rules`
 
-### 8.6 Reports APIs
+### 8.7 Reports APIs
 
 - [ ] `GET /api/admin/reports/overview`
 - [ ] `GET /api/admin/reports/bookings`
@@ -1082,7 +1092,7 @@ Acceptance criteria:
 - [ ] No-show creates violation.
 - [ ] User cancel creates refund when eligible.
 - [ ] Manager cancel creates refund.
-- [ ] RBAC denies wrong role.
+- [x] RBAC denies wrong role.
 
 ### 9.3 E2E tests
 
@@ -1201,7 +1211,7 @@ Một module được coi là hoàn thành khi:
 | Backend foundation | Codex | DONE | Express + TypeScript foundation verified: build/typecheck/lint/test/health |
 | Database & Prisma | Codex | DONE | Schema/migration/seed verified; overlap constraint restored and checked in PostgreSQL |
 | Auth | Codex | DONE | Auth APIs/JWT/password hashing verified; DB manual flow pending local PostgreSQL |
-| RBAC & Users | Codex | PARTIAL | Role middleware done; admin user/role APIs not started |
+| RBAC & Users | Codex | DONE | Admin user/role APIs, RBAC tests, and audit logs implemented |
 | Courts & Court Types | Codex | DONE | Court type/court APIs, filters, status updates, and status history implemented |
 | Operating Hours & Pricing | Codex | DONE | Admin CRUD APIs implemented; booking-impact warnings deferred until booking/availability modules |
 | Booking Rules & Priority |  | TODO |  |

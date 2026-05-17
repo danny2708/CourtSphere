@@ -6,6 +6,7 @@ import { AppError, errorHandler, notFoundHandler } from "./middlewares/error.mid
 import { requestLogger } from "./middlewares/request-logger.middleware";
 import authRouter from "./modules/auth/auth.routes";
 import courtsRouter from "./modules/courts/courts.routes";
+import usersRouter from "./modules/users/users.routes";
 import healthRouter from "./routes/health.routes";
 
 export const app = express();
@@ -32,6 +33,7 @@ app.use(requestLogger);
 app.use("/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api", courtsRouter);
+app.use("/api/admin", usersRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
