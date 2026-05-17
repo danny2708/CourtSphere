@@ -33,6 +33,122 @@ All backend errors should use this response shape:
 
 `details` is optional and should only contain validation-safe data.
 
+## Auth APIs
+
+### `POST /api/auth/register`
+
+Creates a user, assigns a priority group, and assigns the default `USER` role through `user_roles`.
+
+Request:
+
+```json
+{
+  "fullName": "Nguyen Van A",
+  "email": "user@example.com",
+  "phoneNumber": "0900000000",
+  "password": "password123",
+  "confirmPassword": "password123",
+  "priorityGroupCode": "STUDENT",
+  "identityCode": "STUDENT001"
+}
+```
+
+`priorityGroupCode` must be one of `STAFF`, `STUDENT`, or `EXTERNAL`.
+
+Response `201`:
+
+```json
+{
+  "accessToken": "<jwt>",
+  "tokenType": "Bearer",
+  "user": {
+    "id": "uuid",
+    "fullName": "Nguyen Van A",
+    "email": "user@example.com",
+    "phoneNumber": "0900000000",
+    "identityCode": "STUDENT001",
+    "accountStatus": "ACTIVE",
+    "bookingPermissionStatus": "ALLOWED",
+    "roles": ["USER"],
+    "priorityGroup": {
+      "id": "uuid",
+      "code": "STUDENT",
+      "priorityLevel": 2,
+      "advanceBookingDays": 7
+    }
+  }
+}
+```
+
+Conflict errors:
+
+- `EMAIL_ALREADY_EXISTS`
+- `PHONE_ALREADY_EXISTS`
+- `IDENTITY_CODE_ALREADY_EXISTS`
+
+### `POST /api/auth/login`
+
+Authenticates by email and password. `LOCKED` or `DISABLED` accounts cannot log in.
+
+Request:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
+```
+
+Response `200`: same response shape as register.
+
+Auth errors:
+
+- `INVALID_CREDENTIALS`
+- `ACCOUNT_LOCKED`
+- `ACCOUNT_DISABLED`
+
+### `GET /api/auth/me`
+
+Requires `Authorization: Bearer <accessToken>`.
+
+Response `200`:
+
+```json
+{
+  "user": {
+    "id": "uuid",
+    "fullName": "Nguyen Van A",
+    "email": "user@example.com",
+    "phoneNumber": "0900000000",
+    "identityCode": "STUDENT001",
+    "accountStatus": "ACTIVE",
+    "bookingPermissionStatus": "ALLOWED",
+    "roles": ["USER"],
+    "priorityGroup": {
+      "id": "uuid",
+      "code": "STUDENT",
+      "priorityLevel": 2,
+      "advanceBookingDays": 7
+    }
+  }
+}
+```
+
+### `POST /api/auth/logout`
+
+Requires `Authorization: Bearer <accessToken>`.
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Logged out. JWT blacklist is not enabled in the MVP."
+}
+```
+
+Logout is stateless in the MVP. Token blacklist/revocation is not implemented yet.
+
 ## Database Contract Baseline
 
 The MVP database uses PostgreSQL through Prisma.

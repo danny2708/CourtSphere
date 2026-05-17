@@ -410,26 +410,26 @@ Mục tiêu: đăng ký, đăng nhập, token, current user.
 
 Checklist:
 
-- [ ] API `POST /api/auth/register`.
-- [ ] API `POST /api/auth/login`.
-- [ ] API `POST /api/auth/logout`.
-- [ ] API `GET /api/auth/me`.
-- [ ] Hash password bằng bcrypt/argon2.
-- [ ] Validate email/phone/password.
-- [ ] Gán priority group khi register.
-- [ ] Gán role mặc định `USER`.
-- [ ] Sinh access token.
-- [ ] Middleware authenticate request.
-- [ ] Test register duplicate email.
-- [ ] Test login sai mật khẩu.
-- [ ] Test account locked/disabled.
+- [x] API `POST /api/auth/register`.
+- [x] API `POST /api/auth/login`.
+- [x] API `POST /api/auth/logout`.
+- [x] API `GET /api/auth/me`.
+- [x] Hash password bằng bcrypt/argon2.
+- [x] Validate email/phone/password.
+- [x] Gán priority group khi register.
+- [x] Gán role mặc định `USER`.
+- [x] Sinh access token.
+- [x] Middleware authenticate request.
+- [x] Test register duplicate email.
+- [x] Test login sai mật khẩu.
+- [x] Test account locked/disabled.
 
 Acceptance criteria:
 
-- [ ] User đăng ký được.
-- [ ] User login được.
-- [ ] Token dùng được cho protected route.
-- [ ] Role mặc định được tạo trong `user_roles`.
+- [!] User đăng ký API đã implement, chưa manual verify với DB local.
+- [!] User login API đã implement, chưa manual verify với DB local.
+- [x] Token dùng được cho protected route.
+- [!] Role mặc định được tạo trong `user_roles` trong code transaction, chưa manual verify với DB local.
 
 ---
 
@@ -439,8 +439,8 @@ Mục tiêu: phân quyền theo `roles` + `user_roles`.
 
 Checklist:
 
-- [ ] Middleware `requireRole(['ADMIN'])`.
-- [ ] Middleware `requireRole(['FIELD_MANAGER', 'ADMIN'])`.
+- [x] Middleware `requireRole(['ADMIN'])`.
+- [x] Middleware `requireRole(['FIELD_MANAGER', 'ADMIN'])`.
 - [ ] API admin list users.
 - [ ] API admin update user profile.
 - [ ] API admin assign role.
@@ -999,10 +999,10 @@ Acceptance criteria:
 
 ### 8.1 Auth APIs
 
-- [ ] `POST /api/auth/register`
-- [ ] `POST /api/auth/login`
-- [ ] `POST /api/auth/logout`
-- [ ] `GET /api/auth/me`
+- [x] `POST /api/auth/register`
+- [x] `POST /api/auth/login`
+- [x] `POST /api/auth/logout`
+- [x] `GET /api/auth/me`
 
 ### 8.2 Court APIs
 
@@ -1096,8 +1096,8 @@ Acceptance criteria:
 - [ ] Frontend foundation.
 - [x] Prisma schema baseline.
 - [x] Seed data.
-- [ ] Auth basic.
-- [ ] RBAC basic.
+- [x] Auth basic.
+- [x] RBAC basic.
 
 ### Sprint 1 — Courts & availability
 
@@ -1195,8 +1195,8 @@ Một module được coi là hoàn thành khi:
 |---|---|---|---|
 | Backend foundation | Codex | DONE | Express + TypeScript foundation verified: build/typecheck/lint/test/health |
 | Database & Prisma | Codex | DONE | Schema/migration/seed verified; DB apply/seed pending local PostgreSQL |
-| Auth |  | TODO |  |
-| RBAC & Users |  | TODO |  |
+| Auth | Codex | DONE | Auth APIs/JWT/password hashing verified; DB manual flow pending local PostgreSQL |
+| RBAC & Users | Codex | PARTIAL | Role middleware done; admin user/role APIs not started |
 | Courts & Court Types |  | TODO |  |
 | Operating Hours & Pricing |  | TODO |  |
 | Booking Rules & Priority |  | TODO |  |

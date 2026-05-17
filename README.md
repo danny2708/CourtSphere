@@ -77,6 +77,8 @@ copy .env.example .env
 npm run dev
 ```
 
+Auth uses stateless JWT access tokens. Set `JWT_ACCESS_SECRET` to a strong secret in `.env`; the `.env.example` value is only for local development.
+
 Health check:
 
 ```bash
