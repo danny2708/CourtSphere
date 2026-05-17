@@ -149,6 +149,246 @@ Response `200`:
 
 Logout is stateless in the MVP. Token blacklist/revocation is not implemented yet.
 
+## Court APIs
+
+All endpoints below require `Authorization: Bearer <accessToken>`.
+
+### `GET /api/court-types`
+
+Lists court types.
+
+Response `200`:
+
+```json
+{
+  "courtTypes": [
+    {
+      "id": "uuid",
+      "typeName": "Football",
+      "description": "Outdoor football fields",
+      "status": "ACTIVE",
+      "createdAt": "2026-05-17T00:00:00.000Z",
+      "updatedAt": "2026-05-17T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+### `POST /api/admin/court-types`
+
+Requires `ADMIN`.
+
+Request:
+
+```json
+{
+  "typeName": "Football",
+  "description": "Outdoor football fields"
+}
+```
+
+Response `201`:
+
+```json
+{
+  "courtType": {
+    "id": "uuid",
+    "typeName": "Football",
+    "description": "Outdoor football fields",
+    "status": "ACTIVE"
+  }
+}
+```
+
+### `PUT /api/admin/court-types/:id`
+
+Requires `ADMIN`. Accepts at least one of `typeName` or `description`.
+
+### `PATCH /api/admin/court-types/:id/status`
+
+Requires `ADMIN`. This is the soft-disable path for court types; no hard-delete endpoint is exposed.
+
+Request:
+
+```json
+{
+  "status": "INACTIVE"
+}
+```
+
+### `GET /api/courts`
+
+Lists courts. Supports optional filters: `keyword`, `courtTypeId`, `status`, `location`.
+
+Response `200`:
+
+```json
+{
+  "courts": [
+    {
+      "id": "uuid",
+      "courtName": "Main Field",
+      "location": "North Campus",
+      "capacity": 22,
+      "description": "Full-size outdoor field",
+      "imageUrl": "https://example.com/court.jpg",
+      "status": "ACTIVE",
+      "courtType": {
+        "id": "uuid",
+        "typeName": "Football",
+        "description": "Outdoor football fields",
+        "status": "ACTIVE"
+      }
+    }
+  ]
+}
+```
+
+### `GET /api/courts/:id`
+
+Returns one court with operating hours and pricing rules.
+
+Response `200`:
+
+```json
+{
+  "court": {
+    "id": "uuid",
+    "courtName": "Main Field",
+    "location": "North Campus",
+    "capacity": 22,
+    "status": "ACTIVE",
+    "courtType": {
+      "id": "uuid",
+      "typeName": "Football"
+    },
+    "operatingHours": [],
+    "pricingRules": []
+  }
+}
+```
+
+### `POST /api/admin/courts`
+
+Requires `ADMIN`.
+
+Request:
+
+```json
+{
+  "courtTypeId": "uuid",
+  "courtName": "Main Field",
+  "location": "North Campus",
+  "capacity": 22,
+  "description": "Full-size outdoor field",
+  "imageUrl": "https://example.com/court.jpg"
+}
+```
+
+### `PUT /api/admin/courts/:id`
+
+Requires `ADMIN`. Accepts any subset of create fields.
+
+### `PATCH /api/admin/courts/:id/status`
+
+Requires `ADMIN` or `FIELD_MANAGER`. This is the soft-retire/maintenance path for courts; no hard-delete endpoint is exposed. Status changes create `court_status_histories` when the status value changes.
+
+Request:
+
+```json
+{
+  "status": "MAINTENANCE",
+  "reason": "Scheduled maintenance"
+}
+```
+
+Allowed statuses: `ACTIVE`, `MAINTENANCE`, `TEMP_CLOSED`, `RETIRED`.
+
+### `GET /api/admin/courts/:courtId/operating-hours`
+
+Requires `ADMIN`.
+
+### `POST /api/admin/courts/:courtId/operating-hours`
+
+Requires `ADMIN`.
+
+Request:
+
+```json
+{
+  "weekday": 1,
+  "openTime": "08:00",
+  "closeTime": "20:00",
+  "slotDurationMinutes": 60
+}
+```
+
+Validation:
+
+- `weekday` must be `1..7`.
+- `openTime` must be earlier than `closeTime`.
+- `slotDurationMinutes` must be greater than `0`.
+
+### `PUT /api/admin/operating-hours/:id`
+
+Requires `ADMIN`. Accepts any subset of operating-hour fields.
+
+### `PATCH /api/admin/operating-hours/:id/status`
+
+Requires `ADMIN`.
+
+Request:
+
+```json
+{
+  "status": "INACTIVE"
+}
+```
+
+### `GET /api/admin/courts/:courtId/pricing-rules`
+
+Requires `ADMIN`.
+
+### `POST /api/admin/courts/:courtId/pricing-rules`
+
+Requires `ADMIN`.
+
+Request:
+
+```json
+{
+  "startTime": "08:00",
+  "endTime": "10:00",
+  "applicableDay": 1,
+  "priceAmount": 50000,
+  "priorityGroupId": "uuid",
+  "effectiveFrom": "2026-05-17T00:00:00.000Z",
+  "effectiveTo": "2026-12-31T23:59:59.999Z"
+}
+```
+
+Validation:
+
+- `startTime` must be earlier than `endTime`.
+- `priceAmount` must be greater than or equal to `0`.
+- `effectiveFrom` must be earlier than or equal to `effectiveTo` when both are provided.
+
+### `PUT /api/admin/pricing-rules/:id`
+
+Requires `ADMIN`. Accepts any subset of pricing-rule fields.
+
+### `PATCH /api/admin/pricing-rules/:id/status`
+
+Requires `ADMIN`.
+
+Request:
+
+```json
+{
+  "status": "INACTIVE"
+}
+```
+
 ## Database Contract Baseline
 
 The MVP database uses PostgreSQL through Prisma.
