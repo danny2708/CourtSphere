@@ -98,7 +98,8 @@ function toPricingRuleDto(pricingRule: PricingRule | PricingRuleWithPriorityGrou
     "priorityGroup" in pricingRule && pricingRule.priorityGroup
       ? {
           id: pricingRule.priorityGroup.priorityGroupId,
-          code: pricingRule.priorityGroup.groupName,
+          code: pricingRule.priorityGroup.groupCode,
+          name: pricingRule.priorityGroup.groupName,
           priorityLevel: pricingRule.priorityGroup.priorityLevel
         }
       : null;
