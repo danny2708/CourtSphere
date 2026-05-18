@@ -14,6 +14,7 @@ export type AuthUserDto = {
   priorityGroup: {
     id: string;
     code: string;
+    name: string;
     priorityLevel: number;
     advanceBookingDays: number;
   } | null;

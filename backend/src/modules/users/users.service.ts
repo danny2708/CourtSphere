@@ -44,7 +44,8 @@ function toAdminUserDto(user: AdminUserWithRelations) {
     priorityGroup: user.priorityGroup
       ? {
           id: user.priorityGroup.priorityGroupId,
-          code: user.priorityGroup.groupName,
+          code: user.priorityGroup.groupCode,
+          name: user.priorityGroup.groupName,
           priorityLevel: user.priorityGroup.priorityLevel,
           advanceBookingDays: user.priorityGroup.advanceBookingDays
         }

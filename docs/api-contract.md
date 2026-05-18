@@ -73,6 +73,7 @@ Response `201`:
     "priorityGroup": {
       "id": "uuid",
       "code": "STUDENT",
+      "name": "Student",
       "priorityLevel": 2,
       "advanceBookingDays": 7
     }
@@ -127,6 +128,7 @@ Response `200`:
     "priorityGroup": {
       "id": "uuid",
       "code": "STUDENT",
+      "name": "Student",
       "priorityLevel": 2,
       "advanceBookingDays": 7
     }
@@ -177,6 +179,7 @@ Response `200`:
       "priorityGroup": {
         "id": "uuid",
         "code": "STUDENT",
+        "name": "Student",
         "priorityLevel": 2,
         "advanceBookingDays": 7
       }
@@ -265,6 +268,161 @@ Request:
 ```
 
 Admin changes to profile, roles, account status, booking permission, and priority group create `audit_logs` records.
+
+## Admin Config APIs
+
+All endpoints below require `Authorization: Bearer <accessToken>` and `ADMIN`. `USER` and `FIELD_MANAGER` are forbidden.
+
+### `GET /api/admin/booking-rules`
+
+Returns the active booking-rule configuration. If no active row exists yet, the service returns the documented fallback defaults and later writes concrete DB rows when updated.
+
+Response `200`:
+
+```json
+{
+  "bookingRules": {
+    "id": "uuid",
+    "ruleName": "DEFAULT",
+    "maxBookingsPerDay": 2,
+    "maxDurationMinutes": 120,
+    "holdMinutes": 10,
+    "cancelBeforeHours": 2,
+    "lateCheckinMinutes": 15,
+    "violationThreshold": 3,
+    "bookingBanDays": 7,
+    "refundRateUserOnTime": 100,
+    "refundRateManagerFault": 100,
+    "status": "ACTIVE",
+    "updatedByUserId": "uuid",
+    "createdAt": "2026-05-18T00:00:00.000Z",
+    "updatedAt": "2026-05-18T00:00:00.000Z"
+  }
+}
+```
+
+### `PUT /api/admin/booking-rules`
+
+Updates the active booking-rule configuration and writes an `audit_logs` record with `entityType = BOOKING_RULE` and `action = ADMIN_UPDATE_BOOKING_RULES`.
+
+Request accepts at least one field:
+
+```json
+{
+  "maxBookingsPerDay": 2,
+  "maxDurationMinutes": 120,
+  "holdMinutes": 10,
+  "cancelBeforeHours": 2,
+  "lateCheckinMinutes": 15,
+  "violationThreshold": 3,
+  "bookingBanDays": 7,
+  "refundRateUserOnTime": 100,
+  "refundRateManagerFault": 100
+}
+```
+
+Validation:
+
+- Count/duration/hold/threshold fields that must be positive reject `0` and negative values.
+- Window fields that can be disabled use `>= 0`.
+- Refund rates must be between `0` and `100`.
+
+### `GET /api/admin/priority-groups`
+
+Lists priority groups and their current user counts.
+
+Response `200`:
+
+```json
+{
+  "priorityGroups": [
+    {
+      "id": "uuid",
+      "groupCode": "STUDENT",
+      "groupName": "Student",
+      "priorityLevel": 2,
+      "advanceBookingDays": 7,
+      "description": "Student users",
+      "status": "ACTIVE",
+      "userCount": 12,
+      "createdAt": "2026-05-18T00:00:00.000Z",
+      "updatedAt": "2026-05-18T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+### `PUT /api/admin/priority-groups/:id`
+
+Updates a priority group and writes an `audit_logs` record with `entityType = PRIORITY_GROUP` and `action = ADMIN_UPDATE_PRIORITY_GROUP`.
+
+Request accepts at least one field:
+
+```json
+{
+  "groupName": "Student",
+  "groupCode": "STUDENT",
+  "priorityLevel": 2,
+  "advanceBookingDays": 7,
+  "description": "Student users",
+  "status": "ACTIVE"
+}
+```
+
+`groupCode` must be unique. No hard-delete endpoint is exposed for priority groups.
+
+### `GET /api/admin/priority-policies`
+
+Lists priority policies with their linked priority group.
+
+Response `200`:
+
+```json
+{
+  "priorityPolicies": [
+    {
+      "id": "uuid",
+      "priorityGroupId": "uuid",
+      "priorityGroup": {
+        "id": "uuid",
+        "groupCode": "STUDENT",
+        "groupName": "Student"
+      },
+      "policyName": "Student Policy",
+      "priorityRank": 2,
+      "advanceBookingDays": 7,
+      "maxBookingsPerDay": 2,
+      "maxDurationMinutes": 120,
+      "canJoinWaitlist": true,
+      "canBookPrioritySlots": true,
+      "status": "ACTIVE"
+    }
+  ]
+}
+```
+
+### `PUT /api/admin/priority-policies/:id`
+
+Updates a priority policy and writes an `audit_logs` record with `entityType = PRIORITY_POLICY` and `action = ADMIN_UPDATE_PRIORITY_POLICY`.
+
+Request accepts at least one field:
+
+```json
+{
+  "priorityGroupId": "uuid",
+  "priorityRank": 2,
+  "advanceBookingDays": 7,
+  "maxBookingsPerDay": 2,
+  "canJoinWaitlist": true,
+  "status": "ACTIVE"
+}
+```
+
+Validation:
+
+- `priorityRank > 0`.
+- `advanceBookingDays >= 0`.
+- `maxBookingsPerDay > 0` when provided.
 
 ## Court APIs
 
@@ -428,6 +586,7 @@ Response `200`:
     "maxDurationMinutes": 120,
     "maxBookingsPerDay": 2,
     "advanceBookingDays": 7,
+    "canJoinWaitlist": true,
     "refundRateUserOnTime": 100,
     "refundRateManagerFault": 100
   },
@@ -635,5 +794,6 @@ Booking invariants:
 Config tables:
 
 - `booking_rules` stores configurable hold/cancel/check-in/refund/violation defaults.
-- `priority_policies` stores priority-level policy per priority group.
+- `priority_groups` stores unique `group_code`, rank, and advance-booking defaults.
+- `priority_policies` stores priority-level policy per priority group, including waitlist eligibility.
 - `system_settings` remains available for key-value settings needed by later modules.

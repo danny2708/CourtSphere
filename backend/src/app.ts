@@ -7,6 +7,7 @@ import { requestLogger } from "./middlewares/request-logger.middleware";
 import availabilityRouter from "./modules/availability/availability.routes";
 import authRouter from "./modules/auth/auth.routes";
 import courtsRouter from "./modules/courts/courts.routes";
+import rulesRouter from "./modules/rules/rules.routes";
 import usersRouter from "./modules/users/users.routes";
 import healthRouter from "./routes/health.routes";
 
@@ -35,6 +36,7 @@ app.use("/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api", courtsRouter);
 app.use("/api", availabilityRouter);
+app.use("/api/admin", rulesRouter);
 app.use("/api/admin", usersRouter);
 
 app.use(notFoundHandler);

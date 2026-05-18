@@ -94,6 +94,7 @@ enum WaitlistStatus {
 
 model PriorityGroup {
   priorityGroupId    String       @id @default(uuid()) @map("priority_group_id") @db.Uuid
+  groupCode          String       @unique @map("group_code")
   groupName          String       @unique @map("group_name")
   priorityLevel      Int          @map("priority_level")
   advanceBookingDays Int          @map("advance_booking_days")
@@ -290,6 +291,7 @@ model PriorityPolicy {
   advanceBookingDays   Int          @map("advance_booking_days")
   maxBookingsPerDay    Int?         @map("max_bookings_per_day")
   maxDurationMinutes   Int?         @map("max_duration_minutes")
+  canJoinWaitlist      Boolean      @default(true) @map("can_join_waitlist")
   canBookPrioritySlots Boolean      @default(false) @map("can_book_priority_slots")
   status               EntityStatus @default(ACTIVE)
   updatedByUserId      String?      @map("updated_by_user_id") @db.Uuid

@@ -519,23 +519,23 @@ Mục tiêu: cấu hình nghiệp vụ động, không hard-code.
 
 Checklist:
 
-- [ ] API admin get/update booking rules.
-- [ ] API admin get/update priority groups/policies.
-- [ ] Cấu hình `max_bookings_per_day`.
-- [ ] Cấu hình `max_duration_minutes`.
-- [ ] Cấu hình `hold_minutes`.
-- [ ] Cấu hình `cancel_before_hours`.
-- [ ] Cấu hình `late_checkin_minutes`.
-- [ ] Cấu hình `violation_threshold`.
-- [ ] Cấu hình `booking_ban_days`.
-- [ ] Cấu hình `advance_booking_days` theo priority group.
-- [ ] Cấu hình thứ tự ưu tiên.
-- [ ] Ghi audit log khi admin đổi config.
+- [x] API admin get/update booking rules.
+- [x] API admin get/update priority groups/policies.
+- [x] Cấu hình `max_bookings_per_day`.
+- [x] Cấu hình `max_duration_minutes`.
+- [x] Cấu hình `hold_minutes`.
+- [x] Cấu hình `cancel_before_hours`.
+- [x] Cấu hình `late_checkin_minutes`.
+- [x] Cấu hình `violation_threshold`.
+- [x] Cấu hình `booking_ban_days`.
+- [x] Cấu hình `advance_booking_days` theo priority group.
+- [x] Cấu hình thứ tự ưu tiên.
+- [x] Ghi audit log khi admin đổi config.
 
 Acceptance criteria:
 
-- [ ] Nghiệp vụ đọc config từ DB.
-- [ ] Không hard-code số ngày đặt trước, hold time, cancel window, no-show time.
+- [x] Nghiệp vụ đọc config từ DB.
+- [x] Không hard-code số ngày đặt trước, hold time, cancel window, no-show time.
 
 ---
 
@@ -1051,10 +1051,12 @@ Acceptance criteria:
 
 ### 8.6 Admin config APIs
 
-- [ ] `GET /api/admin/booking-rules`
-- [ ] `PUT /api/admin/booking-rules`
-- [ ] `GET /api/admin/priority-groups`
-- [ ] `PUT /api/admin/priority-groups/:id`
+- [x] `GET /api/admin/booking-rules`
+- [x] `PUT /api/admin/booking-rules`
+- [x] `GET /api/admin/priority-groups`
+- [x] `PUT /api/admin/priority-groups/:id`
+- [x] `GET /api/admin/priority-policies`
+- [x] `PUT /api/admin/priority-policies/:id`
 - [x] CRUD `/api/admin/court-types`
 - [x] CRUD `/api/admin/operating-hours`
 - [x] CRUD `/api/admin/pricing-rules`
@@ -1214,7 +1216,7 @@ Một module được coi là hoàn thành khi:
 | RBAC & Users | Codex | DONE | Admin user/role APIs, RBAC tests, and audit logs implemented |
 | Courts & Court Types | Codex | DONE | Court type/court APIs, filters, status updates, and status history implemented |
 | Operating Hours & Pricing | Codex | DONE | Admin CRUD APIs implemented; booking-impact warnings deferred until booking/availability modules |
-| Booking Rules & Priority |  | TODO |  |
+| Booking Rules & Priority | Codex | DONE | Admin config APIs, audit logs, and shared rules repository implemented |
 | Availability | Codex | DONE | Hold-aware slot generation, conflict detection, pricing, and policy response implemented |
 | Booking |  | TODO |  |
 | Payment |  | TODO |  |

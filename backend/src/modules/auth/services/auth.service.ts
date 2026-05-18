@@ -32,7 +32,8 @@ function toAuthUserDto(user: UserWithRelations): AuthUserDto {
     priorityGroup: user.priorityGroup
       ? {
           id: user.priorityGroup.priorityGroupId,
-          code: user.priorityGroup.groupName,
+          code: user.priorityGroup.groupCode,
+          name: user.priorityGroup.groupName,
           priorityLevel: user.priorityGroup.priorityLevel,
           advanceBookingDays: user.priorityGroup.advanceBookingDays
         }
@@ -75,7 +76,7 @@ export class AuthService {
       const user = await this.db.$transaction(async (tx) => {
         const [priorityGroup, defaultRole] = await Promise.all([
           tx.priorityGroup.findUnique({
-            where: { groupName: input.priorityGroupCode }
+            where: { groupCode: input.priorityGroupCode }
           }),
           tx.role.findUnique({
             where: { roleName: "USER" }

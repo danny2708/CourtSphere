@@ -8,6 +8,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { AvailabilityService } from "./availability.service";
+import { RulesRepository } from "../rules/rules.repository";
 
 const courtId = "00000000-0000-4000-8000-000000000301";
 const userId = "00000000-0000-4000-8000-000000000302";
@@ -61,6 +62,7 @@ function createService(input: {
   bookings?: unknown[];
   priorityPolicy?: unknown;
   bookingRule?: unknown;
+  rulesRepository?: unknown;
   now?: Date;
 }) {
   const db = {
@@ -74,6 +76,7 @@ function createService(input: {
         bookingPermissionStatus: BookingPermissionStatus.ALLOWED,
         priorityGroup: {
           priorityGroupId,
+          groupCode: "STUDENT",
           groupName: "STUDENT",
           advanceBookingDays: 7
         }
@@ -97,7 +100,8 @@ function createService(input: {
         input.priorityPolicy ?? {
           advanceBookingDays: 7,
           maxDurationMinutes: 120,
-          maxBookingsPerDay: 2
+          maxBookingsPerDay: 2,
+          canJoinWaitlist: true
         }
       )
     },
@@ -110,7 +114,9 @@ function createService(input: {
     service: new AvailabilityService(
       db as unknown as PrismaClient,
       undefined,
-      () => input.now ?? date("2026-05-18T00:00:00.000Z")
+      () => input.now ?? date("2026-05-18T00:00:00.000Z"),
+      (input.rulesRepository as RulesRepository | undefined) ??
+        new RulesRepository(db as unknown as PrismaClient)
     ),
     db
   };
@@ -219,6 +225,44 @@ describe("AvailabilityService", () => {
     ).rejects.toMatchObject({
       statusCode: 400,
       code: "DURATION_EXCEEDS_LIMIT"
+    });
+  });
+
+  it("uses the shared rules repository policy when calculating availability", async () => {
+    const rulesRepository = {
+      getEffectivePolicy: vi.fn().mockResolvedValue({
+        holdMinutes: 5,
+        cancelBeforeHours: 4,
+        lateCheckinMinutes: 10,
+        maxDurationMinutes: 30,
+        maxBookingsPerDay: 4,
+        advanceBookingDays: 3,
+        canJoinWaitlist: false,
+        refundRateUserOnTime: 80,
+        refundRateManagerFault: 100
+      })
+    };
+    const { service } = createService({ rulesRepository });
+
+    const availability = await service.getCourtAvailability(courtId, userId, {
+      date: "2026-05-20",
+      durationMinutes: 30
+    });
+
+    expect(rulesRepository.getEffectivePolicy).toHaveBeenCalledWith({
+      priorityGroupId,
+      priorityGroupAdvanceBookingDays: 7
+    });
+    expect(availability.policy).toMatchObject({
+      holdMinutes: 5,
+      cancelBeforeHours: 4,
+      lateCheckinMinutes: 10,
+      maxDurationMinutes: 30,
+      maxBookingsPerDay: 4,
+      advanceBookingDays: 3,
+      canJoinWaitlist: false,
+      refundRateUserOnTime: 80,
+      refundRateManagerFault: 100
     });
   });
 });

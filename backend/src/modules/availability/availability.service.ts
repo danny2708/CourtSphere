@@ -8,6 +8,11 @@ import {
 
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../middlewares/error.middleware";
+import {
+  RulesRepository,
+  rulesRepository
+} from "../rules/rules.repository";
+import type { EffectiveBookingPolicy } from "../rules/rules.types";
 import type {
   AvailabilityQuery,
   AvailabilitySlotDto,
@@ -94,7 +99,8 @@ export class AvailabilityService {
   constructor(
     private readonly db: PrismaClient = prisma,
     private readonly conflicts: BookingConflictService = bookingConflictService,
-    private readonly nowProvider: () => Date = () => new Date()
+    private readonly nowProvider: () => Date = () => new Date(),
+    private readonly rules: RulesRepository = rulesRepository
   ) {}
 
   async getCourtAvailability(courtId: string, viewerUserId: string, query: AvailabilityQuery) {
@@ -103,7 +109,7 @@ export class AvailabilityService {
     const includePricing = query.includePricing ?? true;
     const now = this.nowProvider();
 
-    const [court, viewer, bookingRule] = await Promise.all([
+    const [court, viewer] = await Promise.all([
       this.db.court.findUnique({
         where: { courtId },
         include: courtInclude
@@ -113,12 +119,6 @@ export class AvailabilityService {
         include: {
           priorityGroup: true
         }
-      }),
-      this.db.bookingRule.findFirst({
-        where: {
-          status: EntityStatus.ACTIVE
-        },
-        orderBy: [{ updatedAt: "desc" }]
       })
     ]);
 
@@ -130,21 +130,16 @@ export class AvailabilityService {
       throw new AppError(401, "Authenticated user no longer exists", "UNAUTHENTICATED");
     }
 
-    const priorityPolicy = viewer.priorityGroupId
-      ? await this.db.priorityPolicy.findFirst({
-          where: {
-            priorityGroupId: viewer.priorityGroupId,
-            status: EntityStatus.ACTIVE
-          },
-          orderBy: [{ updatedAt: "desc" }]
-        })
-      : null;
+    const policy = await this.rules.getEffectivePolicy({
+      priorityGroupId: viewer.priorityGroupId,
+      priorityGroupAdvanceBookingDays: viewer.priorityGroup?.advanceBookingDays ?? null
+    });
 
     const operatingHour = court.operatingHours.find(
       (hour) => hour.weekday === weekday && hour.status === EntityStatus.ACTIVE
     );
     const slotDurationMinutes = query.durationMinutes ?? operatingHour?.slotDurationMinutes;
-    const maxDurationMinutes = priorityPolicy?.maxDurationMinutes ?? bookingRule?.maxDurationMinutes;
+    const maxDurationMinutes = policy.maxDurationMinutes;
 
     if (query.durationMinutes && maxDurationMinutes && query.durationMinutes > maxDurationMinutes) {
       throw new AppError(
@@ -154,25 +149,13 @@ export class AvailabilityService {
       );
     }
 
-    const policy = {
-      holdMinutes: bookingRule?.holdMinutes ?? null,
-      cancelBeforeHours: bookingRule?.cancelBeforeHours ?? null,
-      lateCheckinMinutes: bookingRule?.lateCheckinMinutes ?? null,
-      maxDurationMinutes: maxDurationMinutes ?? null,
-      maxBookingsPerDay: priorityPolicy?.maxBookingsPerDay ?? bookingRule?.maxBookingsPerDay ?? null,
-      advanceBookingDays:
-        priorityPolicy?.advanceBookingDays ?? viewer.priorityGroup?.advanceBookingDays ?? null,
-      refundRateUserOnTime: bookingRule?.refundRateUserOnTime ?? null,
-      refundRateManagerFault: bookingRule?.refundRateManagerFault ?? null
-    };
-
     if (!operatingHour || !slotDurationMinutes) {
       return {
         court: toCourtDto(court),
         date: query.date,
         weekday,
         durationMinutes: query.durationMinutes ?? null,
-        policy,
+        policy: this.toPolicyDto(policy),
         slots: []
       };
     }
@@ -224,8 +207,22 @@ export class AvailabilityService {
       date: query.date,
       weekday,
       durationMinutes: slotDurationMinutes,
-      policy,
+      policy: this.toPolicyDto(policy),
       slots
+    };
+  }
+
+  private toPolicyDto(policy: EffectiveBookingPolicy) {
+    return {
+      holdMinutes: policy.holdMinutes,
+      cancelBeforeHours: policy.cancelBeforeHours,
+      lateCheckinMinutes: policy.lateCheckinMinutes,
+      maxDurationMinutes: policy.maxDurationMinutes,
+      maxBookingsPerDay: policy.maxBookingsPerDay,
+      advanceBookingDays: policy.advanceBookingDays,
+      canJoinWaitlist: policy.canJoinWaitlist,
+      refundRateUserOnTime: policy.refundRateUserOnTime,
+      refundRateManagerFault: policy.refundRateManagerFault
     };
   }
 

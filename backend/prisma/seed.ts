@@ -19,42 +19,48 @@ const pricingRuleIds = {
 async function seedPriorityGroups() {
   const [staff, student, external] = await Promise.all([
     prisma.priorityGroup.upsert({
-      where: { groupName: "STAFF" },
+      where: { groupCode: "STAFF" },
       update: {
+        groupName: "Staff",
         priorityLevel: 1,
         advanceBookingDays: 14,
         description: "Cán bộ/Giảng viên"
       },
       create: {
-        groupName: "STAFF",
+        groupCode: "STAFF",
+        groupName: "Staff",
         priorityLevel: 1,
         advanceBookingDays: 14,
         description: "Cán bộ/Giảng viên"
       }
     }),
     prisma.priorityGroup.upsert({
-      where: { groupName: "STUDENT" },
+      where: { groupCode: "STUDENT" },
       update: {
+        groupName: "Student",
         priorityLevel: 2,
         advanceBookingDays: 7,
         description: "Sinh viên"
       },
       create: {
-        groupName: "STUDENT",
+        groupCode: "STUDENT",
+        groupName: "Student",
         priorityLevel: 2,
         advanceBookingDays: 7,
         description: "Sinh viên"
       }
     }),
     prisma.priorityGroup.upsert({
-      where: { groupName: "EXTERNAL" },
+      where: { groupCode: "EXTERNAL" },
       update: {
+        groupName: "External",
         priorityLevel: 3,
         advanceBookingDays: 3,
         description: "Người ngoài trường"
       },
       create: {
-        groupName: "EXTERNAL",
+        groupCode: "EXTERNAL",
+        groupName: "External",
         priorityLevel: 3,
         advanceBookingDays: 3,
         description: "Người ngoài trường"
@@ -313,6 +319,7 @@ async function seedBookingRules(adminUserId: string) {
 async function seedPriorityPolicies(
   priorityGroups: Array<{
     priorityGroupId: string;
+    groupCode: string;
     groupName: string;
     priorityLevel: number;
     advanceBookingDays: number;
@@ -332,6 +339,7 @@ async function seedPriorityPolicies(
         advanceBookingDays: group.advanceBookingDays,
         maxBookingsPerDay: 2,
         maxDurationMinutes: 120,
+        canJoinWaitlist: true,
         updatedByUserId: adminUserId
       },
       create: {
@@ -341,6 +349,7 @@ async function seedPriorityPolicies(
         advanceBookingDays: group.advanceBookingDays,
         maxBookingsPerDay: 2,
         maxDurationMinutes: 120,
+        canJoinWaitlist: true,
         updatedByUserId: adminUserId
       }
     });
