@@ -509,7 +509,7 @@ Acceptance criteria:
 
 - [x] Admin cấu hình được giờ hoạt động.
 - [x] Admin cấu hình được bảng giá.
-- [!] Availability service dùng đúng operating hours/pricing rules: thuộc module 6.8 Availability.
+- [x] Availability service dùng đúng operating hours/pricing rules.
 
 ---
 
@@ -545,21 +545,21 @@ Mục tiêu: trả về lịch trống, slot đã đặt, slot đang giữ, giá
 
 Checklist:
 
-- [ ] API `GET /api/courts/:id/availability?date=YYYY-MM-DD`.
-- [ ] Lấy operating hours theo sân và thứ trong tuần.
-- [ ] Sinh slot theo `slot_duration_minutes`.
-- [ ] Lấy active bookings trong ngày.
-- [ ] Đánh dấu slot unavailable nếu overlap.
-- [ ] Đánh dấu slot đang hold nếu `PENDING_PAYMENT` còn hạn.
-- [ ] Tính giá slot theo pricing rules.
-- [ ] Trả về policy áp dụng: cancel window, hold time, late check-in, refund.
-- [ ] Validate advance booking theo priority group user.
+- [x] API `GET /api/courts/:id/availability?date=YYYY-MM-DD`.
+- [x] Lấy operating hours theo sân và thứ trong tuần.
+- [x] Sinh slot theo `slot_duration_minutes`.
+- [x] Lấy active bookings trong ngày.
+- [x] Đánh dấu slot unavailable nếu overlap.
+- [x] Đánh dấu slot đang hold nếu `PENDING_PAYMENT` còn hạn.
+- [x] Tính giá slot theo pricing rules.
+- [x] Trả về policy áp dụng: cancel window, hold time, late check-in, refund.
+- [x] Validate advance booking theo priority group user.
 
 Acceptance criteria:
 
-- [ ] User xem được slot trống/chưa trống.
-- [ ] Slot active booking không hiện là available.
-- [ ] Giá trả về đúng rule.
+- [x] User xem được slot trống/chưa trống.
+- [x] Slot active booking không hiện là available.
+- [x] Giá trả về đúng rule.
 
 ---
 
@@ -1020,7 +1020,7 @@ Acceptance criteria:
 - [x] `GET /api/court-types`
 - [x] `GET /api/courts`
 - [x] `GET /api/courts/:id`
-- [ ] `GET /api/courts/:id/availability`
+- [x] `GET /api/courts/:id/availability`
 - [x] `POST /api/admin/court-types`
 - [x] `PUT /api/admin/court-types/:id`
 - [x] `PATCH /api/admin/court-types/:id/status`
@@ -1072,9 +1072,9 @@ Acceptance criteria:
 
 ### 9.1 Unit tests
 
-- [ ] Overlap detection.
+- [x] Overlap detection.
 - [ ] Booking duration validation.
-- [ ] Advance booking validation.
+- [x] Advance booking validation.
 - [ ] Cancel/refund eligibility.
 - [ ] Priority sorting.
 - [ ] Violation point calculation.
@@ -1215,7 +1215,7 @@ Một module được coi là hoàn thành khi:
 | Courts & Court Types | Codex | DONE | Court type/court APIs, filters, status updates, and status history implemented |
 | Operating Hours & Pricing | Codex | DONE | Admin CRUD APIs implemented; booking-impact warnings deferred until booking/availability modules |
 | Booking Rules & Priority |  | TODO |  |
-| Availability |  | TODO |  |
+| Availability | Codex | DONE | Hold-aware slot generation, conflict detection, pricing, and policy response implemented |
 | Booking |  | TODO |  |
 | Payment |  | TODO |  |
 | Refund |  | TODO |  |

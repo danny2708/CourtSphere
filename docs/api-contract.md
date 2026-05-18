@@ -385,6 +385,88 @@ Response `200`:
 }
 ```
 
+### `GET /api/courts/:id/availability`
+
+Requires `Authorization: Bearer <accessToken>`.
+
+Calculates generated slots for one court on one calendar date. The backend interprets `date` as a `YYYY-MM-DD` UTC calendar date and returns ISO timestamps.
+
+Query params:
+
+- `date` required, format `YYYY-MM-DD`.
+- `durationMinutes` optional. Defaults to the court operating-hour `slotDurationMinutes`.
+- `includePricing` optional boolean. Defaults to `true`.
+
+Example:
+
+```text
+GET /api/courts/:id/availability?date=2026-05-20&durationMinutes=60&includePricing=true
+```
+
+Response `200`:
+
+```json
+{
+  "court": {
+    "id": "uuid",
+    "courtName": "Main Field",
+    "location": "North Campus",
+    "capacity": 22,
+    "status": "ACTIVE",
+    "courtType": {
+      "id": "uuid",
+      "typeName": "Football"
+    }
+  },
+  "date": "2026-05-20",
+  "weekday": 3,
+  "durationMinutes": 60,
+  "policy": {
+    "holdMinutes": 10,
+    "cancelBeforeHours": 2,
+    "lateCheckinMinutes": 15,
+    "maxDurationMinutes": 120,
+    "maxBookingsPerDay": 2,
+    "advanceBookingDays": 7,
+    "refundRateUserOnTime": 100,
+    "refundRateManagerFault": 100
+  },
+  "slots": [
+    {
+      "startDatetime": "2026-05-20T08:00:00.000Z",
+      "endDatetime": "2026-05-20T09:00:00.000Z",
+      "status": "AVAILABLE",
+      "priceAmount": 50000
+    },
+    {
+      "startDatetime": "2026-05-20T09:00:00.000Z",
+      "endDatetime": "2026-05-20T10:00:00.000Z",
+      "status": "HOLD",
+      "priceAmount": 50000,
+      "bookingId": "uuid",
+      "unavailableReason": "Slot is temporarily held pending payment"
+    }
+  ]
+}
+```
+
+Slot statuses:
+
+- `AVAILABLE`: slot can be selected.
+- `BOOKED`: slot overlaps an active booking.
+- `HOLD`: slot overlaps a non-expired `PENDING_PAYMENT` hold.
+- `MAINTENANCE`: court status is `MAINTENANCE`.
+- `CLOSED`: court is closed, retired, in the past, or outside the user's advance booking window.
+
+Booking statuses that occupy availability:
+
+- `PENDING_PAYMENT` only while `holdExpiresAt` is not expired.
+- `PAYMENT_PROCESSING`
+- `CONFIRMED`
+- `IN_USE`
+
+Non-active statuses such as `PAYMENT_EXPIRED`, cancelled statuses, `COMPLETED`, and `NO_SHOW` do not occupy a slot.
+
 ### `POST /api/admin/courts`
 
 Requires `ADMIN`.
