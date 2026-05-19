@@ -35,7 +35,7 @@ Ban quản lý sân không duyệt trước booking. Ban quản lý chỉ tham g
 
 - xác nhận người đặt đã đến sân;
 - check-in;
-- ghi nhận hoàn thành;
+- hệ thống tự động hoàn thành khi hết thời gian sử dụng, quản lý chỉ xử lý ngoại lệ;
 - xử lý quá giờ check-in/no-show;
 - hủy booking do sân gặp sự cố/bảo trì/thời tiết/sự kiện đột xuất.
 
@@ -113,17 +113,17 @@ Khi booking đã đến giờ bắt đầu mà chưa được quản lý check-i
 CONFIRMED
     ↓ auto job sau late_checkin_minutes
 CHECKIN_EXPIRED
-    ↓ manager xác nhận vắng mặt
+    ↓ manager xác nhận vắng mặt hoặc cho phép check-in muộn nếu sân chưa bị sử dụng
 NO_SHOW
 ```
 
-`CHECKIN_EXPIRED` là trạng thái hệ thống đánh dấu quá giờ check-in. `NO_SHOW` là trạng thái ban quản lý xác nhận vắng mặt cuối cùng.
+`CHECKIN_EXPIRED` là trạng thái hệ thống đánh dấu quá giờ check-in và chờ ban quản lý xử lý. `NO_SHOW` là trạng thái cuối cùng khi ban quản lý xác nhận không đến.
 
 Quá giờ check-in/no-show:
 
 - không hoàn tiền;
 - có thể ghi nhận vi phạm;
-- quản lý có thể override trong trường hợp đặc biệt, nhưng phải ghi rõ lý do và audit log.
+- quản lý có thể override cho check-in muộn trong trường hợp đặc biệt, nhưng phải ghi rõ lý do và audit log.
 
 ### 0.6 Tên bảng/cột đã chốt
 
@@ -207,7 +207,7 @@ MVP cần làm đủ các nghiệp vụ lõi sau:
 6. Thanh toán 100% để xác nhận booking.
 7. Hủy booking hợp lệ và tạo refund nếu đủ điều kiện.
 8. Ban quản lý xác nhận check-in.
-9. Ban quản lý ghi nhận hoàn thành.
+9. Hệ thống tự động hoàn thành booking khi hết giờ; ban quản lý chỉ override trong trường hợp ngoại lệ.
 10. Hệ thống đánh dấu quá giờ check-in.
 11. Ban quản lý xác nhận no-show.
 12. Ghi booking status history cho mọi chuyển trạng thái.
@@ -342,7 +342,7 @@ stateDiagram-v2
   CHECKIN_EXPIRED --> NO_SHOW: Manager xác nhận vắng mặt
   CHECKIN_EXPIRED --> IN_USE: Manager override cho check-in muộn
 
-  IN_USE --> COMPLETED: Manager xác nhận hoàn thành
+  IN_USE --> COMPLETED: Auto end-time job
   IN_USE --> CANCELLED_BY_MANAGER: Sự cố khi đang sử dụng
 
   COMPLETED --> [*]
@@ -1228,7 +1228,7 @@ type ApiError = {
 | POST | `/api/bookings/:id/cancel` | Owner | User hủy booking |
 | GET | `/api/manager/bookings/today` | FIELD_MANAGER/ADMIN | Lịch hôm nay |
 | POST | `/api/manager/bookings/:id/check-in` | FIELD_MANAGER/ADMIN | Xác nhận check-in |
-| POST | `/api/manager/bookings/:id/complete` | FIELD_MANAGER/ADMIN | Hoàn thành |
+| POST | `/api/manager/bookings/:id/override-complete` | FIELD_MANAGER/ADMIN | Đóng buổi trong trường hợp ngoại lệ |
 | POST | `/api/manager/bookings/:id/no-show` | FIELD_MANAGER/ADMIN | Xác nhận no-show |
 | POST | `/api/manager/bookings/:id/cancel` | FIELD_MANAGER/ADMIN | Hủy do sân lỗi |
 | POST | `/api/manager/bookings/:id/override-checkin` | FIELD_MANAGER/ADMIN | Override check-in muộn |
@@ -1348,7 +1348,7 @@ backend/
 - tạo hold;
 - hủy booking;
 - manager check-in;
-- manager complete;
+- auto complete job;
 - manager no-show;
 - manager/admin cancel;
 - ghi `booking_status_histories`.
@@ -1669,7 +1669,7 @@ frontend/
 |---|---|
 | ManagerTodaySchedulePage | Lịch sân hôm nay theo sân/giờ/trạng thái |
 | ManagerCheckinPage | Xác nhận người đặt đã đến |
-| ManagerInUsePage | Booking đang sử dụng, xác nhận hoàn thành |
+| ManagerInUsePage | Booking đang sử dụng, xử lý ngoại lệ/đóng sớm nếu cần |
 | ManagerNoShowPage | Booking `CHECKIN_EXPIRED`, xác nhận no-show hoặc override |
 | ManagerCourtStatusPage | Cập nhật sân ACTIVE/MAINTENANCE/TEMP_CLOSED/RETIRED |
 | ManagerUsageHistoryPage | Lịch sử sử dụng sân |
@@ -2051,11 +2051,11 @@ Yêu cầu UI:
 - Nếu booking `CHECKIN_EXPIRED`, chỉ cho check-in khi có override permission.
 - Ghi `checked_in_by_user_id`, `checkin_time`, history.
 
-### 13.5 Manager complete
+### 13.5 Auto complete / manager override
 
-- Actor có role `FIELD_MANAGER` hoặc `ADMIN`.
-- Booking `IN_USE`.
-- Ghi `completed_by_user_id`, `checkout_time`, history.
+- Hệ thống tự động chuyển booking `IN_USE` sang `COMPLETED` khi hết thời gian sử dụng.
+- Actor có role `FIELD_MANAGER` hoặc `ADMIN` chỉ dùng cho trường hợp override ngoại lệ.
+- Khi override, ghi `completed_by_user_id`, `checkout_time`, history, và lý do nếu có.
 
 ### 13.6 Manager no-show
 
@@ -2172,7 +2172,7 @@ Phòng gym
 
 - Today schedule.
 - Check-in.
-- Complete.
+- Auto complete job / override.
 - Auto checkin expired job.
 - No-show confirmation.
 - Violation handling.
@@ -2250,7 +2250,7 @@ Hãy triển khai theo sprint, ưu tiên backend schema + service + API trước
 
 - [ ] User không thấy nút tự check-in.
 - [ ] Manager check-in chuyển IN_USE.
-- [ ] IN_USE chuyển COMPLETED bởi manager.
+- [ ] IN_USE chuyển COMPLETED tự động khi hết giờ; manager chỉ override ngoại lệ.
 - [ ] Quá giờ check-in chuyển CHECKIN_EXPIRED.
 - [ ] Manager xác nhận NO_SHOW.
 - [ ] NO_SHOW không refund.
