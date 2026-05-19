@@ -747,6 +747,190 @@ Request:
 }
 ```
 
+## Booking APIs
+
+All endpoints below require `Authorization: Bearer <accessToken>` and role `USER`.
+
+Booking remains auto-approval:
+
+```text
+create hold -> PENDING_PAYMENT -> full payment success in payment module -> CONFIRMED
+```
+
+User booking APIs do not expose check-in. Check-in is reserved for Field Manager/Admin APIs in a later module.
+
+### `POST /api/bookings`
+
+Creates a temporary booking hold in `PENDING_PAYMENT`. The slot is held until `holdExpiresAt = now + holdMinutes` from active booking rules.
+
+Request:
+
+```json
+{
+  "courtId": "uuid",
+  "startDatetime": "2026-05-21T08:00:00.000Z",
+  "endDatetime": "2026-05-21T09:00:00.000Z",
+  "participantCount": 10,
+  "usagePurpose": "Class training"
+}
+```
+
+Validation:
+
+- User account must be `ACTIVE`.
+- User `bookingPermissionStatus` must be `ALLOWED`.
+- Court must be `ACTIVE`.
+- Booking must be in the future, inside `operating_hours`, and aligned to `slotDurationMinutes`.
+- Booking must not exceed `maxDurationMinutes`, `maxBookingsPerDay`, priority advance window, or court capacity.
+- Booking must not overlap active booking statuses: `PENDING_PAYMENT`, `PAYMENT_PROCESSING`, `CONFIRMED`, `IN_USE`.
+
+Response `201`:
+
+```json
+{
+  "booking": {
+    "id": "uuid",
+    "bookingCode": "BK-20260520-ABC123",
+    "bookingStatus": "PENDING_PAYMENT",
+    "paymentStatus": "INITIATED",
+    "startDatetime": "2026-05-21T08:00:00.000Z",
+    "endDatetime": "2026-05-21T09:00:00.000Z",
+    "participantCount": 10,
+    "usagePurpose": "Class training",
+    "totalAmount": 50000,
+    "holdExpiresAt": "2026-05-20T00:10:00.000Z",
+    "refundable": true,
+    "court": {
+      "id": "uuid",
+      "courtName": "Main Field",
+      "location": "North Campus",
+      "status": "ACTIVE"
+    },
+    "statusHistories": [
+      {
+        "oldStatus": null,
+        "newStatus": "PENDING_PAYMENT",
+        "actionType": "USER_CREATE_BOOKING_HOLD"
+      }
+    ]
+  }
+}
+```
+
+Common errors:
+
+- `ACCOUNT_NOT_ACTIVE`
+- `BOOKING_PERMISSION_RESTRICTED`
+- `COURT_NOT_AVAILABLE`
+- `OUTSIDE_OPERATING_HOURS`
+- `BOOKING_DURATION_EXCEEDS_LIMIT`
+- `ADVANCE_BOOKING_LIMIT_EXCEEDED`
+- `MAX_BOOKINGS_PER_DAY_REACHED`
+- `PARTICIPANT_COUNT_EXCEEDS_CAPACITY`
+- `BOOKING_SLOT_UNAVAILABLE`
+- `PRICING_RULE_NOT_FOUND`
+
+### `GET /api/bookings/my`
+
+Lists bookings owned by the authenticated user.
+
+Optional query params:
+
+- `status`: any `BookingStatus`.
+- `fromDate`: ISO datetime filter on `startDatetime`.
+- `toDate`: ISO datetime filter on `startDatetime`.
+
+Response `200`:
+
+```json
+{
+  "bookings": [
+    {
+      "id": "uuid",
+      "bookingCode": "BK-20260520-ABC123",
+      "bookingStatus": "PENDING_PAYMENT",
+      "paymentStatus": "INITIATED",
+      "startDatetime": "2026-05-21T08:00:00.000Z",
+      "endDatetime": "2026-05-21T09:00:00.000Z",
+      "totalAmount": 50000,
+      "holdExpiresAt": "2026-05-20T00:10:00.000Z",
+      "court": {
+        "id": "uuid",
+        "courtName": "Main Field"
+      }
+    }
+  ]
+}
+```
+
+### `GET /api/bookings/:id`
+
+Returns one owned booking with status history, payments, and refunds.
+
+Response `200`:
+
+```json
+{
+  "booking": {
+    "id": "uuid",
+    "bookingCode": "BK-20260520-ABC123",
+    "bookingStatus": "PENDING_PAYMENT",
+    "paymentStatus": "INITIATED",
+    "statusHistories": [],
+    "payments": [],
+    "refunds": []
+  }
+}
+```
+
+Users cannot view another user's booking through this endpoint.
+
+### `POST /api/bookings/:id/cancel`
+
+Cancels an owned booking when its status allows user cancellation.
+
+Request:
+
+```json
+{
+  "reason": "Schedule changed"
+}
+```
+
+Rules:
+
+- `PENDING_PAYMENT` can be cancelled without refund.
+- `CONFIRMED` can be cancelled only before `cancelBeforeHours`.
+- If a `CONFIRMED` booking has a successful payment, the backend creates a `refunds` row with status `REQUESTED` using `refundRateUserOnTime`.
+- `CHECKIN_EXPIRED` and `NO_SHOW` are not cancellable by user and do not create refunds.
+- Every cancellation writes `booking_status_histories`.
+
+Response `200`:
+
+```json
+{
+  "booking": {
+    "id": "uuid",
+    "bookingStatus": "CANCELLED_BY_USER",
+    "cancelReason": "Schedule changed",
+    "cancelledAt": "2026-05-20T00:00:00.000Z",
+    "statusHistories": [
+      {
+        "oldStatus": "PENDING_PAYMENT",
+        "newStatus": "CANCELLED_BY_USER",
+        "actionType": "USER_CANCEL_BOOKING"
+      }
+    ]
+  }
+}
+```
+
+Common errors:
+
+- `BOOKING_NOT_FOUND`
+- `BOOKING_CANNOT_BE_CANCELLED`
+- `BOOKING_CANCEL_WINDOW_CLOSED`
+
 ## Database Contract Baseline
 
 The MVP database uses PostgreSQL through Prisma.

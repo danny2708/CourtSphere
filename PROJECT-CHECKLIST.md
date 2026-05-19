@@ -569,30 +569,30 @@ Mục tiêu: tạo booking hold, validate nghiệp vụ, chống overlap.
 
 Checklist:
 
-- [ ] API `POST /api/bookings`.
-- [ ] API `GET /api/bookings/my`.
-- [ ] API `GET /api/bookings/:id`.
-- [ ] Validate user account active.
-- [ ] Validate booking permission not restricted.
-- [ ] Validate court active.
-- [ ] Validate operating hours.
-- [ ] Validate advance booking window.
-- [ ] Validate max duration.
-- [ ] Validate max bookings per day.
-- [ ] Validate participant count <= court capacity nếu áp dụng.
-- [ ] Validate overlap trong service layer.
-- [ ] Tạo booking trong transaction.
-- [ ] Ghi `booking_status_histories` khi tạo booking.
-- [ ] Bắt lỗi DB overlap constraint và trả message thân thiện.
-- [ ] API cancel by user.
-- [ ] Tạo refund nếu user cancel hợp lệ.
+- [x] API `POST /api/bookings`.
+- [x] API `GET /api/bookings/my`.
+- [x] API `GET /api/bookings/:id`.
+- [x] Validate user account active.
+- [x] Validate booking permission not restricted.
+- [x] Validate court active.
+- [x] Validate operating hours.
+- [x] Validate advance booking window.
+- [x] Validate max duration.
+- [x] Validate max bookings per day.
+- [x] Validate participant count <= court capacity nếu áp dụng.
+- [x] Validate overlap trong service layer.
+- [x] Tạo booking trong transaction.
+- [x] Ghi `booking_status_histories` khi tạo booking.
+- [x] Bắt lỗi DB overlap constraint và trả message thân thiện.
+- [x] API cancel by user.
+- [x] Tạo refund nếu user cancel hợp lệ.
 
 Acceptance criteria:
 
-- [ ] User tạo được booking `PENDING_PAYMENT`.
-- [ ] Slot được hold đến `hold_expires_at`.
-- [ ] Không thể tạo 2 booking active overlap cùng sân.
-- [ ] User chỉ xem/sửa booking của chính mình trừ manager/admin.
+- [x] User tạo được booking `PENDING_PAYMENT`.
+- [x] Slot được hold đến `hold_expires_at`.
+- [x] Không thể tạo 2 booking active overlap cùng sân.
+- [x] User chỉ xem/sửa booking của chính mình trừ manager/admin.
 
 ---
 
@@ -1030,10 +1030,10 @@ Acceptance criteria:
 
 ### 8.4 Booking APIs
 
-- [ ] `POST /api/bookings`
-- [ ] `GET /api/bookings/my`
-- [ ] `GET /api/bookings/:id`
-- [ ] `POST /api/bookings/:id/cancel`
+- [x] `POST /api/bookings`
+- [x] `GET /api/bookings/my`
+- [x] `GET /api/bookings/:id`
+- [x] `POST /api/bookings/:id/cancel`
 - [ ] `GET /api/manager/bookings/today`
 - [ ] `POST /api/manager/bookings/:id/check-in`
 - [ ] `POST /api/manager/bookings/:id/complete`
@@ -1075,9 +1075,9 @@ Acceptance criteria:
 ### 9.1 Unit tests
 
 - [x] Overlap detection.
-- [ ] Booking duration validation.
+- [x] Booking duration validation.
 - [x] Advance booking validation.
-- [ ] Cancel/refund eligibility.
+- [x] Cancel/refund eligibility.
 - [ ] Priority sorting.
 - [ ] Violation point calculation.
 - [ ] Payment callback idempotency logic.
@@ -1085,14 +1085,14 @@ Acceptance criteria:
 ### 9.2 Integration tests
 
 - [ ] Register/login flow.
-- [ ] Create booking hold.
-- [ ] Prevent double booking.
+- [x] Create booking hold.
+- [x] Prevent double booking.
 - [ ] Payment success confirms booking.
 - [ ] Expire pending payment booking.
 - [ ] Manager check-in.
 - [ ] Manager complete.
 - [ ] No-show creates violation.
-- [ ] User cancel creates refund when eligible.
+- [x] User cancel creates refund when eligible.
 - [ ] Manager cancel creates refund.
 - [x] RBAC denies wrong role.
 
@@ -1218,7 +1218,7 @@ Một module được coi là hoàn thành khi:
 | Operating Hours & Pricing | Codex | DONE | Admin CRUD APIs implemented; booking-impact warnings deferred until booking/availability modules |
 | Booking Rules & Priority | Codex | DONE | Admin config APIs, audit logs, and shared rules repository implemented |
 | Availability | Codex | DONE | Hold-aware slot generation, conflict detection, pricing, and policy response implemented |
-| Booking |  | TODO |  |
+| Booking | Codex | DONE | Hold creation, user booking APIs, cancellation/refund request, and status history implemented |
 | Payment |  | TODO |  |
 | Refund |  | TODO |  |
 | Manager operations |  | TODO |  |
