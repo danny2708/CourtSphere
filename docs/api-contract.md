@@ -931,6 +931,173 @@ Common errors:
 - `BOOKING_CANNOT_BE_CANCELLED`
 - `BOOKING_CANCEL_WINDOW_CLOSED`
 
+## Payment APIs
+
+These APIs implement a mock/sandbox payment flow for MVP. They do not integrate a real payment gateway yet.
+
+### `POST /api/bookings/:id/payments`
+
+Requires `Authorization: Bearer <accessToken>` and role `USER`. Only the booking owner can create a payment.
+
+Creates or returns a mock payment for a booking that is still payable. Creating payment moves the booking from `PENDING_PAYMENT` to `PAYMENT_PROCESSING`; the booking is confirmed only after a successful callback.
+
+Request:
+
+```json
+{
+  "amount": 50000
+}
+```
+
+Rules:
+
+- Booking must belong to the authenticated user.
+- Booking status must be `PENDING_PAYMENT` or `PAYMENT_PROCESSING`.
+- Booking hold must not be expired.
+- `amount` must equal `booking.totalAmount`.
+- No deposit flow exists; payment is always for 100% of the booking total.
+
+Response `201`:
+
+```json
+{
+  "payment": {
+    "id": "uuid",
+    "amount": 50000,
+    "paymentMethod": "MOCK",
+    "gatewayTransactionId": "mock_uuid",
+    "paymentStatus": "PROCESSING",
+    "paymentUrl": "/mock-payment/mock_uuid",
+    "booking": {
+      "id": "uuid",
+      "bookingCode": "BK-20260520-ABC123",
+      "bookingStatus": "PAYMENT_PROCESSING",
+      "paymentStatus": "PROCESSING",
+      "totalAmount": 50000
+    }
+  }
+}
+```
+
+Common errors:
+
+- `BOOKING_NOT_FOUND`
+- `BOOKING_NOT_PAYABLE`
+- `BOOKING_HOLD_EXPIRED`
+- `PAYMENT_AMOUNT_MISMATCH`
+
+### `POST /api/payments/callback/mock`
+
+Public mock callback endpoint. The request must include a valid mock signature generated from `MOCK_PAYMENT_SECRET`.
+
+Signature payload:
+
+```text
+HMAC_SHA256(secret, "<gatewayTransactionId>:<status>")
+```
+
+Request:
+
+```json
+{
+  "gatewayTransactionId": "mock_uuid",
+  "status": "SUCCESS",
+  "signature": "<hex-signature>"
+}
+```
+
+Allowed callback statuses: `SUCCESS`, `FAILED`, `CANCELLED`, `EXPIRED`.
+
+Success behavior:
+
+- Payment changes to `SUCCESS`.
+- `paidAt` is set.
+- Booking changes from `PENDING_PAYMENT` or `PAYMENT_PROCESSING` to `CONFIRMED`.
+- Booking `paymentStatus` changes to `SUCCESS`.
+- A `booking_status_histories` record is created with:
+  - `actionType = PAYMENT_SUCCESS_CONFIRM_BOOKING`
+  - `note = Thanh toán thành công, booking được xác nhận`
+
+Idempotency:
+
+- Repeating a `SUCCESS` callback for an already successful payment returns the current payment and does not create another booking history row.
+- Terminal payments `FAILED`, `CANCELLED`, or `EXPIRED` cannot be switched to a different terminal status by a later callback.
+- If a success callback arrives after `holdExpiresAt`, the backend does not confirm the booking; it marks the payment/booking as expired.
+
+Failed/cancelled behavior:
+
+- Payment status changes to the callback status.
+- Booking is not confirmed.
+- If callback status is `EXPIRED` or the hold is already expired, booking changes to `PAYMENT_EXPIRED` and history is written.
+- Notifications are not emitted yet; this is deferred to the Notifications module.
+
+Common errors:
+
+- `INVALID_PAYMENT_SIGNATURE`
+- `PAYMENT_NOT_FOUND`
+- `PAYMENT_ALREADY_TERMINAL`
+
+### `GET /api/payments/:id`
+
+Requires `Authorization: Bearer <accessToken>`. Payment owner or `ADMIN` can view the payment.
+
+Response `200`:
+
+```json
+{
+  "payment": {
+    "id": "uuid",
+    "amount": 50000,
+    "paymentMethod": "MOCK",
+    "gatewayTransactionId": "mock_uuid",
+    "paymentStatus": "SUCCESS",
+    "paidAt": "2026-05-20T00:00:00.000Z",
+    "booking": {
+      "id": "uuid",
+      "bookingCode": "BK-20260520-ABC123",
+      "bookingStatus": "CONFIRMED",
+      "paymentStatus": "SUCCESS"
+    }
+  }
+}
+```
+
+### `GET /api/admin/payments`
+
+Requires `Authorization: Bearer <accessToken>` and `ADMIN`.
+
+Optional query params:
+
+- `status`: any `PaymentStatus`.
+- `fromDate`: ISO datetime filter on `createdAt`.
+- `toDate`: ISO datetime filter on `createdAt`.
+- `bookingCode`: partial booking code search.
+- `userId`: exact user ID.
+
+Response `200`:
+
+```json
+{
+  "payments": [
+    {
+      "id": "uuid",
+      "amount": 50000,
+      "paymentMethod": "MOCK",
+      "paymentStatus": "SUCCESS",
+      "booking": {
+        "id": "uuid",
+        "bookingCode": "BK-20260520-ABC123"
+      },
+      "user": {
+        "id": "uuid",
+        "fullName": "Nguyen Van A",
+        "email": "user@example.com"
+      }
+    }
+  ]
+}
+```
+
 ## Database Contract Baseline
 
 The MVP database uses PostgreSQL through Prisma.

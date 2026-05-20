@@ -11,7 +11,8 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   JWT_ACCESS_SECRET: z.string().min(32).default("local-development-jwt-secret-change-me"),
-  JWT_ACCESS_EXPIRES_IN: z.string().default("1h")
+  JWT_ACCESS_EXPIRES_IN: z.string().default("1h"),
+  MOCK_PAYMENT_SECRET: z.string().min(16).default("local-mock-payment-secret")
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

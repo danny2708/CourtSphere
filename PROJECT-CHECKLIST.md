@@ -602,24 +602,25 @@ Mục tiêu: thanh toán toàn bộ chi phí và confirm booking.
 
 Checklist:
 
-- [ ] API `POST /api/payments/create`.
-- [ ] API `POST /api/payments/callback/:provider`.
-- [ ] API `GET /api/payments/:id`.
-- [ ] Tạo payment record `INITIATED`.
-- [ ] Hỗ trợ payment sandbox/fake provider cho MVP.
-- [ ] Callback verify signature nếu dùng gateway thật.
-- [ ] Callback idempotent.
-- [ ] Payment success cập nhật booking `CONFIRMED` trong transaction.
-- [ ] Payment failed cập nhật payment `FAILED`.
-- [ ] Xử lý callback đến sau khi booking expired.
-- [ ] Ghi booking status history.
-- [ ] Gửi notification payment success/fail.
+- [x] API `POST /api/bookings/:id/payments`.
+- [x] API `POST /api/payments/callback/mock`.
+- [x] API `GET /api/payments/:id`.
+- [x] API `GET /api/admin/payments`.
+- [x] Tạo payment record `PROCESSING`.
+- [x] Hỗ trợ payment sandbox/fake provider cho MVP.
+- [x] Callback verify signature bằng `MOCK_PAYMENT_SECRET`.
+- [x] Callback idempotent.
+- [x] Payment success cập nhật booking `CONFIRMED` trong transaction.
+- [x] Payment failed cập nhật payment `FAILED`.
+- [x] Xử lý callback đến sau khi booking expired.
+- [x] Ghi booking status history.
+- [!] Gửi notification payment success/fail: hoãn đến module 6.16 Notifications.
 
 Acceptance criteria:
 
-- [ ] Thanh toán thành công thì booking thành `CONFIRMED`.
-- [ ] Callback gọi lại nhiều lần không làm sai dữ liệu.
-- [ ] Không confirm booking nếu hold đã hết hạn và không có logic đối soát hợp lệ.
+- [x] Thanh toán thành công thì booking thành `CONFIRMED`.
+- [x] Callback gọi lại nhiều lần không làm sai dữ liệu.
+- [x] Không confirm booking nếu hold đã hết hạn và không có logic đối soát hợp lệ.
 
 ---
 
@@ -1042,10 +1043,10 @@ Acceptance criteria:
 
 ### 8.5 Payment & refund APIs
 
-- [ ] `POST /api/payments/create`
-- [ ] `POST /api/payments/callback/:provider`
-- [ ] `GET /api/payments/:id`
-- [ ] `GET /api/admin/payments`
+- [x] `POST /api/bookings/:id/payments`
+- [x] `POST /api/payments/callback/mock`
+- [x] `GET /api/payments/:id`
+- [x] `GET /api/admin/payments`
 - [ ] `GET /api/admin/refunds`
 - [ ] `POST /api/admin/refunds/:id/retry`
 
@@ -1080,14 +1081,14 @@ Acceptance criteria:
 - [x] Cancel/refund eligibility.
 - [ ] Priority sorting.
 - [ ] Violation point calculation.
-- [ ] Payment callback idempotency logic.
+- [x] Payment callback idempotency logic.
 
 ### 9.2 Integration tests
 
 - [ ] Register/login flow.
 - [x] Create booking hold.
 - [x] Prevent double booking.
-- [ ] Payment success confirms booking.
+- [x] Payment success confirms booking.
 - [ ] Expire pending payment booking.
 - [ ] Manager check-in.
 - [ ] Manager complete.
@@ -1130,8 +1131,8 @@ Acceptance criteria:
 
 - [ ] Booking hold.
 - [ ] Overlap prevention.
-- [ ] Payment sandbox.
-- [ ] Confirm booking after payment.
+- [x] Payment sandbox.
+- [x] Confirm booking after payment.
 - [ ] My bookings UI.
 - [ ] Booking detail UI.
 
@@ -1219,7 +1220,7 @@ Một module được coi là hoàn thành khi:
 | Booking Rules & Priority | Codex | DONE | Admin config APIs, audit logs, and shared rules repository implemented |
 | Availability | Codex | DONE | Hold-aware slot generation, conflict detection, pricing, and policy response implemented |
 | Booking | Codex | DONE | Hold creation, user booking APIs, cancellation/refund request, and status history implemented |
-| Payment |  | TODO |  |
+| Payment | Codex | DONE | Mock payment, callback idempotency, status query, admin list, and booking confirmation implemented |
 | Refund |  | TODO |  |
 | Manager operations |  | TODO |  |
 | Jobs |  | TODO |  |
