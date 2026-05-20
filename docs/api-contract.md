@@ -1098,6 +1098,165 @@ Response `200`:
 }
 ```
 
+## Refund & Cancellation APIs
+
+These APIs implement mock/sandbox refund processing for MVP. They do not integrate a real refund gateway yet.
+
+Refund invariants:
+
+- Refunds are only created from `PaymentStatus.SUCCESS`.
+- `CHECKIN_EXPIRED` and `NO_SHOW` never create refunds.
+- User on-time cancellation uses `refundRateUserOnTime`.
+- Manager/Admin cancellation due to court issue uses `refundRateManagerFault`, defaulting to `100`.
+- Duplicate active/success refunds for the same booking/payment are not created.
+- Manager/Admin cancellation writes `booking_status_histories` and `audit_logs`.
+- Admin retry/manual refund handling writes `audit_logs`.
+
+### `GET /api/admin/refunds`
+
+Requires `Authorization: Bearer <accessToken>` and `ADMIN`.
+
+Optional query params:
+
+- `refundStatus`: any `RefundStatus`.
+- `fromDate`: ISO datetime filter on `requestedAt`.
+- `toDate`: ISO datetime filter on `requestedAt`.
+- `bookingCode`: partial booking code search.
+- `userId`: exact booking owner user ID.
+- `paymentId`: exact payment ID.
+
+Response `200`:
+
+```json
+{
+  "refunds": [
+    {
+      "id": "uuid",
+      "paymentId": "uuid",
+      "bookingId": "uuid",
+      "refundAmount": 50000,
+      "refundReason": "Court maintenance",
+      "refundStatus": "REQUESTED",
+      "gatewayRefundId": null,
+      "requestedAt": "2026-05-20T00:00:00.000Z",
+      "processedAt": null,
+      "payment": {
+        "id": "uuid",
+        "amount": 50000,
+        "paymentStatus": "SUCCESS",
+        "paidAt": "2026-05-20T00:00:00.000Z"
+      },
+      "booking": {
+        "id": "uuid",
+        "bookingCode": "BK-20260520-ABC123",
+        "bookingStatus": "CANCELLED_BY_MANAGER",
+        "paymentStatus": "SUCCESS"
+      }
+    }
+  ]
+}
+```
+
+### `GET /api/admin/refunds/:id`
+
+Requires `Authorization: Bearer <accessToken>` and `ADMIN`.
+
+Returns one refund with payment, booking, requester, and processor summary.
+
+Common errors:
+
+- `REFUND_NOT_FOUND`
+
+### `POST /api/admin/refunds/:id/retry`
+
+Requires `Authorization: Bearer <accessToken>` and `ADMIN`.
+
+Retries or processes a mock refund. Only `REQUESTED`, `FAILED`, and `MANUAL_REVIEW` refunds are retryable.
+
+Request:
+
+```json
+{
+  "mockResult": "SUCCESS",
+  "reason": "Manual retry after gateway timeout"
+}
+```
+
+`mockResult` is optional and defaults to `SUCCESS`. Allowed values are `SUCCESS`, `FAILED`, and `MANUAL_REVIEW`.
+
+Success behavior:
+
+- `refundStatus` becomes `SUCCESS`.
+- `processedAt` is set.
+- `processedByUserId` is set to the admin actor.
+- `gatewayRefundId` is set by the mock gateway.
+- `audit_logs` receives `ADMIN_RETRY_REFUND` and final refund status action.
+
+Failed/manual-review behavior:
+
+- `refundStatus` becomes `FAILED` or `MANUAL_REVIEW`.
+- `processedByUserId` is set to the admin actor.
+- `audit_logs` receives `ADMIN_RETRY_REFUND` and final refund status action.
+
+Common errors:
+
+- `REFUND_NOT_FOUND`
+- `REFUND_NOT_RETRYABLE`
+
+### `POST /api/manager/bookings/:id/cancel`
+
+Requires `Authorization: Bearer <accessToken>` and role `FIELD_MANAGER` or `ADMIN`.
+
+Cancels a `CONFIRMED` or `IN_USE` booking due to court issue, maintenance, incident, or system/operator fault. This endpoint is not a generic manual approval flow.
+
+Request:
+
+```json
+{
+  "reason": "Court maintenance"
+}
+```
+
+Rules:
+
+- `FIELD_MANAGER` changes the booking to `CANCELLED_BY_MANAGER`.
+- `ADMIN` changes the booking to `CANCELLED_BY_ADMIN`.
+- `COMPLETED`, `NO_SHOW`, `CHECKIN_EXPIRED`, `PAYMENT_EXPIRED`, and already-cancelled bookings cannot be cancelled here.
+- If a successful payment exists, the backend creates a `refunds` row with `REQUESTED` status using `refundRateManagerFault`.
+- If there is no successful payment, cancellation still succeeds but no refund is created.
+- Every status change writes `booking_status_histories`.
+- The cancellation writes `audit_logs`.
+
+Response `200`:
+
+```json
+{
+  "booking": {
+    "id": "uuid",
+    "bookingCode": "BK-20260520-ABC123",
+    "bookingStatus": "CANCELLED_BY_MANAGER",
+    "paymentStatus": "SUCCESS",
+    "cancelReason": "Court maintenance",
+    "cancelledByUserId": "uuid",
+    "cancelledAt": "2026-05-20T00:00:00.000Z",
+    "refundable": true,
+    "noRefundReason": null
+  },
+  "refund": {
+    "id": "uuid",
+    "paymentId": "uuid",
+    "bookingId": "uuid",
+    "refundAmount": 50000,
+    "refundStatus": "REQUESTED"
+  }
+}
+```
+
+Common errors:
+
+- `BOOKING_NOT_FOUND`
+- `BOOKING_CANNOT_BE_CANCELLED_BY_MANAGER`
+
 ## Database Contract Baseline
 
 The MVP database uses PostgreSQL through Prisma.

@@ -630,21 +630,21 @@ Mục tiêu: tạo và xử lý hoàn tiền.
 
 Checklist:
 
-- [ ] Tạo refund khi user hủy đúng hạn.
-- [ ] Tạo refund khi manager/admin hủy do sân lỗi.
-- [ ] Không tạo refund cho no-show/check-in expired.
-- [ ] API admin list refunds.
-- [ ] API admin retry refund.
-- [ ] Refund phải liên kết `payment_id` bắt buộc.
-- [ ] Refund phải liên kết `booking_id`.
-- [ ] Ghi trạng thái refund.
-- [ ] Ghi audit log khi admin xử lý refund thủ công.
+- [x] Tạo refund khi user hủy đúng hạn.
+- [x] Tạo refund khi manager/admin hủy do sân lỗi.
+- [x] Không tạo refund cho no-show/check-in expired.
+- [x] API admin list refunds.
+- [x] API admin retry refund.
+- [x] Refund phải liên kết `payment_id` bắt buộc.
+- [x] Refund phải liên kết `booking_id`.
+- [x] Ghi trạng thái refund.
+- [x] Ghi audit log khi admin xử lý refund thủ công.
 
 Acceptance criteria:
 
-- [ ] Refund chỉ phát sinh từ payment thành công.
-- [ ] Refund policy đúng theo nguyên nhân hủy.
-- [ ] Có trạng thái để đối soát: `REQUESTED`, `PROCESSING`, `SUCCESS`, `FAILED`, `MANUAL_REVIEW`.
+- [x] Refund chỉ phát sinh từ payment thành công.
+- [x] Refund policy đúng theo nguyên nhân hủy.
+- [x] Có trạng thái để đối soát: `REQUESTED`, `PROCESSING`, `SUCCESS`, `FAILED`, `MANUAL_REVIEW`.
 
 ---
 
@@ -658,14 +658,14 @@ Checklist:
 - [ ] API `POST /api/manager/bookings/:id/check-in`.
 - [ ] API `POST /api/manager/bookings/:id/complete`.
 - [ ] API `POST /api/manager/bookings/:id/no-show`.
-- [ ] API `POST /api/manager/bookings/:id/cancel`.
+- [x] API `POST /api/manager/bookings/:id/cancel`.
 - [ ] Check-in chỉ cho booking `CONFIRMED` hoặc trạng thái hợp lệ theo spec.
 - [ ] Check-in ghi `checked_in_by_user_id`.
 - [ ] Complete chỉ cho booking `IN_USE`.
 - [ ] Complete ghi `completed_by_user_id`.
 - [ ] No-show không tạo refund.
 - [ ] No-show tạo violation nếu policy yêu cầu.
-- [ ] Manager cancel tạo refund 100% mặc định.
+- [x] Manager cancel tạo refund 100% mặc định.
 - [ ] Mọi chuyển trạng thái ghi `booking_status_histories`.
 
 Acceptance criteria:
@@ -1039,7 +1039,7 @@ Acceptance criteria:
 - [ ] `POST /api/manager/bookings/:id/check-in`
 - [ ] `POST /api/manager/bookings/:id/complete`
 - [ ] `POST /api/manager/bookings/:id/no-show`
-- [ ] `POST /api/manager/bookings/:id/cancel`
+- [x] `POST /api/manager/bookings/:id/cancel`
 
 ### 8.5 Payment & refund APIs
 
@@ -1047,8 +1047,9 @@ Acceptance criteria:
 - [x] `POST /api/payments/callback/mock`
 - [x] `GET /api/payments/:id`
 - [x] `GET /api/admin/payments`
-- [ ] `GET /api/admin/refunds`
-- [ ] `POST /api/admin/refunds/:id/retry`
+- [x] `GET /api/admin/refunds`
+- [x] `GET /api/admin/refunds/:id`
+- [x] `POST /api/admin/refunds/:id/retry`
 
 ### 8.6 Admin config APIs
 
@@ -1094,7 +1095,7 @@ Acceptance criteria:
 - [ ] Manager complete.
 - [ ] No-show creates violation.
 - [x] User cancel creates refund when eligible.
-- [ ] Manager cancel creates refund.
+- [x] Manager cancel creates refund.
 - [x] RBAC denies wrong role.
 
 ### 9.3 E2E tests
@@ -1147,8 +1148,8 @@ Acceptance criteria:
 
 ### Sprint 4 — Refund, violation, jobs
 
-- [ ] User cancellation.
-- [ ] Refund module.
+- [x] User cancellation.
+- [x] Refund module.
 - [ ] Expire payment job.
 - [ ] Check-in expiration job.
 - [ ] Violation module.
@@ -1221,7 +1222,7 @@ Một module được coi là hoàn thành khi:
 | Availability | Codex | DONE | Hold-aware slot generation, conflict detection, pricing, and policy response implemented |
 | Booking | Codex | DONE | Hold creation, user booking APIs, cancellation/refund request, and status history implemented |
 | Payment | Codex | DONE | Mock payment, callback idempotency, status query, admin list, and booking confirmation implemented |
-| Refund |  | TODO |  |
+| Refund | Codex | DONE | Mock refund processor, admin refund APIs, retry audit logs, and manager/admin cancellation implemented |
 | Manager operations |  | TODO |  |
 | Jobs |  | TODO |  |
 | Waitlist |  | TODO |  |

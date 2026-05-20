@@ -6,8 +6,7 @@ import {
   EntityStatus,
   PaymentStatus,
   Prisma,
-  PrismaClient,
-  RefundStatus
+  PrismaClient
 } from "@prisma/client";
 
 import { prisma } from "../../config/prisma";
@@ -17,6 +16,7 @@ import {
   bookingConflictService,
   type BookingConflictService
 } from "../availability/booking-conflict.service";
+import { refundsService, type RefundsService } from "../refunds/refunds.service";
 import { RulesRepository, rulesRepository } from "../rules/rules.repository";
 import type {
   CancelBookingInput,
@@ -228,6 +228,7 @@ export class BookingsService {
     private readonly conflicts: BookingConflictService = bookingConflictService,
     private readonly state: BookingStateService = bookingStateService,
     private readonly rules: RulesRepository = rulesRepository,
+    private readonly refunds: RefundsService = refundsService,
     private readonly nowProvider: () => Date = () => new Date(),
     private readonly codeGenerator: (now: Date) => string = defaultBookingCode
   ) {}
@@ -416,20 +417,16 @@ export class BookingsService {
             );
 
             if (successfulPayment && policy.refundRateUserOnTime > 0) {
-              const refundAmount = successfulPayment.amount.mul(policy.refundRateUserOnTime).div(100);
-
-              await tx.refund.create({
-                data: {
-                  paymentId: successfulPayment.paymentId,
-                  bookingId: currentBooking.bookingId,
-                  refundAmount,
-                  refundReason: input.reason ?? "User cancelled booking within allowed window",
-                  refundStatus: RefundStatus.REQUESTED,
-                  requestedByUserId: userId
-                }
+              const refundResult = await this.refunds.createRefundForBooking(tx, {
+                bookingId: currentBooking.bookingId,
+                bookingStatus: currentBooking.bookingStatus,
+                payment: successfulPayment,
+                refundRate: policy.refundRateUserOnTime,
+                refundReason: input.reason ?? "User cancelled booking within allowed window",
+                requestedByUserId: userId
               });
 
-              refundable = true;
+              refundable = refundResult !== null;
             } else if (!successfulPayment) {
               noRefundReason = "No successful payment found";
             } else {
@@ -809,4 +806,3 @@ function defaultBookingCode(now: Date): string {
 }
 
 export const bookingsService = new BookingsService();
-

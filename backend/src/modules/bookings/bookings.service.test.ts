@@ -10,6 +10,7 @@ import {
 } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
+import type { RefundsService } from "../refunds/refunds.service";
 import { RulesRepository } from "../rules/rules.repository";
 import { BookingsService } from "./bookings.service";
 
@@ -208,7 +209,10 @@ function createTx(input: {
   };
 }
 
-function createService(tx: unknown, overrides: { rules?: RulesRepository } = {}) {
+function createService(
+  tx: unknown,
+  overrides: { rules?: RulesRepository; refunds?: RefundsService } = {}
+) {
   return new BookingsService(
     {
       $transaction: vi.fn((callback) => callback(tx))
@@ -216,6 +220,7 @@ function createService(tx: unknown, overrides: { rules?: RulesRepository } = {})
     undefined,
     undefined,
     overrides.rules,
+    overrides.refunds,
     () => now,
     () => "BK-20260520-TEST01"
   );
@@ -450,7 +455,7 @@ describe("BookingsService", () => {
         create: vi.fn().mockResolvedValue({})
       },
       refund: {
-        create: vi.fn().mockResolvedValue({})
+        create: vi.fn()
       }
     };
     const rules = {
@@ -466,7 +471,10 @@ describe("BookingsService", () => {
         refundRateManagerFault: 100
       })
     } as unknown as RulesRepository;
-    const service = createService(tx, { rules });
+    const refunds = {
+      createRefundForBooking: vi.fn().mockResolvedValue({ refundId, created: true })
+    } as unknown as RefundsService;
+    const service = createService(tx, { rules, refunds });
 
     const booking = await service.cancelMyBooking(userId, bookingId, {
       reason: "Schedule changed"
@@ -477,17 +485,83 @@ describe("BookingsService", () => {
       bookingStatus: BookingStatus.CANCELLED_BY_USER,
       refundable: true
     });
-    expect(tx.refund.create).toHaveBeenCalledWith(
+    expect(refunds.createRefundForBooking).toHaveBeenCalledWith(
+      tx,
       expect.objectContaining({
-        data: expect.objectContaining({
-          paymentId,
-          bookingId,
-          refundAmount: new Prisma.Decimal(80000),
-          refundReason: "Schedule changed",
-          requestedByUserId: userId
-        })
+        bookingId,
+        bookingStatus: BookingStatus.CONFIRMED,
+        payment,
+        refundRate: 80,
+        refundReason: "Schedule changed",
+        requestedByUserId: userId
       })
     );
+    expect(tx.refund.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects confirmed user cancellation after the configured cancel window", async () => {
+    const payment = {
+      paymentId,
+      bookingId,
+      userId,
+      amount: new Prisma.Decimal(100000),
+      paymentMethod: "FAKE",
+      gatewayTransactionId: "gw_1",
+      paymentStatus: PaymentStatus.SUCCESS,
+      rawCallback: null,
+      paidAt: new Date("2026-05-20T01:00:00.000Z"),
+      createdAt: now,
+      updatedAt: now
+    };
+    const tx = {
+      booking: {
+        findFirst: vi.fn().mockResolvedValue({
+          ...buildBooking({
+            bookingStatus: BookingStatus.CONFIRMED,
+            paymentStatus: PaymentStatus.SUCCESS,
+            startDatetime: new Date("2026-05-20T01:00:00.000Z"),
+            payments: [payment]
+          }),
+          user: buildUser()
+        }),
+        update: vi.fn(),
+        findUniqueOrThrow: vi.fn()
+      },
+      bookingStatusHistory: {
+        create: vi.fn()
+      },
+      refund: {
+        create: vi.fn()
+      }
+    };
+    const rules = {
+      getEffectivePolicy: vi.fn().mockResolvedValue({
+        holdMinutes: 10,
+        cancelBeforeHours: 2,
+        lateCheckinMinutes: 15,
+        maxDurationMinutes: 120,
+        maxBookingsPerDay: 2,
+        advanceBookingDays: 7,
+        canJoinWaitlist: true,
+        refundRateUserOnTime: 80,
+        refundRateManagerFault: 100
+      })
+    } as unknown as RulesRepository;
+    const refunds = {
+      createRefundForBooking: vi.fn()
+    } as unknown as RefundsService;
+    const service = createService(tx, { rules, refunds });
+
+    await expect(
+      service.cancelMyBooking(userId, bookingId, {
+        reason: "Too late"
+      })
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: "BOOKING_CANCEL_WINDOW_CLOSED"
+    });
+    expect(refunds.createRefundForBooking).not.toHaveBeenCalled();
+    expect(tx.refund.create).not.toHaveBeenCalled();
+    expect(tx.booking.update).not.toHaveBeenCalled();
   });
 });
-

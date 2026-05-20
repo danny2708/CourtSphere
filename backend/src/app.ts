@@ -9,6 +9,7 @@ import authRouter from "./modules/auth/auth.routes";
 import bookingsRouter from "./modules/bookings/bookings.routes";
 import courtsRouter from "./modules/courts/courts.routes";
 import paymentsRouter from "./modules/payments/payments.routes";
+import refundsRouter from "./modules/refunds/refunds.routes";
 import rulesRouter from "./modules/rules/rules.routes";
 import usersRouter from "./modules/users/users.routes";
 import healthRouter from "./routes/health.routes";
@@ -40,6 +41,7 @@ app.use("/api", courtsRouter);
 app.use("/api", availabilityRouter);
 app.use("/api/bookings", bookingsRouter);
 app.use("/api", paymentsRouter);
+app.use("/api", refundsRouter);
 app.use("/api/admin", rulesRouter);
 app.use("/api/admin", usersRouter);
 
