@@ -249,7 +249,6 @@ Một booking request hợp lệ khi thỏa toàn bộ:
 - ngày đặt không vượt `advance_booking_days` theo priority group;
 - thời lượng không vượt `max_duration_minutes`;
 - user chưa vượt `max_bookings_per_day`;
-- số người không vượt sức chứa sân;
 - không overlap với booking đang chiếm slot;
 - không nằm trong thời gian sân bảo trì/tạm đóng.
 
@@ -383,7 +382,33 @@ enum RefundStatus {
 
 ## 5. Database schema — nguồn chân lý
 
-### 5.1 Danh sách bảng
+### 5.1 Thay đổi thiết kế booking mới nhất
+
+Từ phiên bản này, hệ thống không còn xem một bản ghi booking là một sân + một khung giờ nữa. Thiết kế mới tách thành hai tầng:
+
+```text
+booking_orders = đơn đặt sân / đơn tổng
+booking_items  = chi tiết đặt sân / từng sân + từng khung giờ
+```
+
+Quy tắc:
+
+```text
+1 booking_order có nhiều booking_items
+1 booking_item thuộc đúng 1 booking_order
+1 booking_item gắn với đúng 1 court và 1 khoảng thời gian start_datetime/end_datetime
+```
+
+Thiết kế này hỗ trợ đồng thời:
+
+- đặt sân đơn: một `booking_order` có một `booking_item`;
+- đặt combo nhiều sân/nhiều khung giờ: một `booking_order` có nhiều `booking_items`;
+- đặt sân cho giải đấu/sự kiện: một đơn tổng chứa nhiều sân và nhiều khung giờ;
+- thanh toán một lần cho toàn bộ đơn;
+- hoàn tiền toàn bộ đơn hoặc hoàn một phần theo từng chi tiết đặt sân;
+- check-in/no-show/completed theo từng chi tiết đặt sân.
+
+### 5.2 Danh sách bảng
 
 | Bảng | Ý nghĩa |
 |---|---|
@@ -395,27 +420,46 @@ enum RefundStatus {
 | `courts` | Sân |
 | `operating_hours` | Khung giờ hoạt động |
 | `pricing_rules` | Bảng giá |
-| `bookings` | Đơn đặt sân |
-| `payments` | Thanh toán |
-| `refunds` | Hoàn tiền |
-| `booking_status_histories` | Lịch sử trạng thái booking |
+| `booking_orders` | Đơn đặt sân tổng |
+| `booking_items` | Chi tiết đặt sân: từng sân + từng khung giờ |
+| `payments` | Thanh toán cho đơn đặt sân |
+| `refunds` | Hoàn tiền, có thể gắn với đơn hoặc chi tiết đặt sân |
+| `booking_order_status_histories` | Lịch sử trạng thái đơn đặt sân |
+| `booking_item_status_histories` | Lịch sử trạng thái từng chi tiết đặt sân |
 | `court_status_histories` | Lịch sử trạng thái sân |
 | `violations` | Vi phạm |
 | `notifications` | Thông báo |
 | `waitlist_entries` | Danh sách chờ |
-| `system_settings` | Cấu hình kỹ thuật/cấu hình lặt vặt |
+| `system_settings` | Cấu hình kỹ thuật/cấu hình nghiệp vụ dạng key-value |
 | `audit_logs` | Audit log chung |
 
-### 5.2 Phân vai cấu hình
+### 5.3 Các thay đổi đã chốt so với thiết kế cũ
+
+- Bảng `bookings` cũ được thay bằng:
+  - `booking_orders`: đơn đặt sân tổng;
+  - `booking_items`: chi tiết đặt sân.
+- Bảng `courts` bỏ:
+  - `location`;
+  - `capacity`.
+- Bảng `booking_items` không có:
+  - `participant_count`;
+  - `checkout_time`;
+  - `no_refund_reason`.
+- `payments` gắn với `booking_orders`, vì một đơn có thể gồm nhiều chi tiết sân nhưng thanh toán một lần.
+- `refunds` gắn với `booking_orders` và có thể gắn thêm `booking_items` nếu hoàn tiền một phần.
+- Chống overlap phải kiểm tra ở bảng `booking_items`, không kiểm tra ở bảng `booking_orders`.
+- `waitlist_entries` có thêm `expires_at` để xử lý trường hợp user đã được thông báo slot trống nhưng không phản hồi đúng hạn.
+
+### 5.4 Phân vai cấu hình
 
 Không để trùng source of truth.
 
 - `priority_groups`: lưu chính sách ưu tiên có cấu trúc.
-- `system_settings`: chỉ lưu cấu hình hệ thống dạng key-value như `hold_minutes`, `cancel_before_hours`, `late_checkin_minutes`, `max_bookings_per_day`, `max_duration_minutes`, `violation_threshold`, `booking_ban_days`, `refund_rate_user_on_time`, `refund_rate_manager_fault`.
-- `pricing_rules`: lưu giá.
-- `operating_hours`: lưu giờ hoạt động.
+- `system_settings`: lưu cấu hình hệ thống dạng key-value như `hold_minutes`, `cancel_before_hours`, `late_checkin_minutes`, `max_bookings_per_day`, `max_duration_minutes`, `violation_threshold`, `booking_ban_days`, `refund_rate_user_on_time`, `refund_rate_manager_fault`, `waitlist_response_minutes`.
+- `pricing_rules`: lưu giá theo sân, khung giờ, ngày áp dụng, nhóm ưu tiên nếu cần.
+- `operating_hours`: lưu giờ hoạt động của từng sân.
 
-### 5.3 ERD Mermaid đồng bộ với relation diagram
+### 5.5 ERD Mermaid đồng bộ với relation diagram mới
 
 ```mermaid
 erDiagram
@@ -427,26 +471,36 @@ erDiagram
   courts ||--o{ operating_hours : has
   courts ||--o{ pricing_rules : priced_by
   users ||--o{ pricing_rules : creates
+  priority_groups ||--o{ pricing_rules : applies_to
 
-  users ||--o{ bookings : creates
-  courts ||--o{ bookings : booked
+  users ||--o{ booking_orders : creates
+  users ||--o{ booking_orders : cancels
+  booking_orders ||--|{ booking_items : contains
+  courts ||--o{ booking_items : booked_in
+  users ||--o{ booking_items : operates
 
-  bookings ||--o{ payments : paid_by
+  booking_orders ||--o{ payments : paid_by
   payments ||--o{ refunds : refunded_by
-  bookings ||--o{ refunds : refund_for
+  booking_orders ||--o{ refunds : refund_for
+  booking_items ||--o{ refunds : partial_refund_for
+  users ||--o{ refunds : requests_or_processes
 
-  bookings ||--o{ booking_status_histories : status_logs
-  users ||--o{ booking_status_histories : action_by
+  booking_orders ||--o{ booking_order_status_histories : status_logs
+  users ||--o{ booking_order_status_histories : action_by
+
+  booking_items ||--o{ booking_item_status_histories : status_logs
+  users ||--o{ booking_item_status_histories : action_by
 
   courts ||--o{ court_status_histories : status_logs
   users ||--o{ court_status_histories : updated_by
 
   users ||--o{ violations : receives
-  bookings ||--o{ violations : caused_by
+  booking_items ||--o{ violations : caused_by
   users ||--o{ violations : recorded_by
 
   users ||--o{ notifications : receives
-  bookings ||--o{ notifications : related_to
+  booking_orders ||--o{ notifications : related_order
+  booking_items ||--o{ notifications : related_item
 
   users ||--o{ waitlist_entries : joins
   courts ||--o{ waitlist_entries : waits_for
@@ -456,7 +510,7 @@ erDiagram
   users ||--o{ audit_logs : acts
 ```
 
-### 5.4 Quan hệ FK chi tiết
+### 5.6 Quan hệ FK chi tiết
 
 ```text
 priority_groups.priority_group_id -> users.priority_group_id
@@ -469,34 +523,42 @@ court_types.court_type_id -> courts.court_type_id
 courts.court_id -> operating_hours.court_id
 courts.court_id -> pricing_rules.court_id
 users.user_id -> pricing_rules.created_by_user_id
+priority_groups.priority_group_id -> pricing_rules.priority_group_id
 
-users.user_id -> bookings.user_id
-courts.court_id -> bookings.court_id
-users.user_id -> bookings.cancelled_by_user_id
-users.user_id -> bookings.checked_in_by_user_id
-users.user_id -> bookings.completed_by_user_id
-users.user_id -> bookings.no_show_marked_by_user_id
+users.user_id -> booking_orders.user_id
+users.user_id -> booking_orders.cancelled_by_user_id
 
-bookings.booking_id -> payments.booking_id
+booking_orders.booking_order_id -> booking_items.booking_order_id
+courts.court_id -> booking_items.court_id
+users.user_id -> booking_items.checked_in_by_user_id
+users.user_id -> booking_items.completed_by_user_id
+users.user_id -> booking_items.no_show_marked_by_user_id
+
+booking_orders.booking_order_id -> payments.booking_order_id
 users.user_id -> payments.user_id
 
 payments.payment_id -> refunds.payment_id
-bookings.booking_id -> refunds.booking_id
+booking_orders.booking_order_id -> refunds.booking_order_id
+booking_items.booking_item_id -> refunds.booking_item_id
 users.user_id -> refunds.requested_by_user_id
 users.user_id -> refunds.processed_by_user_id
 
-bookings.booking_id -> booking_status_histories.booking_id
-users.user_id -> booking_status_histories.action_by_user_id
+booking_orders.booking_order_id -> booking_order_status_histories.booking_order_id
+users.user_id -> booking_order_status_histories.action_by_user_id
+
+booking_items.booking_item_id -> booking_item_status_histories.booking_item_id
+users.user_id -> booking_item_status_histories.action_by_user_id
 
 courts.court_id -> court_status_histories.court_id
 users.user_id -> court_status_histories.updated_by_user_id
 
 users.user_id -> violations.user_id
-bookings.booking_id -> violations.booking_id
+booking_items.booking_item_id -> violations.booking_item_id
 users.user_id -> violations.recorded_by_user_id
 
 users.user_id -> notifications.user_id
-bookings.booking_id -> notifications.booking_id
+booking_orders.booking_order_id -> notifications.booking_order_id
+booking_items.booking_item_id -> notifications.booking_item_id
 
 users.user_id -> waitlist_entries.user_id
 courts.court_id -> waitlist_entries.court_id
@@ -512,7 +574,8 @@ users.user_id -> audit_logs.actor_user_id
 
 > Schema này dùng UUID để dễ phát triển, phù hợp PostgreSQL + Prisma.  
 > Database table name dùng snake_case số nhiều qua `@@map`.  
-> Không còn `role` enum trong `users`; RBAC dùng `roles` + `user_roles`.
+> Không còn `role` enum trong `users`; RBAC dùng `roles` + `user_roles`.  
+> Booking được tách thành `BookingOrder` và `BookingItem` để hỗ trợ đặt combo nhiều sân/nhiều khung giờ.
 
 ```prisma
 generator client {
@@ -547,7 +610,19 @@ enum CourtStatus {
   RETIRED
 }
 
-enum BookingStatus {
+enum BookingOrderStatus {
+  PENDING_PAYMENT
+  PAYMENT_PROCESSING
+  PAYMENT_EXPIRED
+  CONFIRMED
+  PARTIALLY_CANCELLED
+  CANCELLED_BY_USER
+  CANCELLED_BY_MANAGER
+  CANCELLED_BY_ADMIN
+  COMPLETED
+}
+
+enum BookingItemStatus {
   PENDING_PAYMENT
   PAYMENT_PROCESSING
   PAYMENT_EXPIRED
@@ -594,6 +669,8 @@ enum NotificationType {
   BOOKING_CANCELLED
   REFUND_REQUESTED
   REFUND_SUCCESS
+  WAITLIST_SLOT_AVAILABLE
+  WAITLIST_EXPIRED
   CHECKIN_EXPIRED
   NO_SHOW
   VIOLATION_RECORDED
@@ -621,6 +698,7 @@ model PriorityGroup {
 
   users              User[]
   waitlistEntries    WaitlistEntry[]
+  pricingRules       PricingRule[]
 
   @@index([priorityLevel])
   @@map("priority_groups")
@@ -644,18 +722,19 @@ model User {
 
   priorityGroup           PriorityGroup?          @relation(fields: [priorityGroupId], references: [priorityGroupId])
   userRoles               UserRole[]
-  bookings                Booking[]              @relation("BookingOwner")
-  cancelledBookings       Booking[]              @relation("BookingCancelledBy")
-  checkedInBookings       Booking[]              @relation("BookingCheckedInBy")
-  completedBookings       Booking[]              @relation("BookingCompletedBy")
-  noShowMarkedBookings    Booking[]              @relation("BookingNoShowMarkedBy")
+  bookingOrders           BookingOrder[]          @relation("BookingOrderOwner")
+  cancelledBookingOrders  BookingOrder[]          @relation("BookingOrderCancelledBy")
+  checkedInBookingItems   BookingItem[]           @relation("BookingItemCheckedInBy")
+  completedBookingItems   BookingItem[]           @relation("BookingItemCompletedBy")
+  noShowMarkedItems       BookingItem[]           @relation("BookingItemNoShowMarkedBy")
   payments                Payment[]
-  requestedRefunds        Refund[]               @relation("RefundRequestedBy")
-  processedRefunds        Refund[]               @relation("RefundProcessedBy")
-  bookingStatusHistories  BookingStatusHistory[]
+  requestedRefunds        Refund[]                @relation("RefundRequestedBy")
+  processedRefunds        Refund[]                @relation("RefundProcessedBy")
+  orderStatusHistories    BookingOrderStatusHistory[]
+  itemStatusHistories     BookingItemStatusHistory[]
   courtStatusHistories    CourtStatusHistory[]
-  violations              Violation[]            @relation("ViolationUser")
-  recordedViolations      Violation[]            @relation("ViolationRecordedBy")
+  violations              Violation[]             @relation("ViolationUser")
+  recordedViolations      Violation[]             @relation("ViolationRecordedBy")
   notifications           Notification[]
   waitlistEntries         WaitlistEntry[]
   updatedSystemSettings   SystemSetting[]
@@ -706,23 +785,21 @@ model CourtType {
 }
 
 model Court {
-  courtId               String               @id @default(uuid()) @map("court_id")
-  courtTypeId           String               @map("court_type_id")
-  courtName             String               @map("court_name")
-  location              String
-  capacity              Int
-  description           String?
-  imageUrl              String?              @map("image_url")
-  status                CourtStatus          @default(ACTIVE)
-  createdAt             DateTime             @default(now()) @map("created_at")
-  updatedAt             DateTime             @updatedAt @map("updated_at")
+  courtId              String               @id @default(uuid()) @map("court_id")
+  courtTypeId          String               @map("court_type_id")
+  courtName            String               @map("court_name")
+  description          String?
+  imageUrl             String?              @map("image_url")
+  status               CourtStatus          @default(ACTIVE)
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
 
-  courtType             CourtType            @relation(fields: [courtTypeId], references: [courtTypeId])
-  operatingHours        OperatingHour[]
-  pricingRules          PricingRule[]
-  bookings              Booking[]
-  courtStatusHistories  CourtStatusHistory[]
-  waitlistEntries       WaitlistEntry[]
+  courtType            CourtType            @relation(fields: [courtTypeId], references: [courtTypeId])
+  operatingHours       OperatingHour[]
+  pricingRules         PricingRule[]
+  bookingItems         BookingItem[]
+  courtStatusHistories CourtStatusHistory[]
+  waitlistEntries      WaitlistEntry[]
 
   @@index([courtTypeId])
   @@index([status])
@@ -730,17 +807,17 @@ model Court {
 }
 
 model OperatingHour {
-  operatingHourId    String       @id @default(uuid()) @map("operating_hour_id")
-  courtId            String       @map("court_id")
-  weekday            Int
-  openTime           String       @map("open_time")
-  closeTime          String       @map("close_time")
-  slotDurationMinutes Int         @default(60) @map("slot_duration_minutes")
-  status             EntityStatus @default(ACTIVE)
-  createdAt          DateTime     @default(now()) @map("created_at")
-  updatedAt          DateTime     @updatedAt @map("updated_at")
+  operatingHourId     String       @id @default(uuid()) @map("operating_hour_id")
+  courtId             String       @map("court_id")
+  weekday             Int
+  openTime            String       @map("open_time")
+  closeTime           String       @map("close_time")
+  slotDurationMinutes Int          @default(60) @map("slot_duration_minutes")
+  status              EntityStatus @default(ACTIVE)
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
 
-  court              Court        @relation(fields: [courtId], references: [courtId])
+  court               Court        @relation(fields: [courtId], references: [courtId])
 
   @@unique([courtId, weekday])
   @@index([courtId, weekday])
@@ -748,77 +825,98 @@ model OperatingHour {
 }
 
 model PricingRule {
-  pricingRuleId     String       @id @default(uuid()) @map("pricing_rule_id")
-  courtId           String       @map("court_id")
-  createdByUserId   String?      @map("created_by_user_id")
-  startTime         String       @map("start_time")
-  endTime           String       @map("end_time")
-  applicableDay     Int?         @map("applicable_day")
-  priceAmount       Decimal      @db.Decimal(12, 2) @map("price_amount")
-  priorityGroupId   String?      @map("priority_group_id")
-  effectiveFrom     DateTime?    @map("effective_from")
-  effectiveTo       DateTime?    @map("effective_to")
-  status            EntityStatus @default(ACTIVE)
-  createdAt         DateTime     @default(now()) @map("created_at")
-  updatedAt         DateTime     @updatedAt @map("updated_at")
+  pricingRuleId   String       @id @default(uuid()) @map("pricing_rule_id")
+  courtId         String       @map("court_id")
+  createdByUserId String?      @map("created_by_user_id")
+  priorityGroupId String?      @map("priority_group_id")
+  startTime       String       @map("start_time")
+  endTime         String       @map("end_time")
+  applicableDay   Int?         @map("applicable_day")
+  priceAmount     Decimal      @db.Decimal(12, 2) @map("price_amount")
+  effectiveFrom   DateTime?    @map("effective_from")
+  effectiveTo     DateTime?    @map("effective_to")
+  status          EntityStatus @default(ACTIVE)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
 
-  court             Court        @relation(fields: [courtId], references: [courtId])
-  createdBy         User?        @relation(fields: [createdByUserId], references: [userId])
+  court           Court        @relation(fields: [courtId], references: [courtId])
+  createdBy       User?        @relation(fields: [createdByUserId], references: [userId])
+  priorityGroup   PriorityGroup? @relation(fields: [priorityGroupId], references: [priorityGroupId])
 
   @@index([courtId])
   @@index([priorityGroupId])
   @@map("pricing_rules")
 }
 
-model Booking {
-  bookingId              String        @id @default(uuid()) @map("booking_id")
-  bookingCode            String        @unique @map("booking_code")
-  userId                 String        @map("user_id")
-  courtId                String        @map("court_id")
-  startDatetime          DateTime      @map("start_datetime")
-  endDatetime            DateTime      @map("end_datetime")
-  participantCount       Int           @map("participant_count")
-  usagePurpose           String        @map("usage_purpose")
-  totalAmount            Decimal       @db.Decimal(12, 2) @map("total_amount")
-  bookingStatus          BookingStatus @default(PENDING_PAYMENT) @map("booking_status")
-  paymentStatus          PaymentStatus @default(INITIATED) @map("payment_status")
-  refundable             Boolean       @default(true)
-  holdExpiresAt          DateTime?     @map("hold_expires_at")
-  cancelReason           String?       @map("cancel_reason")
-  cancelledByUserId      String?       @map("cancelled_by_user_id")
-  cancelledAt            DateTime?     @map("cancelled_at")
-  checkedInByUserId      String?       @map("checked_in_by_user_id")
-  completedByUserId      String?       @map("completed_by_user_id")
-  noShowMarkedByUserId   String?       @map("no_show_marked_by_user_id")
-  managerNote            String?       @map("manager_note")
-  noRefundReason         String?       @map("no_refund_reason")
-  checkinTime            DateTime?     @map("checkin_time")
-  checkoutTime           DateTime?     @map("checkout_time")
-  createdAt              DateTime      @default(now()) @map("created_at")
-  updatedAt              DateTime      @updatedAt @map("updated_at")
+model BookingOrder {
+  bookingOrderId       String             @id @default(uuid()) @map("booking_order_id")
+  orderCode            String             @unique @map("order_code")
+  userId               String             @map("user_id")
+  orderType            String?            @map("order_type")
+  eventName            String?            @map("event_name")
+  usagePurpose         String?            @map("usage_purpose")
+  totalAmount          Decimal            @db.Decimal(12, 2) @map("total_amount")
+  orderStatus          BookingOrderStatus @default(PENDING_PAYMENT) @map("order_status")
+  paymentStatus        PaymentStatus      @default(INITIATED) @map("payment_status")
+  refundable           Boolean            @default(true)
+  holdExpiresAt        DateTime?          @map("hold_expires_at")
+  note                 String?
+  cancelReason         String?            @map("cancel_reason")
+  cancelledByUserId    String?            @map("cancelled_by_user_id")
+  cancelledAt          DateTime?          @map("cancelled_at")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
 
-  user                   User          @relation("BookingOwner", fields: [userId], references: [userId])
-  court                  Court         @relation(fields: [courtId], references: [courtId])
-  cancelledBy            User?         @relation("BookingCancelledBy", fields: [cancelledByUserId], references: [userId])
-  checkedInBy            User?         @relation("BookingCheckedInBy", fields: [checkedInByUserId], references: [userId])
-  completedBy            User?         @relation("BookingCompletedBy", fields: [completedByUserId], references: [userId])
-  noShowMarkedBy         User?         @relation("BookingNoShowMarkedBy", fields: [noShowMarkedByUserId], references: [userId])
-  payments               Payment[]
-  refunds                Refund[]
-  bookingStatusHistories BookingStatusHistory[]
-  violations             Violation[]
-  notifications          Notification[]
+  user                 User               @relation("BookingOrderOwner", fields: [userId], references: [userId])
+  cancelledBy          User?              @relation("BookingOrderCancelledBy", fields: [cancelledByUserId], references: [userId])
+  items                BookingItem[]
+  payments             Payment[]
+  refunds              Refund[]
+  statusHistories      BookingOrderStatusHistory[]
+  notifications        Notification[]
 
   @@index([userId])
+  @@index([orderStatus])
+  @@index([paymentStatus])
+  @@map("booking_orders")
+}
+
+model BookingItem {
+  bookingItemId        String            @id @default(uuid()) @map("booking_item_id")
+  bookingOrderId       String            @map("booking_order_id")
+  courtId              String            @map("court_id")
+  startDatetime        DateTime          @map("start_datetime")
+  endDatetime          DateTime          @map("end_datetime")
+  unitPrice            Decimal           @db.Decimal(12, 2) @map("unit_price")
+  lineAmount           Decimal           @db.Decimal(12, 2) @map("line_amount")
+  bookingStatus        BookingItemStatus @default(PENDING_PAYMENT) @map("booking_status")
+  checkinTime          DateTime?         @map("checkin_time")
+  checkedInByUserId    String?           @map("checked_in_by_user_id")
+  completedByUserId    String?           @map("completed_by_user_id")
+  noShowMarkedByUserId String?           @map("no_show_marked_by_user_id")
+  managerNote          String?           @map("manager_note")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  bookingOrder         BookingOrder      @relation(fields: [bookingOrderId], references: [bookingOrderId], onDelete: Cascade)
+  court                Court             @relation(fields: [courtId], references: [courtId])
+  checkedInBy          User?             @relation("BookingItemCheckedInBy", fields: [checkedInByUserId], references: [userId])
+  completedBy          User?             @relation("BookingItemCompletedBy", fields: [completedByUserId], references: [userId])
+  noShowMarkedBy       User?             @relation("BookingItemNoShowMarkedBy", fields: [noShowMarkedByUserId], references: [userId])
+  refunds              Refund[]
+  statusHistories      BookingItemStatusHistory[]
+  violations           Violation[]
+  notifications        Notification[]
+
+  @@index([bookingOrderId])
   @@index([courtId, startDatetime, endDatetime])
   @@index([bookingStatus])
-  @@index([paymentStatus])
-  @@map("bookings")
+  @@map("booking_items")
 }
 
 model Payment {
   paymentId            String        @id @default(uuid()) @map("payment_id")
-  bookingId            String        @map("booking_id")
+  bookingOrderId       String        @map("booking_order_id")
   userId               String        @map("user_id")
   amount               Decimal       @db.Decimal(12, 2)
   paymentMethod        String        @map("payment_method")
@@ -829,11 +927,11 @@ model Payment {
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
 
-  booking              Booking       @relation(fields: [bookingId], references: [bookingId])
+  bookingOrder         BookingOrder  @relation(fields: [bookingOrderId], references: [bookingOrderId])
   user                 User          @relation(fields: [userId], references: [userId])
   refunds              Refund[]
 
-  @@index([bookingId])
+  @@index([bookingOrderId])
   @@index([userId])
   @@index([paymentStatus])
   @@map("payments")
@@ -842,7 +940,8 @@ model Payment {
 model Refund {
   refundId            String       @id @default(uuid()) @map("refund_id")
   paymentId           String       @map("payment_id")
-  bookingId           String       @map("booking_id")
+  bookingOrderId      String       @map("booking_order_id")
+  bookingItemId       String?      @map("booking_item_id")
   refundAmount        Decimal      @db.Decimal(12, 2) @map("refund_amount")
   refundReason        String       @map("refund_reason")
   refundStatus        RefundStatus @default(REQUESTED) @map("refund_status")
@@ -854,32 +953,52 @@ model Refund {
   updatedAt           DateTime     @updatedAt @map("updated_at")
 
   payment             Payment      @relation(fields: [paymentId], references: [paymentId])
-  booking             Booking      @relation(fields: [bookingId], references: [bookingId])
+  bookingOrder        BookingOrder @relation(fields: [bookingOrderId], references: [bookingOrderId])
+  bookingItem         BookingItem? @relation(fields: [bookingItemId], references: [bookingItemId])
   requestedBy         User?        @relation("RefundRequestedBy", fields: [requestedByUserId], references: [userId])
   processedBy         User?        @relation("RefundProcessedBy", fields: [processedByUserId], references: [userId])
 
   @@index([paymentId])
-  @@index([bookingId])
+  @@index([bookingOrderId])
+  @@index([bookingItemId])
   @@index([refundStatus])
   @@map("refunds")
 }
 
-model BookingStatusHistory {
-  bookingStatusHistoryId String         @id @default(uuid()) @map("booking_status_history_id")
-  bookingId              String         @map("booking_id")
-  actionByUserId         String?        @map("action_by_user_id")
-  oldStatus              BookingStatus? @map("old_status")
-  newStatus              BookingStatus  @map("new_status")
-  actionType             String         @map("action_type")
-  note                   String?
-  changedAt              DateTime       @default(now()) @map("changed_at")
+model BookingOrderStatusHistory {
+  bookingOrderStatusHistoryId String              @id @default(uuid()) @map("booking_order_status_history_id")
+  bookingOrderId              String              @map("booking_order_id")
+  actionByUserId              String?             @map("action_by_user_id")
+  oldStatus                   BookingOrderStatus? @map("old_status")
+  newStatus                   BookingOrderStatus  @map("new_status")
+  actionType                  String              @map("action_type")
+  note                        String?
+  changedAt                   DateTime            @default(now()) @map("changed_at")
 
-  booking                Booking        @relation(fields: [bookingId], references: [bookingId])
-  actionBy               User?          @relation(fields: [actionByUserId], references: [userId])
+  bookingOrder                BookingOrder        @relation(fields: [bookingOrderId], references: [bookingOrderId])
+  actionBy                    User?               @relation(fields: [actionByUserId], references: [userId])
 
-  @@index([bookingId])
+  @@index([bookingOrderId])
   @@index([actionByUserId])
-  @@map("booking_status_histories")
+  @@map("booking_order_status_histories")
+}
+
+model BookingItemStatusHistory {
+  bookingItemStatusHistoryId String             @id @default(uuid()) @map("booking_item_status_history_id")
+  bookingItemId              String             @map("booking_item_id")
+  actionByUserId             String?            @map("action_by_user_id")
+  oldStatus                  BookingItemStatus? @map("old_status")
+  newStatus                  BookingItemStatus  @map("new_status")
+  actionType                 String             @map("action_type")
+  note                       String?
+  changedAt                  DateTime           @default(now()) @map("changed_at")
+
+  bookingItem                BookingItem        @relation(fields: [bookingItemId], references: [bookingItemId])
+  actionBy                   User?              @relation(fields: [actionByUserId], references: [userId])
+
+  @@index([bookingItemId])
+  @@index([actionByUserId])
+  @@map("booking_item_status_histories")
 }
 
 model CourtStatusHistory {
@@ -901,7 +1020,7 @@ model CourtStatusHistory {
 model Violation {
   violationId       String        @id @default(uuid()) @map("violation_id")
   userId            String        @map("user_id")
-  bookingId         String?       @map("booking_id")
+  bookingItemId     String?       @map("booking_item_id")
   violationType     ViolationType @map("violation_type")
   penaltyPoints     Int           @map("penalty_points")
   description       String?
@@ -910,18 +1029,19 @@ model Violation {
   recordedAt        DateTime      @default(now()) @map("recorded_at")
 
   user              User          @relation("ViolationUser", fields: [userId], references: [userId])
-  booking           Booking?      @relation(fields: [bookingId], references: [bookingId])
+  bookingItem       BookingItem?  @relation(fields: [bookingItemId], references: [bookingItemId])
   recordedBy        User?         @relation("ViolationRecordedBy", fields: [recordedByUserId], references: [userId])
 
   @@index([userId])
-  @@index([bookingId])
+  @@index([bookingItemId])
   @@map("violations")
 }
 
 model Notification {
   notificationId   String           @id @default(uuid()) @map("notification_id")
   userId           String           @map("user_id")
-  bookingId        String?          @map("booking_id")
+  bookingOrderId   String?          @map("booking_order_id")
+  bookingItemId    String?          @map("booking_item_id")
   title            String
   content          String
   notificationType NotificationType @map("notification_type")
@@ -930,32 +1050,35 @@ model Notification {
   createdAt        DateTime         @default(now()) @map("created_at")
 
   user             User             @relation(fields: [userId], references: [userId])
-  booking          Booking?         @relation(fields: [bookingId], references: [bookingId])
+  bookingOrder     BookingOrder?    @relation(fields: [bookingOrderId], references: [bookingOrderId])
+  bookingItem      BookingItem?     @relation(fields: [bookingItemId], references: [bookingItemId])
 
   @@index([userId])
-  @@index([bookingId])
+  @@index([bookingOrderId])
+  @@index([bookingItemId])
   @@map("notifications")
 }
 
 model WaitlistEntry {
-  waitlistEntryId     String         @id @default(uuid()) @map("waitlist_entry_id")
-  userId              String         @map("user_id")
-  courtId             String         @map("court_id")
-  priorityGroupId     String?        @map("priority_group_id")
-  desiredStartDatetime DateTime      @map("desired_start_datetime")
-  desiredEndDatetime   DateTime      @map("desired_end_datetime")
-  priorityOrder       Int?           @map("priority_order")
-  status              WaitlistStatus @default(WAITING)
-  registeredAt        DateTime       @default(now()) @map("registered_at")
-  notifiedAt          DateTime?      @map("notified_at")
-  expiresAt           DateTime?      @map("expires_at")
+  waitlistEntryId       String         @id @default(uuid()) @map("waitlist_entry_id")
+  userId                String         @map("user_id")
+  courtId               String         @map("court_id")
+  priorityGroupId       String?        @map("priority_group_id")
+  desiredStartDatetime  DateTime       @map("desired_start_datetime")
+  desiredEndDatetime    DateTime       @map("desired_end_datetime")
+  priorityOrder         Int?           @map("priority_order")
+  status                WaitlistStatus @default(WAITING)
+  registeredAt          DateTime       @default(now()) @map("registered_at")
+  notifiedAt            DateTime?      @map("notified_at")
+  expiresAt             DateTime?      @map("expires_at")
 
-  user                User           @relation(fields: [userId], references: [userId])
-  court               Court          @relation(fields: [courtId], references: [courtId])
-  priorityGroup       PriorityGroup? @relation(fields: [priorityGroupId], references: [priorityGroupId])
+  user                  User           @relation(fields: [userId], references: [userId])
+  court                 Court          @relation(fields: [courtId], references: [courtId])
+  priorityGroup         PriorityGroup? @relation(fields: [priorityGroupId], references: [priorityGroupId])
 
   @@unique([userId, courtId, desiredStartDatetime, desiredEndDatetime])
   @@index([courtId, desiredStartDatetime, desiredEndDatetime])
+  @@index([status, expiresAt])
   @@map("waitlist_entries")
 }
 
@@ -998,20 +1121,22 @@ model AuditLog {
 
 Prisma chưa hỗ trợ đầy đủ exclusion constraint, nên sau migration có thể thêm SQL thủ công.
 
-### 7.1 Chống overlap booking ở tầng DB
+### 7.1 Chống overlap chi tiết đặt sân ở tầng DB
+
+Sau khi tách booking thành `booking_orders` và `booking_items`, constraint chống overlap phải đặt trên bảng `booking_items`.
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
-ALTER TABLE bookings
+ALTER TABLE booking_items
 ADD COLUMN IF NOT EXISTS booking_time_range tstzrange
 GENERATED ALWAYS AS (tstzrange(start_datetime, end_datetime, '[)')) STORED;
 
-CREATE INDEX IF NOT EXISTS bookings_time_range_idx
-ON bookings USING gist (court_id, booking_time_range);
+CREATE INDEX IF NOT EXISTS booking_items_time_range_idx
+ON booking_items USING gist (court_id, booking_time_range);
 
-ALTER TABLE bookings
-ADD CONSTRAINT no_overlapping_active_bookings
+ALTER TABLE booking_items
+ADD CONSTRAINT no_overlapping_active_booking_items
 EXCLUDE USING gist (
   court_id WITH =,
   booking_time_range WITH &&
@@ -1026,15 +1151,34 @@ WHERE (
 );
 ```
 
-Nếu chưa dùng exclusion constraint, service tạo booking phải chạy trong transaction `SERIALIZABLE` hoặc dùng PostgreSQL advisory lock.
+### 7.2 Advisory lock gợi ý cho combo booking
 
-### 7.2 Advisory lock gợi ý
+Với đơn có nhiều chi tiết đặt sân, service tạo booking phải lock tất cả `court_id + date` liên quan theo thứ tự cố định để tránh deadlock.
 
 ```sql
 SELECT pg_advisory_xact_lock(hashtext(CONCAT(court_id, ':', DATE(start_datetime))));
 ```
 
+Quy tắc:
+
+```text
+1. Chuẩn hóa danh sách chi tiết đặt sân.
+2. Tạo danh sách lock key court_id + date.
+3. Sort lock key theo thứ tự tăng dần.
+4. Acquire lock từng key trong transaction.
+5. Kiểm tra overlap lần cuối trên booking_items.
+6. Tạo booking_order và toàn bộ booking_items theo nguyên tắc all-or-nothing.
+```
+
+Combo booking dùng nguyên tắc:
+
+```text
+Tất cả chi tiết đặt sân hợp lệ thì tạo đơn.
+Nếu một chi tiết bị conflict thì không tạo đơn.
+```
+
 ---
+
 
 ## 8. Luồng nghiệp vụ chi tiết
 

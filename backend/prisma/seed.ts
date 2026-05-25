@@ -187,16 +187,12 @@ async function seedCourts(courtTypeIds: { football: string; badminton: string; b
       where: { courtId: courtIds.footballA },
       update: {
         courtName: "Sân bóng đá A",
-        courtTypeId: courtTypeIds.football,
-        location: "Khu thể thao trung tâm",
-        capacity: 22
+        courtTypeId: courtTypeIds.football
       },
       create: {
         courtId: courtIds.footballA,
         courtName: "Sân bóng đá A",
         courtTypeId: courtTypeIds.football,
-        location: "Khu thể thao trung tâm",
-        capacity: 22,
         description: "Sân bóng đá 11 người"
       }
     }),
@@ -204,16 +200,12 @@ async function seedCourts(courtTypeIds: { football: string; badminton: string; b
       where: { courtId: courtIds.badmintonA },
       update: {
         courtName: "Sân cầu lông A",
-        courtTypeId: courtTypeIds.badminton,
-        location: "Nhà thi đấu đa năng",
-        capacity: 4
+        courtTypeId: courtTypeIds.badminton
       },
       create: {
         courtId: courtIds.badmintonA,
         courtName: "Sân cầu lông A",
         courtTypeId: courtTypeIds.badminton,
-        location: "Nhà thi đấu đa năng",
-        capacity: 4,
         description: "Sân cầu lông trong nhà"
       }
     }),
@@ -221,16 +213,12 @@ async function seedCourts(courtTypeIds: { football: string; badminton: string; b
       where: { courtId: courtIds.basketballA },
       update: {
         courtName: "Sân bóng rổ A",
-        courtTypeId: courtTypeIds.basketball,
-        location: "Khu thể thao ngoài trời",
-        capacity: 10
+        courtTypeId: courtTypeIds.basketball
       },
       create: {
         courtId: courtIds.basketballA,
         courtName: "Sân bóng rổ A",
         courtTypeId: courtTypeIds.basketball,
-        location: "Khu thể thao ngoài trời",
-        capacity: 10,
         description: "Sân bóng rổ tiêu chuẩn"
       }
     })

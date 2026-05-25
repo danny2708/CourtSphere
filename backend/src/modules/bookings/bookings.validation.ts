@@ -7,21 +7,34 @@ const isoDateTimeSchema = z
   .refine((value) => !Number.isNaN(Date.parse(value)), "Expected a valid ISO datetime")
   .transform((value) => new Date(value));
 
-export const bookingIdParamSchema = z.object({
+export const bookingOrderIdParamSchema = z.object({
   id: z.string().uuid()
 });
 
-export const createBookingSchema = z
+const createBookingItemSchema = z
   .object({
     courtId: z.string().uuid(),
     startDatetime: isoDateTimeSchema,
-    endDatetime: isoDateTimeSchema,
-    participantCount: z.coerce.number().int().positive(),
-    usagePurpose: z.string().trim().min(3).max(500)
+    endDatetime: isoDateTimeSchema
   })
   .refine((value) => value.startDatetime < value.endDatetime, {
     message: "startDatetime must be earlier than endDatetime",
     path: ["endDatetime"]
+  });
+
+export const createBookingSchema = z
+  .object({
+    items: z.array(createBookingItemSchema).min(1).max(20),
+    note: z.string().trim().min(1).max(500).optional()
+  })
+  .refine((value) => {
+    const keys = value.items.map(
+      (item) => `${item.courtId}:${item.startDatetime.toISOString()}:${item.endDatetime.toISOString()}`
+    );
+    return new Set(keys).size === keys.length;
+  }, {
+    message: "Duplicate booking items are not allowed",
+    path: ["items"]
   });
 
 export const listMyBookingsQuerySchema = z

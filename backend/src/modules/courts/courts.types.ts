@@ -4,7 +4,6 @@ export type ListCourtsQuery = {
   keyword?: string;
   courtTypeId?: string;
   status?: CourtStatus;
-  location?: string;
 };
 
 export type CreateCourtTypeInput = {
@@ -21,8 +20,6 @@ export type UpdateEntityStatusInput = {
 export type CreateCourtInput = {
   courtTypeId: string;
   courtName: string;
-  location: string;
-  capacity: number;
   description?: string;
   imageUrl?: string;
 };

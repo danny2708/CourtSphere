@@ -16,12 +16,14 @@ export type AvailabilitySlotDto = {
   endDatetime: string;
   status: AvailabilitySlotStatus;
   priceAmount?: number;
-  bookingId?: string;
+  bookingOrderId?: string;
+  bookingItemId?: string;
   unavailableReason?: string;
 };
 
 export type BookingConflictCandidate = {
-  bookingId: string;
+  bookingOrderId: string;
+  bookingItemId: string;
   bookingStatus: string;
   startDatetime: Date;
   endDatetime: Date;

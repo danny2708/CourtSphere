@@ -16,8 +16,7 @@ export const courtIdParamSchema = z.object({
 export const listCourtsQuerySchema = z.object({
   keyword: z.string().trim().min(1).max(100).optional(),
   courtTypeId: z.string().uuid().optional(),
-  status: z.enum(CourtStatus).optional(),
-  location: z.string().trim().min(1).max(100).optional()
+  status: z.enum(CourtStatus).optional()
 });
 
 export const createCourtTypeSchema = z.object({
@@ -37,8 +36,6 @@ export const updateEntityStatusSchema = z.object({
 export const createCourtSchema = z.object({
   courtTypeId: z.string().uuid(),
   courtName: z.string().trim().min(2).max(120),
-  location: z.string().trim().min(2).max(255),
-  capacity: z.coerce.number().int().positive(),
   description: z.string().trim().max(1000).optional(),
   imageUrl: z.string().trim().url().optional()
 });

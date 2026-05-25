@@ -8,7 +8,7 @@ import { RefundsController } from "./refunds.controller";
 import { createRefundsRouter } from "./refunds.routes";
 
 const userId = "00000000-0000-4000-8000-000000001301";
-const bookingId = "00000000-0000-4000-8000-000000001302";
+const bookingOrderId = "00000000-0000-4000-8000-000000001302";
 const refundId = "00000000-0000-4000-8000-000000001303";
 const tokenService = new TokenService();
 
@@ -39,7 +39,7 @@ function createMockController() {
   controller.cancelBookingDueToCourtIssue = vi.fn(
     async (req: Request, res: Response): Promise<void> => {
       res.status(200).json({
-        booking: {
+        bookingOrder: {
           id: req.params.id,
           bookingStatus: req.user?.roles.includes("ADMIN")
             ? "CANCELLED_BY_ADMIN"
@@ -123,18 +123,18 @@ describe("refund routes", () => {
     const app = createTestApp(controller);
 
     const managerResponse = await request(app)
-      .post(`/api/manager/bookings/${bookingId}/cancel`)
+      .post(`/api/manager/bookings/${bookingOrderId}/cancel`)
       .set("Authorization", bearerToken(["FIELD_MANAGER"]))
       .send({ reason: "Court maintenance" });
     const adminResponse = await request(app)
-      .post(`/api/manager/bookings/${bookingId}/cancel`)
+      .post(`/api/manager/bookings/${bookingOrderId}/cancel`)
       .set("Authorization", bearerToken(["ADMIN"]))
       .send({ reason: "System incident" });
 
     expect(managerResponse.status).toBe(200);
-    expect(managerResponse.body.booking.bookingStatus).toBe("CANCELLED_BY_MANAGER");
+    expect(managerResponse.body.bookingOrder.bookingStatus).toBe("CANCELLED_BY_MANAGER");
     expect(adminResponse.status).toBe(200);
-    expect(adminResponse.body.booking.bookingStatus).toBe("CANCELLED_BY_ADMIN");
+    expect(adminResponse.body.bookingOrder.bookingStatus).toBe("CANCELLED_BY_ADMIN");
     expect(controller.cancelBookingDueToCourtIssue).toHaveBeenCalledTimes(2);
   });
 
@@ -143,7 +143,7 @@ describe("refund routes", () => {
     const app = createTestApp(controller);
 
     const response = await request(app)
-      .post(`/api/manager/bookings/${bookingId}/cancel`)
+      .post(`/api/manager/bookings/${bookingOrderId}/cancel`)
       .set("Authorization", bearerToken(["USER"]))
       .send({ reason: "Court maintenance" });
 
@@ -161,7 +161,7 @@ describe("refund routes", () => {
       .set("Authorization", bearerToken(["ADMIN"]))
       .send({ mockResult: "REQUESTED" });
     const cancelResponse = await request(app)
-      .post(`/api/manager/bookings/${bookingId}/cancel`)
+      .post(`/api/manager/bookings/${bookingOrderId}/cancel`)
       .set("Authorization", bearerToken(["FIELD_MANAGER"]))
       .send({ reason: "x" });
 

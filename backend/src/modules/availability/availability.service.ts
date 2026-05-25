@@ -81,8 +81,6 @@ function toCourtDto(court: CourtWithAvailabilityRelations) {
   return {
     id: court.courtId,
     courtName: court.courtName,
-    location: court.location,
-    capacity: court.capacity,
     description: court.description,
     imageUrl: court.imageUrl,
     status: court.status,
@@ -162,7 +160,7 @@ export class AvailabilityService {
 
     const dayStart = requestedDate;
     const dayEnd = addDays(dayStart, 1);
-    const bookings = await this.db.booking.findMany({
+    const bookingItems = await this.db.bookingItem.findMany({
       where: {
         courtId,
         bookingStatus: {
@@ -176,19 +174,32 @@ export class AvailabilityService {
         }
       },
       select: {
-        bookingId: true,
+        bookingItemId: true,
+        bookingOrderId: true,
         bookingStatus: true,
         startDatetime: true,
         endDatetime: true,
-        holdExpiresAt: true
+        bookingOrder: {
+          select: {
+            holdExpiresAt: true
+          }
+        }
       }
     });
+    const conflictCandidates = bookingItems.map((item) => ({
+      bookingItemId: item.bookingItemId,
+      bookingOrderId: item.bookingOrderId,
+      bookingStatus: item.bookingStatus,
+      startDatetime: item.startDatetime,
+      endDatetime: item.endDatetime,
+      holdExpiresAt: item.bookingOrder.holdExpiresAt
+    }));
 
     const slots = this.generateSlots(requestedDate, operatingHour, slotDurationMinutes).map((slot) =>
       this.toSlotDto({
         slot,
         court,
-        bookings,
+        bookingItems: conflictCandidates,
         pricingRules: court.pricingRules,
         userPriorityGroupId: viewer.priorityGroupId,
         weekday,
@@ -252,8 +263,9 @@ export class AvailabilityService {
   private toSlotDto(input: {
     slot: SlotWindow;
     court: CourtWithAvailabilityRelations;
-    bookings: Array<{
-      bookingId: string;
+    bookingItems: Array<{
+      bookingOrderId: string;
+      bookingItemId: string;
       bookingStatus: BookingStatus;
       startDatetime: Date;
       endDatetime: Date;
@@ -301,12 +313,13 @@ export class AvailabilityService {
       };
     }
 
-    const conflict = this.conflicts.findConflict(input.slot, input.bookings, input.now);
+    const conflict = this.conflicts.findConflict(input.slot, input.bookingItems, input.now);
     if (conflict) {
       return {
         ...baseSlot,
         status: conflict.status,
-        bookingId: conflict.bookingId,
+        bookingOrderId: conflict.bookingOrderId,
+        bookingItemId: conflict.bookingItemId,
         unavailableReason:
           conflict.status === "HOLD"
             ? "Slot is temporarily held pending payment"

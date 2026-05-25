@@ -1,4 +1,4 @@
-import { BookingStatus, PaymentStatus, Prisma, type PrismaClient } from "@prisma/client";
+import { BookingStatus, CourtStatus, EntityStatus, PaymentStatus, Prisma, type PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
 import { BookingStateService } from "../bookings/booking-state.service";
@@ -7,40 +7,75 @@ import { PaymentsService } from "./payments.service";
 
 const userId = "00000000-0000-4000-8000-000000000901";
 const otherUserId = "00000000-0000-4000-8000-000000000902";
-const bookingId = "00000000-0000-4000-8000-000000000904";
+const bookingOrderId = "00000000-0000-4000-8000-000000000904";
+const bookingItemId = "00000000-0000-4000-8000-000000000914";
 const paymentId = "00000000-0000-4000-8000-000000000905";
 const courtId = "00000000-0000-4000-8000-000000000906";
 const courtTypeId = "00000000-0000-4000-8000-000000000907";
 const gatewayTransactionId = "mock_tx_1";
 const now = new Date("2026-05-20T00:00:00.000Z");
 
-function buildBooking(overrides: Record<string, unknown> = {}) {
+function buildItem(overrides: Record<string, unknown> = {}) {
   return {
-    bookingId,
-    bookingCode: "BK-20260520-TEST01",
-    userId,
+    bookingItemId,
+    bookingOrderId,
     courtId,
     startDatetime: new Date("2026-05-21T08:00:00.000Z"),
     endDatetime: new Date("2026-05-21T09:00:00.000Z"),
-    participantCount: 10,
-    usagePurpose: "Class training",
+    unitPrice: new Prisma.Decimal(50000),
+    amount: new Prisma.Decimal(50000),
+    bookingStatus: BookingStatus.PENDING_PAYMENT,
+    checkinTime: null,
+    checkedInByUserId: null,
+    completedByUserId: null,
+    noShowMarkedByUserId: null,
+    managerNote: null,
+    createdAt: now,
+    updatedAt: now,
+    court: {
+      courtId,
+      courtTypeId,
+      courtName: "Main Field",
+      description: null,
+      imageUrl: null,
+      status: CourtStatus.ACTIVE,
+      createdAt: now,
+      updatedAt: now,
+      courtType: {
+        courtTypeId,
+        typeName: "Football",
+        description: null,
+        status: EntityStatus.ACTIVE,
+        createdAt: now,
+        updatedAt: now
+      }
+    },
+    ...overrides
+  };
+}
+
+function buildOrder(overrides: Record<string, unknown> = {}) {
+  return {
+    bookingOrderId,
+    bookingCode: "BK-20260520-TEST01",
+    userId,
     totalAmount: new Prisma.Decimal(50000),
     bookingStatus: BookingStatus.PENDING_PAYMENT,
     paymentStatus: PaymentStatus.INITIATED,
     refundable: true,
     holdExpiresAt: new Date("2026-05-20T00:10:00.000Z"),
+    note: null,
     cancelReason: null,
     cancelledByUserId: null,
     cancelledAt: null,
-    checkedInByUserId: null,
-    completedByUserId: null,
-    noShowMarkedByUserId: null,
-    managerNote: null,
-    noRefundReason: null,
-    checkinTime: null,
-    checkoutTime: null,
     createdAt: now,
     updatedAt: now,
+    user: {
+      userId,
+      fullName: "Sample User",
+      email: "user@example.edu"
+    },
+    items: [buildItem()],
     ...overrides
   };
 }
@@ -48,7 +83,7 @@ function buildBooking(overrides: Record<string, unknown> = {}) {
 function buildPayment(overrides: Record<string, unknown> = {}) {
   return {
     paymentId,
-    bookingId,
+    bookingOrderId,
     userId,
     amount: new Prisma.Decimal(50000),
     paymentMethod: "MOCK",
@@ -63,34 +98,7 @@ function buildPayment(overrides: Record<string, unknown> = {}) {
       fullName: "Sample User",
       email: "user@example.edu"
     },
-    booking: {
-      ...buildBooking(),
-      user: {
-        userId,
-        fullName: "Sample User",
-        email: "user@example.edu"
-      },
-      court: {
-        courtId,
-        courtTypeId,
-        courtName: "Main Field",
-        location: "North Campus",
-        capacity: 20,
-        description: null,
-        imageUrl: null,
-        status: "ACTIVE",
-        createdAt: now,
-        updatedAt: now,
-        courtType: {
-          courtTypeId,
-          typeName: "Football",
-          description: null,
-          status: "ACTIVE",
-          createdAt: now,
-          updatedAt: now
-        }
-      }
-    },
+    bookingOrder: buildOrder(),
     ...overrides
   };
 }
@@ -138,22 +146,28 @@ function createService(input: {
 }
 
 describe("PaymentsService", () => {
-  it("allows owner to create payment for a pending-payment booking", async () => {
+  it("allows owner to create payment for a pending-payment booking order", async () => {
     const tx = {
-      booking: {
-        findFirst: vi.fn().mockResolvedValue(buildBooking({ payments: [] })),
+      bookingOrder: {
+        findFirst: vi.fn().mockResolvedValue(buildOrder({ payments: [] })),
         update: vi.fn().mockResolvedValue({})
+      },
+      bookingItem: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 })
       },
       payment: {
         create: vi.fn().mockResolvedValue({ paymentId })
       },
-      bookingStatusHistory: {
+      bookingOrderStatusHistory: {
+        create: vi.fn().mockResolvedValue({})
+      },
+      bookingItemStatusHistory: {
         create: vi.fn().mockResolvedValue({})
       }
     };
     const { service } = createService({ tx });
 
-    const payment = await service.createPaymentForBooking(userId, bookingId, {
+    const payment = await service.createPaymentForBooking(userId, bookingOrderId, {
       amount: 50000
     });
 
@@ -165,7 +179,7 @@ describe("PaymentsService", () => {
     expect(tx.payment.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          bookingId,
+          bookingOrderId,
           userId,
           amount: new Prisma.Decimal(50000),
           paymentMethod: "MOCK",
@@ -174,7 +188,7 @@ describe("PaymentsService", () => {
         })
       })
     );
-    expect(tx.booking.update).toHaveBeenCalledWith(
+    expect(tx.bookingOrder.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           bookingStatus: BookingStatus.PAYMENT_PROCESSING,
@@ -182,7 +196,14 @@ describe("PaymentsService", () => {
         })
       })
     );
-    expect(tx.bookingStatusHistory.create).toHaveBeenCalledWith(
+    expect(tx.bookingItem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          bookingStatus: BookingStatus.PAYMENT_PROCESSING
+        }
+      })
+    );
+    expect(tx.bookingOrderStatusHistory.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           oldStatus: BookingStatus.PENDING_PAYMENT,
@@ -193,27 +214,27 @@ describe("PaymentsService", () => {
     );
   });
 
-  it("does not allow another user to create payment for an owned booking", async () => {
+  it("does not allow another user to create payment for an owned booking order", async () => {
     const tx = {
-      booking: {
+      bookingOrder: {
         findFirst: vi.fn().mockResolvedValue(null)
       }
     };
     const { service } = createService({ tx });
 
     await expect(
-      service.createPaymentForBooking(otherUserId, bookingId, { amount: 50000 })
+      service.createPaymentForBooking(otherUserId, bookingOrderId, { amount: 50000 })
     ).rejects.toMatchObject({
       statusCode: 404,
       code: "BOOKING_NOT_FOUND"
     });
   });
 
-  it("does not create payment for confirmed bookings", async () => {
+  it("does not create payment for confirmed booking orders", async () => {
     const tx = {
-      booking: {
+      bookingOrder: {
         findFirst: vi.fn().mockResolvedValue(
-          buildBooking({
+          buildOrder({
             bookingStatus: BookingStatus.CONFIRMED,
             paymentStatus: PaymentStatus.SUCCESS,
             payments: []
@@ -224,7 +245,7 @@ describe("PaymentsService", () => {
     const { service } = createService({ tx });
 
     await expect(
-      service.createPaymentForBooking(userId, bookingId, { amount: 50000 })
+      service.createPaymentForBooking(userId, bookingOrderId, { amount: 50000 })
     ).rejects.toMatchObject({
       statusCode: 409,
       code: "BOOKING_NOT_PAYABLE"
@@ -233,9 +254,9 @@ describe("PaymentsService", () => {
 
   it("does not create payment after the hold expires", async () => {
     const tx = {
-      booking: {
+      bookingOrder: {
         findFirst: vi.fn().mockResolvedValue(
-          buildBooking({
+          buildOrder({
             holdExpiresAt: new Date("2026-05-19T23:59:00.000Z"),
             payments: []
           })
@@ -245,44 +266,40 @@ describe("PaymentsService", () => {
     const { service } = createService({ tx });
 
     await expect(
-      service.createPaymentForBooking(userId, bookingId, { amount: 50000 })
+      service.createPaymentForBooking(userId, bookingOrderId, { amount: 50000 })
     ).rejects.toMatchObject({
       statusCode: 409,
       code: "BOOKING_HOLD_EXPIRED"
     });
   });
 
-  it("does not create payment when amount differs from booking total", async () => {
-    const tx = {
-      booking: {
-        findFirst: vi.fn().mockResolvedValue(buildBooking({ payments: [] }))
-      }
-    };
-    const { service } = createService({ tx });
-
-    await expect(
-      service.createPaymentForBooking(userId, bookingId, { amount: 1000 })
-    ).rejects.toMatchObject({
-      statusCode: 400,
-      code: "PAYMENT_AMOUNT_MISMATCH"
-    });
-  });
-
-  it("confirms booking and writes history on successful callback", async () => {
+  it("confirms booking order and all pending items on successful callback", async () => {
     const tx = {
       payment: {
         findUnique: vi.fn().mockResolvedValue(
           buildPayment({
-            booking: buildBooking({ bookingStatus: BookingStatus.PAYMENT_PROCESSING })
+            bookingOrder: buildOrder({
+              bookingStatus: BookingStatus.PAYMENT_PROCESSING,
+              items: [
+                buildItem({
+                  bookingStatus: BookingStatus.PAYMENT_PROCESSING
+                })
+              ]
+            })
           })
         ),
         update: vi.fn().mockResolvedValue({})
       },
-      booking: {
-        update: vi.fn().mockResolvedValue({}),
-        updateMany: vi.fn()
+      bookingOrder: {
+        update: vi.fn().mockResolvedValue({})
       },
-      bookingStatusHistory: {
+      bookingItem: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 })
+      },
+      bookingOrderStatusHistory: {
+        create: vi.fn().mockResolvedValue({})
+      },
+      bookingItemStatusHistory: {
         create: vi.fn().mockResolvedValue({})
       }
     };
@@ -291,7 +308,16 @@ describe("PaymentsService", () => {
       payment: buildPayment({
         paymentStatus: PaymentStatus.SUCCESS,
         paidAt: now,
-        booking: buildPayment().booking
+        bookingOrder: buildOrder({
+          bookingStatus: BookingStatus.CONFIRMED,
+          paymentStatus: PaymentStatus.SUCCESS,
+          holdExpiresAt: null,
+          items: [
+            buildItem({
+              bookingStatus: BookingStatus.CONFIRMED
+            })
+          ]
+        })
       })
     });
 
@@ -311,7 +337,7 @@ describe("PaymentsService", () => {
         })
       })
     );
-    expect(tx.booking.update).toHaveBeenCalledWith(
+    expect(tx.bookingOrder.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           bookingStatus: BookingStatus.CONFIRMED,
@@ -320,13 +346,18 @@ describe("PaymentsService", () => {
         })
       })
     );
-    expect(tx.bookingStatusHistory.create).toHaveBeenCalledWith(
+    expect(tx.bookingItem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          bookingStatus: BookingStatus.CONFIRMED
+        }
+      })
+    );
+    expect(tx.bookingItemStatusHistory.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          oldStatus: BookingStatus.PAYMENT_PROCESSING,
           newStatus: BookingStatus.CONFIRMED,
-          actionType: "PAYMENT_SUCCESS_CONFIRM_BOOKING",
-          note: "Thanh toán thành công, booking được xác nhận"
+          actionType: "PAYMENT_SUCCESS_CONFIRM_BOOKING_ITEM"
         })
       })
     );
@@ -339,15 +370,21 @@ describe("PaymentsService", () => {
           buildPayment({
             paymentStatus: PaymentStatus.SUCCESS,
             paidAt: now,
-            booking: buildBooking({ bookingStatus: BookingStatus.CONFIRMED })
+            bookingOrder: buildOrder({ bookingStatus: BookingStatus.CONFIRMED })
           })
         ),
         update: vi.fn()
       },
-      booking: {
+      bookingOrder: {
         update: vi.fn()
       },
-      bookingStatusHistory: {
+      bookingItem: {
+        updateMany: vi.fn()
+      },
+      bookingOrderStatusHistory: {
+        create: vi.fn()
+      },
+      bookingItemStatusHistory: {
         create: vi.fn()
       }
     };
@@ -367,8 +404,9 @@ describe("PaymentsService", () => {
 
     expect(payment.paymentStatus).toBe(PaymentStatus.SUCCESS);
     expect(tx.payment.update).not.toHaveBeenCalled();
-    expect(tx.booking.update).not.toHaveBeenCalled();
-    expect(tx.bookingStatusHistory.create).not.toHaveBeenCalled();
+    expect(tx.bookingOrder.update).not.toHaveBeenCalled();
+    expect(tx.bookingOrderStatusHistory.create).not.toHaveBeenCalled();
+    expect(tx.bookingItemStatusHistory.create).not.toHaveBeenCalled();
   });
 
   it("rejects callback with invalid signature", async () => {
@@ -391,21 +429,23 @@ describe("PaymentsService", () => {
     expect(db.$transaction).not.toHaveBeenCalled();
   });
 
-  it("updates failed callback without confirming booking", async () => {
+  it("updates failed callback without confirming booking order", async () => {
     const tx = {
       payment: {
         findUnique: vi.fn().mockResolvedValue(
           buildPayment({
-            booking: buildBooking({ bookingStatus: BookingStatus.PAYMENT_PROCESSING })
+            bookingOrder: buildOrder({ bookingStatus: BookingStatus.PAYMENT_PROCESSING })
           })
         ),
         update: vi.fn().mockResolvedValue({})
       },
-      booking: {
-        update: vi.fn().mockResolvedValue({}),
+      bookingOrder: {
+        update: vi.fn().mockResolvedValue({})
+      },
+      bookingItem: {
         updateMany: vi.fn()
       },
-      bookingStatusHistory: {
+      bookingOrderStatusHistory: {
         create: vi.fn()
       }
     };
@@ -430,14 +470,15 @@ describe("PaymentsService", () => {
         })
       })
     );
-    expect(tx.booking.update).toHaveBeenCalledWith(
+    expect(tx.bookingOrder.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: {
           paymentStatus: PaymentStatus.FAILED
         }
       })
     );
-    expect(tx.bookingStatusHistory.create).not.toHaveBeenCalled();
+    expect(tx.bookingItem.updateMany).not.toHaveBeenCalled();
+    expect(tx.bookingOrderStatusHistory.create).not.toHaveBeenCalled();
   });
 
   it("allows owner to get payment detail", async () => {
@@ -449,6 +490,9 @@ describe("PaymentsService", () => {
       id: paymentId,
       user: {
         id: userId
+      },
+      bookingOrder: {
+        id: bookingOrderId
       }
     });
   });
@@ -481,7 +525,7 @@ describe("PaymentsService", () => {
         where: expect.objectContaining({
           paymentStatus: PaymentStatus.PROCESSING,
           userId,
-          booking: {
+          bookingOrder: {
             bookingCode: {
               contains: "BK",
               mode: "insensitive"
