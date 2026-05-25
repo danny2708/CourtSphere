@@ -747,6 +747,516 @@ Request:
 }
 ```
 
+## Booking APIs
+
+All endpoints below require `Authorization: Bearer <accessToken>` and role `USER`.
+
+Booking remains auto-approval:
+
+```text
+create hold -> PENDING_PAYMENT -> full payment success in payment module -> CONFIRMED
+```
+
+User booking APIs do not expose check-in. Check-in is reserved for Field Manager/Admin APIs in a later module.
+
+### `POST /api/bookings`
+
+Creates a temporary booking hold in `PENDING_PAYMENT`. The slot is held until `holdExpiresAt = now + holdMinutes` from active booking rules.
+
+Request:
+
+```json
+{
+  "courtId": "uuid",
+  "startDatetime": "2026-05-21T08:00:00.000Z",
+  "endDatetime": "2026-05-21T09:00:00.000Z",
+  "participantCount": 10,
+  "usagePurpose": "Class training"
+}
+```
+
+Validation:
+
+- User account must be `ACTIVE`.
+- User `bookingPermissionStatus` must be `ALLOWED`.
+- Court must be `ACTIVE`.
+- Booking must be in the future, inside `operating_hours`, and aligned to `slotDurationMinutes`.
+- Booking must not exceed `maxDurationMinutes`, `maxBookingsPerDay`, priority advance window, or court capacity.
+- Booking must not overlap active booking statuses: `PENDING_PAYMENT`, `PAYMENT_PROCESSING`, `CONFIRMED`, `IN_USE`.
+
+Response `201`:
+
+```json
+{
+  "booking": {
+    "id": "uuid",
+    "bookingCode": "BK-20260520-ABC123",
+    "bookingStatus": "PENDING_PAYMENT",
+    "paymentStatus": "INITIATED",
+    "startDatetime": "2026-05-21T08:00:00.000Z",
+    "endDatetime": "2026-05-21T09:00:00.000Z",
+    "participantCount": 10,
+    "usagePurpose": "Class training",
+    "totalAmount": 50000,
+    "holdExpiresAt": "2026-05-20T00:10:00.000Z",
+    "refundable": true,
+    "court": {
+      "id": "uuid",
+      "courtName": "Main Field",
+      "location": "North Campus",
+      "status": "ACTIVE"
+    },
+    "statusHistories": [
+      {
+        "oldStatus": null,
+        "newStatus": "PENDING_PAYMENT",
+        "actionType": "USER_CREATE_BOOKING_HOLD"
+      }
+    ]
+  }
+}
+```
+
+Common errors:
+
+- `ACCOUNT_NOT_ACTIVE`
+- `BOOKING_PERMISSION_RESTRICTED`
+- `COURT_NOT_AVAILABLE`
+- `OUTSIDE_OPERATING_HOURS`
+- `BOOKING_DURATION_EXCEEDS_LIMIT`
+- `ADVANCE_BOOKING_LIMIT_EXCEEDED`
+- `MAX_BOOKINGS_PER_DAY_REACHED`
+- `PARTICIPANT_COUNT_EXCEEDS_CAPACITY`
+- `BOOKING_SLOT_UNAVAILABLE`
+- `PRICING_RULE_NOT_FOUND`
+
+### `GET /api/bookings/my`
+
+Lists bookings owned by the authenticated user.
+
+Optional query params:
+
+- `status`: any `BookingStatus`.
+- `fromDate`: ISO datetime filter on `startDatetime`.
+- `toDate`: ISO datetime filter on `startDatetime`.
+
+Response `200`:
+
+```json
+{
+  "bookings": [
+    {
+      "id": "uuid",
+      "bookingCode": "BK-20260520-ABC123",
+      "bookingStatus": "PENDING_PAYMENT",
+      "paymentStatus": "INITIATED",
+      "startDatetime": "2026-05-21T08:00:00.000Z",
+      "endDatetime": "2026-05-21T09:00:00.000Z",
+      "totalAmount": 50000,
+      "holdExpiresAt": "2026-05-20T00:10:00.000Z",
+      "court": {
+        "id": "uuid",
+        "courtName": "Main Field"
+      }
+    }
+  ]
+}
+```
+
+### `GET /api/bookings/:id`
+
+Returns one owned booking with status history, payments, and refunds.
+
+Response `200`:
+
+```json
+{
+  "booking": {
+    "id": "uuid",
+    "bookingCode": "BK-20260520-ABC123",
+    "bookingStatus": "PENDING_PAYMENT",
+    "paymentStatus": "INITIATED",
+    "statusHistories": [],
+    "payments": [],
+    "refunds": []
+  }
+}
+```
+
+Users cannot view another user's booking through this endpoint.
+
+### `POST /api/bookings/:id/cancel`
+
+Cancels an owned booking when its status allows user cancellation.
+
+Request:
+
+```json
+{
+  "reason": "Schedule changed"
+}
+```
+
+Rules:
+
+- `PENDING_PAYMENT` can be cancelled without refund.
+- `CONFIRMED` can be cancelled only before `cancelBeforeHours`.
+- If a `CONFIRMED` booking has a successful payment, the backend creates a `refunds` row with status `REQUESTED` using `refundRateUserOnTime`.
+- `CHECKIN_EXPIRED` and `NO_SHOW` are not cancellable by user and do not create refunds.
+- Every cancellation writes `booking_status_histories`.
+
+Response `200`:
+
+```json
+{
+  "booking": {
+    "id": "uuid",
+    "bookingStatus": "CANCELLED_BY_USER",
+    "cancelReason": "Schedule changed",
+    "cancelledAt": "2026-05-20T00:00:00.000Z",
+    "statusHistories": [
+      {
+        "oldStatus": "PENDING_PAYMENT",
+        "newStatus": "CANCELLED_BY_USER",
+        "actionType": "USER_CANCEL_BOOKING"
+      }
+    ]
+  }
+}
+```
+
+Common errors:
+
+- `BOOKING_NOT_FOUND`
+- `BOOKING_CANNOT_BE_CANCELLED`
+- `BOOKING_CANCEL_WINDOW_CLOSED`
+
+## Payment APIs
+
+These APIs implement a mock/sandbox payment flow for MVP. They do not integrate a real payment gateway yet.
+
+### `POST /api/bookings/:id/payments`
+
+Requires `Authorization: Bearer <accessToken>` and role `USER`. Only the booking owner can create a payment.
+
+Creates or returns a mock payment for a booking that is still payable. Creating payment moves the booking from `PENDING_PAYMENT` to `PAYMENT_PROCESSING`; the booking is confirmed only after a successful callback.
+
+Request:
+
+```json
+{
+  "amount": 50000
+}
+```
+
+Rules:
+
+- Booking must belong to the authenticated user.
+- Booking status must be `PENDING_PAYMENT` or `PAYMENT_PROCESSING`.
+- Booking hold must not be expired.
+- `amount` must equal `booking.totalAmount`.
+- No deposit flow exists; payment is always for 100% of the booking total.
+
+Response `201`:
+
+```json
+{
+  "payment": {
+    "id": "uuid",
+    "amount": 50000,
+    "paymentMethod": "MOCK",
+    "gatewayTransactionId": "mock_uuid",
+    "paymentStatus": "PROCESSING",
+    "paymentUrl": "/mock-payment/mock_uuid",
+    "booking": {
+      "id": "uuid",
+      "bookingCode": "BK-20260520-ABC123",
+      "bookingStatus": "PAYMENT_PROCESSING",
+      "paymentStatus": "PROCESSING",
+      "totalAmount": 50000
+    }
+  }
+}
+```
+
+Common errors:
+
+- `BOOKING_NOT_FOUND`
+- `BOOKING_NOT_PAYABLE`
+- `BOOKING_HOLD_EXPIRED`
+- `PAYMENT_AMOUNT_MISMATCH`
+
+### `POST /api/payments/callback/mock`
+
+Public mock callback endpoint. The request must include a valid mock signature generated from `MOCK_PAYMENT_SECRET`.
+
+Signature payload:
+
+```text
+HMAC_SHA256(secret, "<gatewayTransactionId>:<status>")
+```
+
+Request:
+
+```json
+{
+  "gatewayTransactionId": "mock_uuid",
+  "status": "SUCCESS",
+  "signature": "<hex-signature>"
+}
+```
+
+Allowed callback statuses: `SUCCESS`, `FAILED`, `CANCELLED`, `EXPIRED`.
+
+Success behavior:
+
+- Payment changes to `SUCCESS`.
+- `paidAt` is set.
+- Booking changes from `PENDING_PAYMENT` or `PAYMENT_PROCESSING` to `CONFIRMED`.
+- Booking `paymentStatus` changes to `SUCCESS`.
+- A `booking_status_histories` record is created with:
+  - `actionType = PAYMENT_SUCCESS_CONFIRM_BOOKING`
+  - `note = Thanh toán thành công, booking được xác nhận`
+
+Idempotency:
+
+- Repeating a `SUCCESS` callback for an already successful payment returns the current payment and does not create another booking history row.
+- Terminal payments `FAILED`, `CANCELLED`, or `EXPIRED` cannot be switched to a different terminal status by a later callback.
+- If a success callback arrives after `holdExpiresAt`, the backend does not confirm the booking; it marks the payment/booking as expired.
+
+Failed/cancelled behavior:
+
+- Payment status changes to the callback status.
+- Booking is not confirmed.
+- If callback status is `EXPIRED` or the hold is already expired, booking changes to `PAYMENT_EXPIRED` and history is written.
+- Notifications are not emitted yet; this is deferred to the Notifications module.
+
+Common errors:
+
+- `INVALID_PAYMENT_SIGNATURE`
+- `PAYMENT_NOT_FOUND`
+- `PAYMENT_ALREADY_TERMINAL`
+
+### `GET /api/payments/:id`
+
+Requires `Authorization: Bearer <accessToken>`. Payment owner or `ADMIN` can view the payment.
+
+Response `200`:
+
+```json
+{
+  "payment": {
+    "id": "uuid",
+    "amount": 50000,
+    "paymentMethod": "MOCK",
+    "gatewayTransactionId": "mock_uuid",
+    "paymentStatus": "SUCCESS",
+    "paidAt": "2026-05-20T00:00:00.000Z",
+    "booking": {
+      "id": "uuid",
+      "bookingCode": "BK-20260520-ABC123",
+      "bookingStatus": "CONFIRMED",
+      "paymentStatus": "SUCCESS"
+    }
+  }
+}
+```
+
+### `GET /api/admin/payments`
+
+Requires `Authorization: Bearer <accessToken>` and `ADMIN`.
+
+Optional query params:
+
+- `status`: any `PaymentStatus`.
+- `fromDate`: ISO datetime filter on `createdAt`.
+- `toDate`: ISO datetime filter on `createdAt`.
+- `bookingCode`: partial booking code search.
+- `userId`: exact user ID.
+
+Response `200`:
+
+```json
+{
+  "payments": [
+    {
+      "id": "uuid",
+      "amount": 50000,
+      "paymentMethod": "MOCK",
+      "paymentStatus": "SUCCESS",
+      "booking": {
+        "id": "uuid",
+        "bookingCode": "BK-20260520-ABC123"
+      },
+      "user": {
+        "id": "uuid",
+        "fullName": "Nguyen Van A",
+        "email": "user@example.com"
+      }
+    }
+  ]
+}
+```
+
+## Refund & Cancellation APIs
+
+These APIs implement mock/sandbox refund processing for MVP. They do not integrate a real refund gateway yet.
+
+Refund invariants:
+
+- Refunds are only created from `PaymentStatus.SUCCESS`.
+- `CHECKIN_EXPIRED` and `NO_SHOW` never create refunds.
+- User on-time cancellation uses `refundRateUserOnTime`.
+- Manager/Admin cancellation due to court issue uses `refundRateManagerFault`, defaulting to `100`.
+- Duplicate active/success refunds for the same booking/payment are not created.
+- Manager/Admin cancellation writes `booking_status_histories` and `audit_logs`.
+- Admin retry/manual refund handling writes `audit_logs`.
+
+### `GET /api/admin/refunds`
+
+Requires `Authorization: Bearer <accessToken>` and `ADMIN`.
+
+Optional query params:
+
+- `refundStatus`: any `RefundStatus`.
+- `fromDate`: ISO datetime filter on `requestedAt`.
+- `toDate`: ISO datetime filter on `requestedAt`.
+- `bookingCode`: partial booking code search.
+- `userId`: exact booking owner user ID.
+- `paymentId`: exact payment ID.
+
+Response `200`:
+
+```json
+{
+  "refunds": [
+    {
+      "id": "uuid",
+      "paymentId": "uuid",
+      "bookingId": "uuid",
+      "refundAmount": 50000,
+      "refundReason": "Court maintenance",
+      "refundStatus": "REQUESTED",
+      "gatewayRefundId": null,
+      "requestedAt": "2026-05-20T00:00:00.000Z",
+      "processedAt": null,
+      "payment": {
+        "id": "uuid",
+        "amount": 50000,
+        "paymentStatus": "SUCCESS",
+        "paidAt": "2026-05-20T00:00:00.000Z"
+      },
+      "booking": {
+        "id": "uuid",
+        "bookingCode": "BK-20260520-ABC123",
+        "bookingStatus": "CANCELLED_BY_MANAGER",
+        "paymentStatus": "SUCCESS"
+      }
+    }
+  ]
+}
+```
+
+### `GET /api/admin/refunds/:id`
+
+Requires `Authorization: Bearer <accessToken>` and `ADMIN`.
+
+Returns one refund with payment, booking, requester, and processor summary.
+
+Common errors:
+
+- `REFUND_NOT_FOUND`
+
+### `POST /api/admin/refunds/:id/retry`
+
+Requires `Authorization: Bearer <accessToken>` and `ADMIN`.
+
+Retries or processes a mock refund. Only `REQUESTED`, `FAILED`, and `MANUAL_REVIEW` refunds are retryable.
+
+Request:
+
+```json
+{
+  "mockResult": "SUCCESS",
+  "reason": "Manual retry after gateway timeout"
+}
+```
+
+`mockResult` is optional and defaults to `SUCCESS`. Allowed values are `SUCCESS`, `FAILED`, and `MANUAL_REVIEW`.
+
+Success behavior:
+
+- `refundStatus` becomes `SUCCESS`.
+- `processedAt` is set.
+- `processedByUserId` is set to the admin actor.
+- `gatewayRefundId` is set by the mock gateway.
+- `audit_logs` receives `ADMIN_RETRY_REFUND` and final refund status action.
+
+Failed/manual-review behavior:
+
+- `refundStatus` becomes `FAILED` or `MANUAL_REVIEW`.
+- `processedByUserId` is set to the admin actor.
+- `audit_logs` receives `ADMIN_RETRY_REFUND` and final refund status action.
+
+Common errors:
+
+- `REFUND_NOT_FOUND`
+- `REFUND_NOT_RETRYABLE`
+
+### `POST /api/manager/bookings/:id/cancel`
+
+Requires `Authorization: Bearer <accessToken>` and role `FIELD_MANAGER` or `ADMIN`.
+
+Cancels a `CONFIRMED` or `IN_USE` booking due to court issue, maintenance, incident, or system/operator fault. This endpoint is not a generic manual approval flow.
+
+Request:
+
+```json
+{
+  "reason": "Court maintenance"
+}
+```
+
+Rules:
+
+- `FIELD_MANAGER` changes the booking to `CANCELLED_BY_MANAGER`.
+- `ADMIN` changes the booking to `CANCELLED_BY_ADMIN`.
+- `COMPLETED`, `NO_SHOW`, `CHECKIN_EXPIRED`, `PAYMENT_EXPIRED`, and already-cancelled bookings cannot be cancelled here.
+- If a successful payment exists, the backend creates a `refunds` row with `REQUESTED` status using `refundRateManagerFault`.
+- If there is no successful payment, cancellation still succeeds but no refund is created.
+- Every status change writes `booking_status_histories`.
+- The cancellation writes `audit_logs`.
+
+Response `200`:
+
+```json
+{
+  "booking": {
+    "id": "uuid",
+    "bookingCode": "BK-20260520-ABC123",
+    "bookingStatus": "CANCELLED_BY_MANAGER",
+    "paymentStatus": "SUCCESS",
+    "cancelReason": "Court maintenance",
+    "cancelledByUserId": "uuid",
+    "cancelledAt": "2026-05-20T00:00:00.000Z",
+    "refundable": true,
+    "noRefundReason": null
+  },
+  "refund": {
+    "id": "uuid",
+    "paymentId": "uuid",
+    "bookingId": "uuid",
+    "refundAmount": 50000,
+    "refundStatus": "REQUESTED"
+  }
+}
+```
+
+Common errors:
+
+- `BOOKING_NOT_FOUND`
+- `BOOKING_CANNOT_BE_CANCELLED_BY_MANAGER`
+
 ## Database Contract Baseline
 
 The MVP database uses PostgreSQL through Prisma.

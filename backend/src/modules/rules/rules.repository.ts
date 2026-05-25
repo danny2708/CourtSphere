@@ -3,6 +3,8 @@ import { EntityStatus, Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import type { EffectiveBookingPolicy } from "./rules.types";
 
+type RulesDbClient = Pick<PrismaClient, "bookingRule" | "priorityPolicy"> | Prisma.TransactionClient;
+
 export const FALLBACK_BOOKING_RULES = {
   ruleName: "DEFAULT",
   holdMinutes: 10,
@@ -46,7 +48,7 @@ export type PriorityPolicyRecord = Prisma.PriorityPolicyGetPayload<{
 }>;
 
 export class RulesRepository {
-  constructor(private readonly db: PrismaClient = prisma) {}
+  constructor(private readonly db: RulesDbClient = prisma) {}
 
   async getActiveBookingRule(): Promise<BookingRuleRecord | null> {
     return this.db.bookingRule.findFirst({
