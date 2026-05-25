@@ -1273,6 +1273,202 @@ Common errors:
 - `BOOKING_NOT_FOUND`
 - `BOOKING_CANNOT_BE_CANCELLED_BY_MANAGER`
 
+## Manager Operations APIs
+
+These APIs operate at `booking_items` level. Users never self check-in. `FIELD_MANAGER` or `ADMIN` performs check-in, no-show confirmation, and in-use exception handling.
+
+### `GET /api/manager/bookings/today`
+
+Requires `Authorization: Bearer <accessToken>` and role `FIELD_MANAGER` or `ADMIN`.
+
+Lists booking items whose `startDatetime` is within the current UTC day.
+
+Optional query params:
+
+- `courtId`: exact court ID.
+- `status`: any `BookingStatus`.
+
+Response `200`:
+
+```json
+{
+  "bookingItems": [
+    {
+      "id": "uuid",
+      "bookingItemId": "uuid",
+      "bookingOrderId": "uuid",
+      "bookingCode": "BK-20260520-ABC123",
+      "court": {
+        "id": "uuid",
+        "courtName": "Main Field",
+        "status": "ACTIVE",
+        "courtType": {
+          "id": "uuid",
+          "typeName": "Football"
+        }
+      },
+      "user": {
+        "id": "uuid",
+        "fullName": "Nguyen Van A",
+        "email": "user@example.com"
+      },
+      "startDatetime": "2026-05-20T08:00:00.000Z",
+      "endDatetime": "2026-05-20T09:00:00.000Z",
+      "unitPrice": 50000,
+      "amount": 50000,
+      "itemStatus": "CONFIRMED",
+      "paymentStatus": "SUCCESS",
+      "checkinTime": null,
+      "checkedInByUserId": null,
+      "completedByUserId": null,
+      "noShowMarkedByUserId": null,
+      "managerNote": null
+    }
+  ]
+}
+```
+
+### `POST /api/manager/booking-items/:id/check-in`
+
+Requires `FIELD_MANAGER` or `ADMIN`.
+
+Checks in a paid, confirmed booking item.
+
+Rules:
+
+- `booking_items.booking_status` must be `CONFIRMED`.
+- Parent `booking_orders.payment_status` must be `SUCCESS`.
+- Check-in must be within the configured `lateCheckinMinutes` window around the item start time.
+- The item changes to `IN_USE`.
+- `checkinTime` and `checkedInByUserId` are set.
+- `booking_item_status_histories` is written.
+- If the parent order is `CONFIRMED`, it may move to `IN_USE`.
+
+Response `200`:
+
+```json
+{
+  "bookingItem": {
+    "id": "uuid",
+    "bookingItemId": "uuid",
+    "itemStatus": "IN_USE",
+    "checkinTime": "2026-05-20T08:00:00.000Z",
+    "checkedInByUserId": "uuid"
+  }
+}
+```
+
+Common errors:
+
+- `BOOKING_ITEM_NOT_FOUND`
+- `BOOKING_ITEM_CANNOT_CHECK_IN`
+- `BOOKING_ORDER_NOT_PAID`
+- `CHECKIN_TOO_EARLY`
+- `CHECKIN_WINDOW_EXPIRED`
+
+### `POST /api/manager/booking-items/:id/override-checkin`
+
+Requires `FIELD_MANAGER` or `ADMIN`.
+
+Allows a manager/admin to check in a `CHECKIN_EXPIRED` booking item as an exception.
+
+Request:
+
+```json
+{
+  "reason": "User arrived late but court is still available"
+}
+```
+
+Rules:
+
+- `reason` is required.
+- Item status must be `CHECKIN_EXPIRED`.
+- Parent order payment must be `SUCCESS`.
+- The item must not conflict with another active booking item.
+- Item changes to `IN_USE`.
+- Writes `booking_item_status_histories` and `audit_logs`.
+
+Common errors:
+
+- `BOOKING_ITEM_OVERRIDE_NOT_ALLOWED`
+- `BOOKING_ORDER_NOT_PAID`
+- `BOOKING_ITEM_CONFLICT`
+
+### `POST /api/manager/booking-items/:id/no-show`
+
+Requires `FIELD_MANAGER` or `ADMIN`.
+
+Confirms a `CHECKIN_EXPIRED` booking item as no-show.
+
+Request:
+
+```json
+{
+  "reason": "User did not arrive"
+}
+```
+
+Rules:
+
+- Item status must be `CHECKIN_EXPIRED`.
+- Item changes to `NO_SHOW`.
+- `noShowMarkedByUserId` is set.
+- Creates a `violations` row with `violationType = NO_SHOW` and `bookingItemId`.
+- Increments user violation points.
+- If points reach active `booking_rules.violationThreshold`, sets `bookingPermissionStatus = RESTRICTED` and `bookingLockedUntil` from `bookingBanDays`.
+- Does not create refunds.
+- Writes `booking_item_status_histories` and `audit_logs`.
+- No-show penalty points default to `1` until a dedicated config field is added.
+
+Response `200`:
+
+```json
+{
+  "bookingItem": {
+    "id": "uuid",
+    "bookingItemId": "uuid",
+    "itemStatus": "NO_SHOW"
+  },
+  "violation": {
+    "id": "uuid",
+    "violationType": "NO_SHOW",
+    "penaltyPoints": 1
+  }
+}
+```
+
+Common errors:
+
+- `BOOKING_ITEM_NO_SHOW_NOT_ALLOWED`
+
+### `POST /api/manager/booking-items/:id/override-complete`
+
+Requires `FIELD_MANAGER` or `ADMIN`.
+
+Manually completes an `IN_USE` booking item for an exception or early close. This is not the default completion flow; automatic completion is deferred to the Jobs module.
+
+Request:
+
+```json
+{
+  "reason": "Closed early due to facility incident"
+}
+```
+
+Rules:
+
+- `reason` is required.
+- Item status must be `IN_USE`.
+- Item changes to `COMPLETED`.
+- `completedByUserId` is set.
+- Writes `booking_item_status_histories` and `audit_logs`.
+- If all items on the parent order are `COMPLETED`, the order changes to `COMPLETED` and writes `booking_order_status_histories`.
+
+Common errors:
+
+- `BOOKING_ITEM_COMPLETE_NOT_ALLOWED`
+
 ## Database Contract Baseline
 
 The MVP database uses PostgreSQL through Prisma.

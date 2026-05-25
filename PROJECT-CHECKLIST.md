@@ -658,26 +658,27 @@ Mục tiêu: vận hành sân hằng ngày.
 
 Checklist:
 
-- [ ] API `GET /api/manager/bookings/today`.
-- [ ] API `POST /api/manager/bookings/:id/check-in`.
-- [ ] API `POST /api/manager/bookings/:id/complete`.
-- [ ] API `POST /api/manager/bookings/:id/no-show`.
+- [x] API `GET /api/manager/bookings/today`.
+- [x] API `POST /api/manager/booking-items/:id/check-in`.
+- [x] API `POST /api/manager/booking-items/:id/override-checkin`.
+- [x] API `POST /api/manager/booking-items/:id/override-complete`.
+- [x] API `POST /api/manager/booking-items/:id/no-show`.
 - [x] API `POST /api/manager/bookings/:id/cancel`.
-- [ ] Check-in chỉ cho booking `CONFIRMED` hoặc trạng thái hợp lệ theo spec.
-- [ ] Check-in ghi `checked_in_by_user_id`.
-- [ ] Complete chỉ cho booking `IN_USE`.
-- [ ] Complete ghi `completed_by_user_id`.
-- [ ] No-show không tạo refund.
-- [ ] No-show tạo violation nếu policy yêu cầu.
+- [x] Check-in chỉ cho booking item `CONFIRMED` và order đã thanh toán `SUCCESS`.
+- [x] Check-in ghi `checked_in_by_user_id`.
+- [x] Complete exception chỉ cho booking item `IN_USE`.
+- [x] Complete ghi `completed_by_user_id`.
+- [x] No-show không tạo refund.
+- [x] No-show tạo violation nếu policy yêu cầu.
 - [x] Manager cancel tạo refund 100% mặc định.
-- [ ] Mọi chuyển trạng thái ghi order/item status histories tương ứng.
+- [x] Mọi chuyển trạng thái ghi order/item status histories tương ứng.
 
 Acceptance criteria:
 
-- [ ] Manager check-in được user tại sân.
-- [ ] User không tự check-in được.
-- [ ] Manager hoàn thành được buổi sử dụng.
-- [ ] Manager xác nhận no-show và tạo violation đúng.
+- [x] Manager check-in được user tại sân.
+- [x] User không tự check-in được.
+- [x] Manager xử lý hoàn thành ngoại lệ khi item đang `IN_USE`.
+- [x] Manager xác nhận no-show và tạo violation đúng.
 
 ---
 
@@ -732,13 +733,13 @@ Mục tiêu: ghi nhận và xử lý điểm vi phạm.
 
 Checklist:
 
-- [ ] Tạo violation khi no-show.
+- [x] Tạo violation khi no-show.
 - [ ] Tạo violation khi late cancellation nếu policy yêu cầu.
 - [ ] API admin/manager list violations.
 - [ ] API admin waive violation.
 - [ ] API admin adjust violation points.
-- [ ] Cộng điểm vào user.
-- [ ] Kiểm tra threshold để khóa quyền đặt sân.
+- [x] Cộng điểm vào user.
+- [x] Kiểm tra threshold để khóa quyền đặt sân.
 - [ ] Ghi audit log khi admin can thiệp.
 
 Acceptance criteria:
@@ -1072,10 +1073,11 @@ Acceptance criteria:
 - [x] `GET /api/bookings/my`
 - [x] `GET /api/bookings/:id`
 - [x] `POST /api/bookings/:id/cancel`
-- [ ] `GET /api/manager/bookings/today`
-- [ ] `POST /api/manager/bookings/:id/check-in`
-- [ ] `POST /api/manager/bookings/:id/complete`
-- [ ] `POST /api/manager/bookings/:id/no-show`
+- [x] `GET /api/manager/bookings/today`
+- [x] `POST /api/manager/booking-items/:id/check-in`
+- [x] `POST /api/manager/booking-items/:id/override-checkin`
+- [x] `POST /api/manager/booking-items/:id/override-complete`
+- [x] `POST /api/manager/booking-items/:id/no-show`
 - [x] `POST /api/manager/bookings/:id/cancel`
 
 ### 8.5 Payment & refund APIs
@@ -1128,9 +1130,9 @@ Acceptance criteria:
 - [x] Prevent double booking.
 - [x] Payment success confirms booking.
 - [ ] Expire pending payment booking.
-- [ ] Manager check-in.
-- [ ] Manager complete.
-- [ ] No-show creates violation.
+- [x] Manager check-in.
+- [x] Manager override complete exception.
+- [x] No-show creates violation.
 - [x] User cancel creates refund when eligible.
 - [x] Manager cancel creates refund.
 - [x] RBAC denies wrong role.
@@ -1261,7 +1263,7 @@ Một module được coi là hoàn thành khi:
 | Payment | Codex | DONE | Mock payment tied to booking_orders, callback idempotency, status query, admin list, and order/item confirmation implemented |
 | Refund | Codex | DONE | Mock refund processor tied to booking_orders with optional booking_items, admin APIs, retry audit logs, and manager/admin cancellation implemented |
 | DB refactor sync | Codex | DONE | Backend synced to new booking_orders/booking_items database design and re-verified |
-| Manager operations |  | TODO |  |
+| Manager operations | Codex | DONE | Booking item schedule, manager/admin check-in, late override, no-show violation, and in-use exception close implemented |
 | Jobs |  | TODO |  |
 | Waitlist |  | TODO |  |
 | Violations |  | TODO |  |
