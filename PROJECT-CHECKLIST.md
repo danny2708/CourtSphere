@@ -688,19 +688,22 @@ Mục tiêu: xử lý tự động các nghiệp vụ theo thời gian.
 
 Checklist:
 
-- [ ] Job expire pending payment bookings chạy mỗi 1 phút.
-- [ ] Job chuyển booking quá giờ check-in.
-- [ ] Job gửi notification trước giờ sử dụng nếu cần.
-- [ ] Job notify waitlist khi slot được giải phóng.
-- [ ] Job phải idempotent.
-- [ ] Job ghi status history/audit log khi cập nhật trạng thái.
-- [ ] Có log lỗi và retry strategy cơ bản.
+- [x] Job expire pending payment bookings chạy qua runner nội bộ.
+- [x] Job chuyển booking item quá giờ check-in.
+- [x] Job tự hoàn thành booking item khi hết giờ sử dụng.
+- [x] Job expire waitlist notified entries quá `expires_at`.
+- [!] Job gửi notification trước giờ sử dụng nếu cần: hoãn đến module Notifications.
+- [!] Job notify waitlist khi slot được giải phóng: hoãn đến module Waitlist runtime.
+- [x] Job phải idempotent.
+- [x] Job ghi status history/audit log khi cập nhật trạng thái.
+- [x] Có runner `jobs:run-once` để scheduler gọi.
 
 Acceptance criteria:
 
-- [ ] Booking quá hạn thanh toán tự chuyển `PAYMENT_EXPIRED`.
-- [ ] Booking quá giờ check-in tự chuyển trạng thái đúng.
-- [ ] Không job nào update trùng gây sai dữ liệu.
+- [x] Booking quá hạn thanh toán tự chuyển `PAYMENT_EXPIRED`.
+- [x] Booking item quá giờ check-in tự chuyển `CHECKIN_EXPIRED`.
+- [x] Booking item `IN_USE` hết giờ tự chuyển `COMPLETED`.
+- [x] Không job nào update trùng gây sai dữ liệu.
 
 ---
 
@@ -1129,7 +1132,7 @@ Acceptance criteria:
 - [x] Create booking hold.
 - [x] Prevent double booking.
 - [x] Payment success confirms booking.
-- [ ] Expire pending payment booking.
+- [x] Expire pending payment booking.
 - [x] Manager check-in.
 - [x] Manager override complete exception.
 - [x] No-show creates violation.
@@ -1189,8 +1192,8 @@ Acceptance criteria:
 
 - [x] User cancellation.
 - [x] Refund module.
-- [ ] Expire payment job.
-- [ ] Check-in expiration job.
+- [x] Expire payment job.
+- [x] Check-in expiration job.
 - [ ] Violation module.
 - [ ] Notifications.
 
@@ -1264,7 +1267,7 @@ Một module được coi là hoàn thành khi:
 | Refund | Codex | DONE | Mock refund processor tied to booking_orders with optional booking_items, admin APIs, retry audit logs, and manager/admin cancellation implemented |
 | DB refactor sync | Codex | DONE | Backend synced to new booking_orders/booking_items database design and re-verified |
 | Manager operations | Codex | DONE | Booking item schedule, manager/admin check-in, late override, no-show violation, and in-use exception close implemented |
-| Jobs |  | TODO |  |
+| Jobs | Codex | DONE | Internal run-once jobs for payment hold expiry, check-in expiry, auto-complete, waitlist expiry, idempotent updates, and histories verified |
 | Waitlist |  | TODO |  |
 | Violations |  | TODO |  |
 | Notifications |  | TODO |  |

@@ -13,7 +13,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "jobs:run-once": "tsx src/jobs/jobs.runner.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

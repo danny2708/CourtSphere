@@ -1469,6 +1469,73 @@ Common errors:
 
 - `BOOKING_ITEM_COMPLETE_NOT_ALLOWED`
 
+## System Internal Jobs
+
+System jobs are internal backend operations, not public APIs. The MVP does not start a background cron process by default. A scheduler can call the runner, or a developer can run:
+
+```text
+npm run jobs:run-once
+```
+
+The runner executes jobs in this order with a default batch size of `100` records per job.
+
+### Expire Payment Holds
+
+Job name: `expire-payment-holds`.
+
+Rules:
+
+- Finds `booking_orders` with status `PENDING_PAYMENT` or `PAYMENT_PROCESSING`.
+- `holdExpiresAt < now`.
+- No related `payments` row has `paymentStatus = SUCCESS`.
+- Changes the order to `PAYMENT_EXPIRED`.
+- Changes pending/payment-processing `booking_items` on the order to `PAYMENT_EXPIRED`.
+- Changes `INITIATED` or `PROCESSING` payments to `EXPIRED`.
+- Writes `booking_order_status_histories` and `booking_item_status_histories`.
+
+Idempotency:
+
+- The job updates only rows still in eligible statuses.
+- Histories are written only after `updateMany.count > 0`.
+- Re-running the job does not create duplicate histories for already expired records.
+
+### Expire Check-In
+
+Job name: `expire-checkin`.
+
+Rules:
+
+- Reads `lateCheckinMinutes` from active booking rules.
+- Finds `booking_items` with status `CONFIRMED`, no `checkinTime`, parent order `paymentStatus = SUCCESS`, and `now > startDatetime + lateCheckinMinutes`.
+- Changes the item to `CHECKIN_EXPIRED`.
+- Writes `booking_item_status_histories` with `actionType = AUTO_EXPIRE_CHECKIN`.
+- Does not create refund.
+- Does not create no-show violation; manager/admin confirms `NO_SHOW` later.
+
+### Auto Complete Booking Items
+
+Job name: `auto-complete-booking-items`.
+
+Rules:
+
+- Finds `booking_items` with status `IN_USE` and `now >= endDatetime`.
+- Changes the item to `COMPLETED`.
+- Sets `completedByUserId = null` because the system completed the item.
+- Writes `booking_item_status_histories` with `actionType = AUTO_COMPLETE_BOOKING_ITEM`.
+- Recomputes the parent order. If all items are `COMPLETED`, the order changes to `COMPLETED` and writes `booking_order_status_histories`.
+
+### Expire Waitlist Notifications
+
+Job name: `expire-waitlist-notifications`.
+
+Rules:
+
+- Finds `waitlist_entries` with status `NOTIFIED` and `expiresAt < now`.
+- Changes the entry to `EXPIRED`.
+- Creates a basic in-app `notifications` row with `notificationType = SYSTEM`.
+- Writes an `audit_logs` record with `action = AUTO_EXPIRE_WAITLIST_ENTRY`.
+- Does not notify the next waitlist user yet; that belongs to the later Waitlist runtime module.
+
 ## Database Contract Baseline
 
 The MVP database uses PostgreSQL through Prisma.

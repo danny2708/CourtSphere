@@ -8,6 +8,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "../../config/prisma";
+import { recomputeBookingOrderStatus } from "../../jobs/booking-order-aggregate";
 import { AppError } from "../../middlewares/error.middleware";
 import {
   ACTIVE_BOOKING_STATUSES,
@@ -469,63 +470,11 @@ export class ManagerService {
     bookingOrderId: string,
     actionByUserId?: string | null
   ): Promise<void> {
-    const order = await tx.bookingOrder.findUnique({
-      where: { bookingOrderId },
-      select: {
-        bookingOrderId: true,
-        bookingStatus: true,
-        items: {
-          select: {
-            bookingStatus: true
-          }
-        }
-      }
+    await recomputeBookingOrderStatus(tx, {
+      bookingOrderId,
+      actionByUserId,
+      state: this.state
     });
-
-    if (!order || order.items.length === 0) {
-      return;
-    }
-
-    if (
-      order.items.every((item) => item.bookingStatus === BookingStatus.COMPLETED) &&
-      order.bookingStatus !== BookingStatus.COMPLETED
-    ) {
-      await tx.bookingOrder.update({
-        where: { bookingOrderId },
-        data: {
-          bookingStatus: BookingStatus.COMPLETED
-        }
-      });
-      await this.state.recordOrderStatusHistory(tx, {
-        bookingOrderId,
-        oldStatus: order.bookingStatus,
-        newStatus: BookingStatus.COMPLETED,
-        actionType: "ALL_BOOKING_ITEMS_COMPLETED",
-        actionByUserId: actionByUserId ?? null,
-        note: "All booking items are completed"
-      });
-      return;
-    }
-
-    if (
-      order.items.some((item) => item.bookingStatus === BookingStatus.IN_USE) &&
-      order.bookingStatus === BookingStatus.CONFIRMED
-    ) {
-      await tx.bookingOrder.update({
-        where: { bookingOrderId },
-        data: {
-          bookingStatus: BookingStatus.IN_USE
-        }
-      });
-      await this.state.recordOrderStatusHistory(tx, {
-        bookingOrderId,
-        oldStatus: BookingStatus.CONFIRMED,
-        newStatus: BookingStatus.IN_USE,
-        actionType: "BOOKING_ITEM_IN_USE",
-        actionByUserId: actionByUserId ?? null,
-        note: "At least one booking item is in use"
-      });
-    }
   }
 
   private async getBookingItemOrThrow(

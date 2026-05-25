@@ -167,7 +167,7 @@ function createTx(input: {
           items: [{ bookingStatus: BookingStatus.IN_USE }]
         }
       ),
-      update: vi.fn().mockResolvedValue({})
+      updateMany: vi.fn().mockResolvedValue({ count: 1 })
     },
     bookingRule: {
       findFirst: vi.fn().mockResolvedValue(input.bookingRule ?? bookingRule())
@@ -289,7 +289,7 @@ describe("ManagerService", () => {
         })
       })
     );
-    expect(tx.bookingOrder.update).toHaveBeenCalledWith(
+    expect(tx.bookingOrder.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: {
           bookingStatus: BookingStatus.IN_USE
@@ -486,7 +486,7 @@ describe("ManagerService", () => {
         })
       })
     );
-    expect(tx.bookingOrder.update).toHaveBeenCalledWith(
+    expect(tx.bookingOrder.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: {
           bookingStatus: BookingStatus.COMPLETED
