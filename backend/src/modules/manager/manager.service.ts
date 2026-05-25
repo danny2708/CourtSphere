@@ -2,6 +2,7 @@ import {
   BookingPermissionStatus,
   BookingStatus,
   PaymentStatus,
+  NotificationType,
   Prisma,
   PrismaClient,
   ViolationType
@@ -16,6 +17,10 @@ import {
   type BookingConflictService
 } from "../availability/booking-conflict.service";
 import { bookingStateService, type BookingStateService } from "../bookings/booking-state.service";
+import {
+  notificationsService,
+  type NotificationsService
+} from "../notifications/notifications.service";
 import { RulesRepository } from "../rules/rules.repository";
 import type {
   AuditContext,
@@ -170,7 +175,8 @@ export class ManagerService {
     private readonly db: PrismaClient = prisma,
     private readonly state: BookingStateService = bookingStateService,
     private readonly conflicts: BookingConflictService = bookingConflictService,
-    private readonly nowProvider: () => Date = () => new Date()
+    private readonly nowProvider: () => Date = () => new Date(),
+    private readonly notifications: NotificationsService = notificationsService
   ) {}
 
   async getTodaySchedule(query: ManagerTodayScheduleQuery) {
@@ -374,6 +380,32 @@ export class ManagerService {
                 : {})
             }
           });
+          await this.notifications.createBookingNotification(tx, {
+            userId: item.bookingOrder.userId,
+            bookingOrderId: item.bookingOrderId,
+            bookingItemId,
+            notificationType: NotificationType.NO_SHOW,
+            title: "No-show recorded",
+            content: `Booking ${item.bookingOrder.bookingCode} was marked no-show.`
+          });
+          await this.notifications.createViolationNotification(tx, {
+            userId: item.bookingOrder.userId,
+            bookingOrderId: item.bookingOrderId,
+            bookingItemId,
+            notificationType: NotificationType.VIOLATION_RECORDED,
+            title: "Violation recorded",
+            content: "A no-show violation was recorded on your account."
+          });
+          if (shouldRestrictUser) {
+            await this.notifications.createViolationNotification(tx, {
+              userId: item.bookingOrder.userId,
+              bookingOrderId: item.bookingOrderId,
+              bookingItemId,
+              notificationType: NotificationType.BOOKING_PERMISSION_RESTRICTED,
+              title: "Booking permission restricted",
+              content: "Your booking permission has been restricted due to policy violations."
+            });
+          }
           await this.createAuditLog(tx, audit, {
             entityType: "BOOKING_ITEM",
             entityId: bookingItemId,

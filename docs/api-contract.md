@@ -1036,7 +1036,7 @@ Failed/cancelled behavior:
 - Payment status changes to the callback status.
 - Booking order is not confirmed.
 - If callback status is `EXPIRED` or the hold is already expired, order/items change to `PAYMENT_EXPIRED` and history is written.
-- Notifications are not emitted yet; this is deferred to the Notifications module.
+- The Notifications module emits `PAYMENT_SUCCESS`, `PAYMENT_EXPIRED`, or a `SYSTEM` notification for failed/cancelled mock payments.
 
 Common errors:
 
@@ -1469,6 +1469,127 @@ Common errors:
 
 - `BOOKING_ITEM_COMPLETE_NOT_ALLOWED`
 
+## Notification APIs
+
+Notifications are in-app only in the MVP. Email, SMS, and push delivery are not integrated yet. Notification records can link to a `bookingOrderId` and optionally a `bookingItemId`.
+
+Supported notification types:
+
+- `BOOKING_CREATED`
+- `PAYMENT_SUCCESS`
+- `PAYMENT_EXPIRED`
+- `BOOKING_CANCELLED`
+- `REFUND_REQUESTED`
+- `REFUND_SUCCESS`
+- `REFUND_FAILED`
+- `CHECKIN_EXPIRED`
+- `NO_SHOW`
+- `VIOLATION_RECORDED`
+- `BOOKING_PERMISSION_RESTRICTED`
+- `WAITLIST_NOTIFIED`
+- `WAITLIST_EXPIRED`
+- `SYSTEM`
+
+### `GET /api/notifications`
+
+Requires `Authorization: Bearer <accessToken>`.
+
+Lists notifications owned by the authenticated user.
+
+Optional query params:
+
+- `isRead`: `true` or `false`.
+- `type`: any supported `NotificationType`.
+- `page`: defaults to `1`.
+- `limit`: defaults to `20`, max `100`.
+
+Response `200`:
+
+```json
+{
+  "notifications": [
+    {
+      "id": "uuid",
+      "notificationId": "uuid",
+      "title": "Payment successful",
+      "content": "Payment for booking BK-20260520-ABC123 succeeded.",
+      "notificationType": "PAYMENT_SUCCESS",
+      "channel": "IN_APP",
+      "isRead": false,
+      "bookingOrderId": "uuid",
+      "bookingItemId": null,
+      "createdAt": "2026-05-20T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+### `GET /api/notifications/unread-count`
+
+Requires `Authorization: Bearer <accessToken>`.
+
+Response `200`:
+
+```json
+{
+  "count": 3
+}
+```
+
+### `PATCH /api/notifications/:id/read`
+
+Requires `Authorization: Bearer <accessToken>`. Only the notification owner can mark it as read.
+
+Response `200`:
+
+```json
+{
+  "notification": {
+    "id": "uuid",
+    "notificationId": "uuid",
+    "isRead": true
+  }
+}
+```
+
+Common errors:
+
+- `NOTIFICATION_NOT_FOUND`
+
+### `PATCH /api/notifications/read-all`
+
+Requires `Authorization: Bearer <accessToken>`.
+
+Marks all unread notifications for the authenticated user as read.
+
+Response `200`:
+
+```json
+{
+  "updatedCount": 2
+}
+```
+
+Lifecycle integrations:
+
+- Booking hold creation emits `BOOKING_CREATED`.
+- User, manager, or admin cancellation emits `BOOKING_CANCELLED`.
+- Payment success emits `PAYMENT_SUCCESS`.
+- Expired payment hold emits `PAYMENT_EXPIRED`.
+- Refund request emits `REFUND_REQUESTED`.
+- Refund success emits `REFUND_SUCCESS`.
+- Refund failed or manual review emits `REFUND_FAILED`.
+- Check-in expiry emits `CHECKIN_EXPIRED`.
+- No-show confirmation emits `NO_SHOW`.
+- No-show violation emits `VIOLATION_RECORDED`.
+- Automatic booking permission restriction emits `BOOKING_PERMISSION_RESTRICTED`.
+- Waitlist response expiry emits `WAITLIST_EXPIRED`.
+
+Duplicate handling:
+
+- Jobs create notifications only after a real state transition succeeds.
+- `NotificationService` also deduplicates by user, type, order, item, title, and content before creating a row.
+
 ## System Internal Jobs
 
 System jobs are internal backend operations, not public APIs. The MVP does not start a background cron process by default. A scheduler can call the runner, or a developer can run:
@@ -1492,6 +1613,7 @@ Rules:
 - Changes pending/payment-processing `booking_items` on the order to `PAYMENT_EXPIRED`.
 - Changes `INITIATED` or `PROCESSING` payments to `EXPIRED`.
 - Writes `booking_order_status_histories` and `booking_item_status_histories`.
+- Creates an in-app `PAYMENT_EXPIRED` notification for the order owner.
 
 Idempotency:
 
@@ -1509,6 +1631,7 @@ Rules:
 - Finds `booking_items` with status `CONFIRMED`, no `checkinTime`, parent order `paymentStatus = SUCCESS`, and `now > startDatetime + lateCheckinMinutes`.
 - Changes the item to `CHECKIN_EXPIRED`.
 - Writes `booking_item_status_histories` with `actionType = AUTO_EXPIRE_CHECKIN`.
+- Creates an in-app `CHECKIN_EXPIRED` notification for the order owner.
 - Does not create refund.
 - Does not create no-show violation; manager/admin confirms `NO_SHOW` later.
 
@@ -1532,7 +1655,7 @@ Rules:
 
 - Finds `waitlist_entries` with status `NOTIFIED` and `expiresAt < now`.
 - Changes the entry to `EXPIRED`.
-- Creates a basic in-app `notifications` row with `notificationType = SYSTEM`.
+- Creates a basic in-app `notifications` row with `notificationType = WAITLIST_EXPIRED`.
 - Writes an `audit_logs` record with `action = AUTO_EXPIRE_WAITLIST_ENTRY`.
 - Does not notify the next waitlist user yet; that belongs to the later Waitlist runtime module.
 

@@ -1,6 +1,7 @@
 import {
   BookingStatus,
   EntityStatus,
+  NotificationType,
   PaymentStatus,
   Prisma,
   RefundStatus,
@@ -206,6 +207,10 @@ describe("RefundsService", () => {
       refund: {
         findFirst: vi.fn().mockResolvedValue(null),
         create: vi.fn().mockResolvedValue({ refundId })
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
       }
     };
     const { service } = createService({});
@@ -233,6 +238,15 @@ describe("RefundsService", () => {
         })
       })
     );
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          notificationType: NotificationType.REFUND_REQUESTED
+        })
+      })
+    );
   });
 
   it("supports item-level refund references", async () => {
@@ -240,6 +254,10 @@ describe("RefundsService", () => {
       refund: {
         findFirst: vi.fn().mockResolvedValue(null),
         create: vi.fn().mockResolvedValue({ refundId })
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
       }
     };
     const { service } = createService({});
@@ -350,6 +368,10 @@ describe("RefundsService", () => {
         findFirst: vi.fn().mockResolvedValue(null),
         create: vi.fn().mockResolvedValue({ refundId })
       },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
+      },
       bookingOrderStatusHistory: {
         create: vi.fn().mockResolvedValue({})
       },
@@ -413,6 +435,24 @@ describe("RefundsService", () => {
         })
       })
     );
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          notificationType: NotificationType.REFUND_REQUESTED
+        })
+      })
+    );
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          notificationType: NotificationType.BOOKING_CANCELLED
+        })
+      })
+    );
   });
 
   it("admin cancel on confirmed order creates CANCELLED_BY_ADMIN and refund", async () => {
@@ -445,6 +485,10 @@ describe("RefundsService", () => {
       refund: {
         findFirst: vi.fn().mockResolvedValue(null),
         create: vi.fn().mockResolvedValue({ refundId })
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
       },
       bookingOrderStatusHistory: {
         create: vi.fn().mockResolvedValue({})
@@ -533,6 +577,10 @@ describe("RefundsService", () => {
           })
         )
       },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
+      },
       auditLog: {
         create: vi.fn().mockResolvedValue({})
       }
@@ -556,6 +604,15 @@ describe("RefundsService", () => {
         })
       })
     );
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          notificationType: NotificationType.REFUND_SUCCESS
+        })
+      })
+    );
     expect(tx.auditLog.create).toHaveBeenCalledTimes(2);
   });
 
@@ -574,6 +631,10 @@ describe("RefundsService", () => {
             }
           })
         )
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
       },
       auditLog: {
         create: vi.fn().mockResolvedValue({})
@@ -594,6 +655,15 @@ describe("RefundsService", () => {
         data: expect.objectContaining({
           refundStatus: RefundStatus.FAILED,
           processedByUserId: adminUserId
+        })
+      })
+    );
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          notificationType: NotificationType.REFUND_FAILED
         })
       })
     );

@@ -1,8 +1,18 @@
-import { BookingStatus, PaymentStatus, Prisma, PrismaClient } from "@prisma/client";
+import {
+  BookingStatus,
+  NotificationType,
+  PaymentStatus,
+  Prisma,
+  PrismaClient
+} from "@prisma/client";
 
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../middlewares/error.middleware";
 import { bookingStateService, type BookingStateService } from "../bookings/booking-state.service";
+import {
+  notificationsService,
+  type NotificationsService
+} from "../notifications/notifications.service";
 import {
   mockPaymentGateway,
   type MockPaymentGateway
@@ -49,6 +59,8 @@ const paymentInclude = {
 type PaymentWithRelations = Prisma.PaymentGetPayload<{ include: typeof paymentInclude }>;
 type PaymentOrder = {
   bookingOrderId: string;
+  userId: string;
+  bookingCode: string;
   bookingStatus: BookingStatus;
   paymentStatus: PaymentStatus;
   holdExpiresAt: Date | null;
@@ -157,7 +169,8 @@ export class PaymentsService {
     private readonly db: PrismaClient = prisma,
     private readonly gateway: MockPaymentGateway = mockPaymentGateway,
     private readonly state: BookingStateService = bookingStateService,
-    private readonly nowProvider: () => Date = () => new Date()
+    private readonly nowProvider: () => Date = () => new Date(),
+    private readonly notifications: NotificationsService = notificationsService
   ) {}
 
   async createPaymentForBooking(userId: string, bookingOrderId: string, input: CreatePaymentInput) {
@@ -396,6 +409,14 @@ export class PaymentsService {
                   note: "Thanh toan thanh cong, booking item duoc xac nhan"
                 });
               }
+
+              await this.notifications.createPaymentNotification(tx, {
+                userId: payment.userId,
+                bookingOrderId: payment.bookingOrderId,
+                notificationType: NotificationType.PAYMENT_SUCCESS,
+                title: "Payment successful",
+                content: `Payment for booking ${payment.bookingOrder.bookingCode} succeeded.`
+              });
             }
 
             return payment.paymentId;
@@ -420,6 +441,14 @@ export class PaymentsService {
             (payment.bookingOrder.holdExpiresAt && payment.bookingOrder.holdExpiresAt <= now)
           ) {
             await this.expireOrderIfStillWaiting(tx, payment.bookingOrder, now);
+          } else if (input.status === PaymentStatus.FAILED || input.status === PaymentStatus.CANCELLED) {
+            await this.notifications.createPaymentNotification(tx, {
+              userId: payment.userId,
+              bookingOrderId: payment.bookingOrderId,
+              notificationType: NotificationType.SYSTEM,
+              title: "Payment not completed",
+              content: `Payment for booking ${payment.bookingOrder.bookingCode} is ${input.status}.`
+            });
           }
 
           return payment.paymentId;
@@ -571,6 +600,14 @@ export class PaymentsService {
         note: `Payment callback processed after hold expired at ${now.toISOString()}`
       });
     }
+
+    await this.notifications.createPaymentNotification(tx, {
+      userId: order.userId,
+      bookingOrderId: order.bookingOrderId,
+      notificationType: NotificationType.PAYMENT_EXPIRED,
+      title: "Payment hold expired",
+      content: `Booking ${order.bookingCode} expired because payment was not completed in time.`
+    });
   }
 }
 

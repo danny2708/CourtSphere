@@ -1,7 +1,17 @@
-import { BookingStatus, PaymentStatus, Prisma, PrismaClient } from "@prisma/client";
+import {
+  BookingStatus,
+  NotificationType,
+  PaymentStatus,
+  Prisma,
+  PrismaClient
+} from "@prisma/client";
 
 import { prisma } from "../config/prisma";
 import { bookingStateService, type BookingStateService } from "../modules/bookings/booking-state.service";
+import {
+  notificationsService,
+  type NotificationsService
+} from "../modules/notifications/notifications.service";
 import { RulesRepository, rulesRepository } from "../modules/rules/rules.repository";
 import { recomputeBookingOrderStatus } from "./booking-order-aggregate";
 import type { JobRunOptions, JobRunResult } from "./jobs.types";
@@ -12,6 +22,8 @@ const checkinExpiryItemInclude = {
   bookingOrder: {
     select: {
       bookingOrderId: true,
+      bookingCode: true,
+      userId: true,
       paymentStatus: true
     }
   }
@@ -30,7 +42,8 @@ export class ExpireCheckinJob {
     private readonly db: PrismaClient = prisma,
     private readonly state: BookingStateService = bookingStateService,
     private readonly rules: RulesRepository = rulesRepository,
-    private readonly nowProvider: () => Date = () => new Date()
+    private readonly nowProvider: () => Date = () => new Date(),
+    private readonly notifications: NotificationsService = notificationsService
   ) {}
 
   async run(options: JobRunOptions = {}): Promise<JobRunResult> {
@@ -119,6 +132,14 @@ export class ExpireCheckinJob {
     await recomputeBookingOrderStatus(tx, {
       bookingOrderId: currentItem.bookingOrderId,
       state: this.state
+    });
+    await this.notifications.createBookingNotification(tx, {
+      userId: currentItem.bookingOrder.userId,
+      bookingOrderId: currentItem.bookingOrderId,
+      bookingItemId: currentItem.bookingItemId,
+      notificationType: NotificationType.CHECKIN_EXPIRED,
+      title: "Check-in window expired",
+      content: `Booking ${currentItem.bookingOrder.bookingCode} check-in window has expired.`
     });
 
     return true;

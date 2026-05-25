@@ -2,6 +2,7 @@ import {
   BookingPermissionStatus,
   BookingStatus,
   EntityStatus,
+  NotificationType,
   PaymentStatus,
   Prisma,
   ViolationType,
@@ -189,6 +190,10 @@ function createTx(input: {
     },
     refund: {
       create: vi.fn()
+    },
+    notification: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({})
     }
   };
 }
@@ -442,6 +447,36 @@ describe("ManagerService", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           action: "MANAGER_MARK_NO_SHOW"
+        })
+      })
+    );
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          bookingItemId,
+          notificationType: NotificationType.NO_SHOW
+        })
+      })
+    );
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          bookingItemId,
+          notificationType: NotificationType.VIOLATION_RECORDED
+        })
+      })
+    );
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          bookingItemId,
+          notificationType: NotificationType.BOOKING_PERMISSION_RESTRICTED
         })
       })
     );

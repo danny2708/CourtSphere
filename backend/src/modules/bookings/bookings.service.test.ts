@@ -244,6 +244,10 @@ function createTx(input: {
     },
     bookingItemStatusHistory: {
       create: vi.fn().mockResolvedValue({})
+    },
+    notification: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({})
     }
   };
 
@@ -324,6 +328,15 @@ describe("BookingsService", () => {
           oldStatus: null,
           newStatus: BookingStatus.PENDING_PAYMENT,
           actionType: "USER_CREATE_BOOKING_ITEM_HOLD"
+        })
+      })
+    );
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          notificationType: "BOOKING_CREATED"
         })
       })
     );
@@ -485,6 +498,10 @@ describe("BookingsService", () => {
       },
       bookingItemStatusHistory: {
         create: vi.fn().mockResolvedValue({})
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
       }
     };
     const rules = {
@@ -513,6 +530,15 @@ describe("BookingsService", () => {
         refundRate: 80,
         refundReason: "Schedule changed",
         requestedByUserId: userId
+      })
+    );
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          notificationType: "BOOKING_CANCELLED"
+        })
       })
     );
   });

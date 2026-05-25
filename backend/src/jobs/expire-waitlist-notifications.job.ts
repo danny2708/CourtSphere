@@ -1,11 +1,15 @@
 import { NotificationType, Prisma, PrismaClient, WaitlistStatus } from "@prisma/client";
 
 import { prisma } from "../config/prisma";
+import {
+  notificationsService,
+  type NotificationsService
+} from "../modules/notifications/notifications.service";
 import type { JobRunOptions, JobRunResult } from "./jobs.types";
 
 const jobName = "expire-waitlist-notifications";
 const waitlistExpiredContent =
-  "Lượt chờ đặt sân của bạn đã hết hạn vì bạn không xác nhận trong thời gian cho phép. Bạn có thể tham gia lại danh sách chờ nếu vẫn có nhu cầu.";
+  "Your waitlist response window has expired. You can join the waitlist again if you still need the slot.";
 
 function jsonSafe(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
@@ -14,7 +18,8 @@ function jsonSafe(value: unknown): Prisma.InputJsonValue {
 export class ExpireWaitlistNotificationsJob {
   constructor(
     private readonly db: PrismaClient = prisma,
-    private readonly nowProvider: () => Date = () => new Date()
+    private readonly nowProvider: () => Date = () => new Date(),
+    private readonly notifications: NotificationsService = notificationsService
   ) {}
 
   async run(options: JobRunOptions = {}): Promise<JobRunResult> {
@@ -97,13 +102,11 @@ export class ExpireWaitlistNotificationsJob {
       return false;
     }
 
-    await tx.notification.create({
-      data: {
-        userId: currentEntry.userId,
-        title: "Lượt chờ đặt sân đã hết hạn",
-        content: waitlistExpiredContent,
-        notificationType: NotificationType.SYSTEM
-      }
+    await this.notifications.createWaitlistNotification(tx, {
+      userId: currentEntry.userId,
+      notificationType: NotificationType.WAITLIST_EXPIRED,
+      title: "Waitlist response expired",
+      content: waitlistExpiredContent
     });
     await tx.auditLog.create({
       data: {
@@ -126,3 +129,4 @@ export class ExpireWaitlistNotificationsJob {
 }
 
 export const expireWaitlistNotificationsJob = new ExpireWaitlistNotificationsJob();
+

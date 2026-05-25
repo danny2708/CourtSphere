@@ -618,7 +618,7 @@ Checklist:
 - [x] Payment failed cập nhật payment `FAILED`.
 - [x] Xử lý callback đến sau khi booking expired.
 - [x] Ghi booking status history.
-- [!] Gửi notification payment success/fail: hoãn đến module 6.16 Notifications.
+- [x] Gửi notification payment success/fail qua module 6.16 Notifications.
 
 Acceptance criteria:
 
@@ -692,7 +692,7 @@ Checklist:
 - [x] Job chuyển booking item quá giờ check-in.
 - [x] Job tự hoàn thành booking item khi hết giờ sử dụng.
 - [x] Job expire waitlist notified entries quá `expires_at`.
-- [!] Job gửi notification trước giờ sử dụng nếu cần: hoãn đến module Notifications.
+- [!] Job gửi reminder trước giờ sử dụng nếu cần: hoãn đến module reminder/scheduler sau.
 - [!] Job notify waitlist khi slot được giải phóng: hoãn đến module Waitlist runtime.
 - [x] Job phải idempotent.
 - [x] Job ghi status history/audit log khi cập nhật trạng thái.
@@ -759,20 +759,20 @@ Mục tiêu: thông báo sự kiện quan trọng.
 
 Checklist:
 
-- [ ] API list my notifications.
-- [ ] API mark notification as read.
-- [ ] Tạo notification khi booking pending payment.
-- [ ] Tạo notification khi payment success/fail.
-- [ ] Tạo notification khi booking expired.
-- [ ] Tạo notification khi manager cancel.
-- [ ] Tạo notification khi refund status changed.
-- [ ] Tạo notification khi no-show/check-in expired.
-- [ ] Tạo notification khi booking permission restricted.
+- [x] API list my notifications.
+- [x] API mark notification as read.
+- [x] Tạo notification khi booking pending payment.
+- [x] Tạo notification khi payment success/fail.
+- [x] Tạo notification khi booking expired.
+- [x] Tạo notification khi manager cancel.
+- [x] Tạo notification khi refund status changed.
+- [x] Tạo notification khi no-show/check-in expired.
+- [x] Tạo notification khi booking permission restricted.
 
 Acceptance criteria:
 
-- [ ] User nhận được notification trong app.
-- [ ] Notification liên kết booking nếu có.
+- [x] User nhận được notification trong app.
+- [x] Notification liên kết booking nếu có.
 
 ---
 
@@ -1105,7 +1105,14 @@ Acceptance criteria:
 - [x] CRUD `/api/admin/operating-hours`
 - [x] CRUD `/api/admin/pricing-rules`
 
-### 8.7 Reports APIs
+### 8.7 Notification APIs
+
+- [x] `GET /api/notifications`
+- [x] `GET /api/notifications/unread-count`
+- [x] `PATCH /api/notifications/:id/read`
+- [x] `PATCH /api/notifications/read-all`
+
+### 8.8 Reports APIs
 
 - [ ] `GET /api/admin/reports/overview`
 - [ ] `GET /api/admin/reports/bookings`
@@ -1270,7 +1277,7 @@ Một module được coi là hoàn thành khi:
 | Jobs | Codex | DONE | Internal run-once jobs for payment hold expiry, check-in expiry, auto-complete, waitlist expiry, idempotent updates, and histories verified |
 | Waitlist |  | TODO |  |
 | Violations |  | TODO |  |
-| Notifications |  | TODO |  |
+| Notifications | Codex | DONE | In-app notification APIs/service, lifecycle integrations, enum migration, and tests verified |
 | Reports |  | TODO |  |
 | Frontend foundation |  | TODO |  |
 | UI design system |  | TODO |  |

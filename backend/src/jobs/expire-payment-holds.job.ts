@@ -1,7 +1,17 @@
-import { BookingStatus, PaymentStatus, Prisma, PrismaClient } from "@prisma/client";
+import {
+  BookingStatus,
+  NotificationType,
+  PaymentStatus,
+  Prisma,
+  PrismaClient
+} from "@prisma/client";
 
 import { prisma } from "../config/prisma";
 import { bookingStateService, type BookingStateService } from "../modules/bookings/booking-state.service";
+import {
+  notificationsService,
+  type NotificationsService
+} from "../modules/notifications/notifications.service";
 import type { JobRunOptions, JobRunResult } from "./jobs.types";
 
 const jobName = "expire-payment-holds";
@@ -41,7 +51,8 @@ export class ExpirePaymentHoldsJob {
   constructor(
     private readonly db: PrismaClient = prisma,
     private readonly state: BookingStateService = bookingStateService,
-    private readonly nowProvider: () => Date = () => new Date()
+    private readonly nowProvider: () => Date = () => new Date(),
+    private readonly notifications: NotificationsService = notificationsService
   ) {}
 
   async run(options: JobRunOptions = {}): Promise<JobRunResult> {
@@ -167,6 +178,14 @@ export class ExpirePaymentHoldsJob {
         note: "System expired booking item after payment hold elapsed"
       });
     }
+
+    await this.notifications.createPaymentNotification(tx, {
+      userId: currentOrder.userId,
+      bookingOrderId: currentOrder.bookingOrderId,
+      notificationType: NotificationType.PAYMENT_EXPIRED,
+      title: "Payment hold expired",
+      content: `Booking ${currentOrder.bookingCode} expired because payment was not completed in time.`
+    });
 
     return true;
   }

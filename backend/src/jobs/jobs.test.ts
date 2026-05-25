@@ -30,6 +30,8 @@ function createTransactionDb(tx: unknown, models: Record<string, unknown> = {}) 
 function buildOrder(overrides: Record<string, unknown> = {}) {
   return {
     bookingOrderId,
+    bookingCode: "BK-20260520-TEST01",
+    userId,
     bookingStatus: BookingStatus.PENDING_PAYMENT,
     paymentStatus: PaymentStatus.INITIATED,
     holdExpiresAt: new Date("2026-05-20T09:45:00.000Z"),
@@ -59,6 +61,8 @@ function buildBookingItem(overrides: Record<string, unknown> = {}) {
     checkinTime: null,
     bookingOrder: {
       bookingOrderId,
+      bookingCode: "BK-20260520-TEST01",
+      userId,
       paymentStatus: PaymentStatus.SUCCESS
     },
     ...overrides
@@ -107,6 +111,10 @@ describe("system jobs", () => {
         create: vi.fn().mockResolvedValue({})
       },
       bookingItemStatusHistory: {
+        create: vi.fn().mockResolvedValue({})
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
         create: vi.fn().mockResolvedValue({})
       }
     };
@@ -160,6 +168,15 @@ describe("system jobs", () => {
         data: expect.objectContaining({
           oldStatus: BookingStatus.PENDING_PAYMENT,
           newStatus: BookingStatus.PAYMENT_EXPIRED
+        })
+      })
+    );
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          notificationType: NotificationType.PAYMENT_EXPIRED
         })
       })
     );
@@ -236,6 +253,10 @@ describe("system jobs", () => {
       },
       refund: {
         create: vi.fn()
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
       }
     };
     const db = createTransactionDb(tx, {
@@ -278,6 +299,16 @@ describe("system jobs", () => {
       })
     );
     expect(tx.refund.create).not.toHaveBeenCalled();
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          bookingItemId,
+          notificationType: NotificationType.CHECKIN_EXPIRED
+        })
+      })
+    );
   });
 
   it("does not expire IN_USE or not-yet-late check-in items", async () => {
@@ -420,6 +451,7 @@ describe("system jobs", () => {
         updateMany: vi.fn().mockResolvedValue({ count: 1 })
       },
       notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
         create: vi.fn().mockResolvedValue({})
       },
       auditLog: {
@@ -450,7 +482,7 @@ describe("system jobs", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           userId,
-          notificationType: NotificationType.SYSTEM
+          notificationType: NotificationType.WAITLIST_EXPIRED
         })
       })
     );
@@ -464,6 +496,7 @@ describe("system jobs", () => {
         updateMany: vi.fn()
       },
       notification: {
+        findFirst: vi.fn(),
         create: vi.fn()
       },
       auditLog: {

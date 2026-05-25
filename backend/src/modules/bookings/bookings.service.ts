@@ -4,6 +4,7 @@ import {
   BookingStatus,
   CourtStatus,
   EntityStatus,
+  NotificationType,
   PaymentStatus,
   Prisma,
   PrismaClient
@@ -16,6 +17,10 @@ import {
   bookingConflictService,
   type BookingConflictService
 } from "../availability/booking-conflict.service";
+import {
+  notificationsService,
+  type NotificationsService
+} from "../notifications/notifications.service";
 import { refundsService, type RefundsService } from "../refunds/refunds.service";
 import { RulesRepository, rulesRepository } from "../rules/rules.repository";
 import type {
@@ -288,7 +293,8 @@ export class BookingsService {
     private readonly rules: RulesRepository = rulesRepository,
     private readonly refunds: RefundsService = refundsService,
     private readonly nowProvider: () => Date = () => new Date(),
-    private readonly codeGenerator: (now: Date) => string = defaultBookingCode
+    private readonly codeGenerator: (now: Date) => string = defaultBookingCode,
+    private readonly notifications: NotificationsService = notificationsService
   ) {}
 
   async createBookingHold(userId: string, input: CreateBookingInput) {
@@ -385,7 +391,8 @@ export class BookingsService {
               }
             },
             select: {
-              bookingOrderId: true
+              bookingOrderId: true,
+              bookingCode: true
             }
           });
 
@@ -413,6 +420,14 @@ export class BookingsService {
               note: "Booking item hold created pending full payment"
             });
           }
+
+          await this.notifications.createBookingNotification(tx, {
+            userId,
+            bookingOrderId: createdOrder.bookingOrderId,
+            notificationType: NotificationType.BOOKING_CREATED,
+            title: "Booking hold created",
+            content: `Booking ${createdOrder.bookingCode} is pending full payment.`
+          });
 
           return this.getBookingOrderById(tx, createdOrder.bookingOrderId);
         },
@@ -588,6 +603,14 @@ export class BookingsService {
               note: input.reason ?? null
             });
           }
+
+          await this.notifications.createBookingNotification(tx, {
+            userId,
+            bookingOrderId: currentOrder.bookingOrderId,
+            notificationType: NotificationType.BOOKING_CANCELLED,
+            title: "Booking cancelled",
+            content: `Booking ${currentOrder.bookingCode} was cancelled.`
+          });
 
           return this.getBookingOrderById(tx, updatedOrder.bookingOrderId);
         },
