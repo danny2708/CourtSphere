@@ -9,7 +9,7 @@ import { createBookingsRouter } from "./bookings.routes";
 
 const userId = "00000000-0000-4000-8000-000000000701";
 const courtId = "00000000-0000-4000-8000-000000000702";
-const bookingId = "00000000-0000-4000-8000-000000000703";
+const bookingOrderId = "00000000-0000-4000-8000-000000000703";
 const tokenService = new TokenService();
 
 function bearerToken(roles: string[]): string {
@@ -24,7 +24,7 @@ function createMockController() {
   const controller = new BookingsController();
 
   controller.createBookingHold = vi.fn(async (req: Request, res: Response): Promise<void> => {
-    res.status(201).json({ booking: { id: bookingId, ...req.body } });
+    res.status(201).json({ booking: { id: bookingOrderId, ...req.body } });
   });
   controller.listMyBookings = vi.fn(async (_req: Request, res: Response): Promise<void> => {
     res.status(200).json({ bookings: [] });
@@ -60,18 +60,25 @@ describe("bookings routes", () => {
       .post("/api/bookings")
       .set("Authorization", bearerToken(["USER"]))
       .send({
-        courtId,
-        startDatetime: "2026-05-21T08:00:00.000Z",
-        endDatetime: "2026-05-21T09:00:00.000Z",
-        participantCount: 10,
-        usagePurpose: "Class training"
+        items: [
+          {
+            courtId,
+            startDatetime: "2026-05-21T08:00:00.000Z",
+            endDatetime: "2026-05-21T09:00:00.000Z"
+          }
+        ],
+        note: "Class training"
       });
 
     expect(response.status).toBe(201);
     expect(response.body.booking).toMatchObject({
-      id: bookingId,
-      courtId,
-      participantCount: 10
+      id: bookingOrderId,
+      items: [
+        {
+          courtId
+        }
+      ],
+      note: "Class training"
     });
     expect(controller.createBookingHold).toHaveBeenCalledOnce();
   });
@@ -86,10 +93,10 @@ describe("bookings routes", () => {
       .query({ status: "PENDING_PAYMENT" })
       .set("Authorization", authorization);
     const detailResponse = await request(app)
-      .get(`/api/bookings/${bookingId}`)
+      .get(`/api/bookings/${bookingOrderId}`)
       .set("Authorization", authorization);
     const cancelResponse = await request(app)
-      .post(`/api/bookings/${bookingId}/cancel`)
+      .post(`/api/bookings/${bookingOrderId}/cancel`)
       .set("Authorization", authorization)
       .send({ reason: "Schedule changed" });
 
@@ -109,11 +116,14 @@ describe("bookings routes", () => {
       .post("/api/bookings")
       .set("Authorization", bearerToken(["FIELD_MANAGER"]))
       .send({
-        courtId,
-        startDatetime: "2026-05-21T08:00:00.000Z",
-        endDatetime: "2026-05-21T09:00:00.000Z",
-        participantCount: 10,
-        usagePurpose: "Class training"
+        items: [
+          {
+            courtId,
+            startDatetime: "2026-05-21T08:00:00.000Z",
+            endDatetime: "2026-05-21T09:00:00.000Z"
+          }
+        ],
+        note: "Class training"
       });
 
     expect(response.status).toBe(403);
@@ -140,11 +150,13 @@ describe("bookings routes", () => {
       .post("/api/bookings")
       .set("Authorization", bearerToken(["USER"]))
       .send({
-        courtId,
-        startDatetime: "2026-05-21T09:00:00.000Z",
-        endDatetime: "2026-05-21T08:00:00.000Z",
-        participantCount: 0,
-        usagePurpose: "x"
+        items: [
+          {
+            courtId,
+            startDatetime: "2026-05-21T09:00:00.000Z",
+            endDatetime: "2026-05-21T08:00:00.000Z"
+          }
+        ]
       });
 
     expect(response.status).toBe(400);

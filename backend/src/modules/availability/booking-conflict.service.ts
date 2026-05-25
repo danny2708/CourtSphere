@@ -14,7 +14,8 @@ export const ACTIVE_BOOKING_STATUSES = [
 ] as const;
 
 type ConflictResult = {
-  bookingId: string;
+  bookingOrderId: string;
+  bookingItemId: string;
   status: Exclude<AvailabilitySlotStatus, "AVAILABLE" | "MAINTENANCE" | "CLOSED">;
 };
 
@@ -58,13 +59,15 @@ export class BookingConflictService {
 
     if (booked) {
       return {
-        bookingId: booked.bookingId,
+        bookingOrderId: booked.bookingOrderId,
+        bookingItemId: booked.bookingItemId,
         status: "BOOKED"
       };
     }
 
     return {
-      bookingId: overlappingBookings[0].bookingId,
+      bookingOrderId: overlappingBookings[0].bookingOrderId,
+      bookingItemId: overlappingBookings[0].bookingItemId,
       status: "HOLD"
     };
   }

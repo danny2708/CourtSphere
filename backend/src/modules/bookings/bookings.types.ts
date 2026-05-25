@@ -1,11 +1,12 @@
 import type { BookingStatus } from "@prisma/client";
 
 export type CreateBookingInput = {
-  courtId: string;
-  startDatetime: Date;
-  endDatetime: Date;
-  participantCount: number;
-  usagePurpose: string;
+  items: Array<{
+    courtId: string;
+    startDatetime: Date;
+    endDatetime: Date;
+  }>;
+  note?: string;
 };
 
 export type ListMyBookingsQuery = {

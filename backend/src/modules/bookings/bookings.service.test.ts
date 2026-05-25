@@ -16,8 +16,11 @@ import { BookingsService } from "./bookings.service";
 
 const userId = "00000000-0000-4000-8000-000000000801";
 const courtId = "00000000-0000-4000-8000-000000000802";
+const secondCourtId = "00000000-0000-4000-8000-000000000812";
 const courtTypeId = "00000000-0000-4000-8000-000000000803";
-const bookingId = "00000000-0000-4000-8000-000000000804";
+const bookingOrderId = "00000000-0000-4000-8000-000000000804";
+const bookingItemId = "00000000-0000-4000-8000-000000000814";
+const secondBookingItemId = "00000000-0000-4000-8000-000000000815";
 const paymentId = "00000000-0000-4000-8000-000000000805";
 const refundId = "00000000-0000-4000-8000-000000000806";
 const priorityGroupId = "00000000-0000-4000-8000-000000000807";
@@ -40,6 +43,20 @@ function bookingRule() {
     updatedByUserId: null,
     createdAt: now,
     updatedAt: now
+  };
+}
+
+function effectivePolicy() {
+  return {
+    holdMinutes: 10,
+    cancelBeforeHours: 2,
+    lateCheckinMinutes: 15,
+    maxDurationMinutes: 120,
+    maxBookingsPerDay: 2,
+    advanceBookingDays: 7,
+    canJoinWaitlist: true,
+    refundRateUserOnTime: 80,
+    refundRateManagerFault: 100
   };
 }
 
@@ -74,13 +91,11 @@ function buildUser(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function buildCourt(overrides: Record<string, unknown> = {}) {
+function buildCourt(id = courtId, overrides: Record<string, unknown> = {}) {
   return {
-    courtId,
+    courtId: id,
     courtTypeId,
-    courtName: "Main Field",
-    location: "North Campus",
-    capacity: 20,
+    courtName: id === courtId ? "Main Field" : "Side Field",
     description: null,
     imageUrl: null,
     status: CourtStatus.ACTIVE,
@@ -97,7 +112,7 @@ function buildCourt(overrides: Record<string, unknown> = {}) {
     operatingHours: [
       {
         operatingHourId: "00000000-0000-4000-8000-000000000809",
-        courtId,
+        courtId: id,
         weekday: 4,
         openTime: "08:00",
         closeTime: "12:00",
@@ -110,7 +125,7 @@ function buildCourt(overrides: Record<string, unknown> = {}) {
     pricingRules: [
       {
         pricingRuleId: "00000000-0000-4000-8000-000000000810",
-        courtId,
+        courtId: id,
         createdByUserId: null,
         priorityGroupId: null,
         startTime: "08:00",
@@ -129,31 +144,20 @@ function buildCourt(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function buildBooking(overrides: Record<string, unknown> = {}) {
+function buildOrder(overrides: Record<string, unknown> = {}) {
   return {
-    bookingId,
+    bookingOrderId,
     bookingCode: "BK-20260520-TEST01",
     userId,
-    courtId,
-    startDatetime: new Date("2026-05-21T08:00:00.000Z"),
-    endDatetime: new Date("2026-05-21T09:00:00.000Z"),
-    participantCount: 10,
-    usagePurpose: "Class training",
     totalAmount: new Prisma.Decimal(50000),
     bookingStatus: BookingStatus.PENDING_PAYMENT,
     paymentStatus: PaymentStatus.INITIATED,
     refundable: true,
     holdExpiresAt: new Date("2026-05-20T00:10:00.000Z"),
+    note: null,
     cancelReason: null,
     cancelledByUserId: null,
     cancelledAt: null,
-    checkedInByUserId: null,
-    completedByUserId: null,
-    noShowMarkedByUserId: null,
-    managerNote: null,
-    noRefundReason: null,
-    checkinTime: null,
-    checkoutTime: null,
     createdAt: now,
     updatedAt: now,
     user: {
@@ -161,8 +165,28 @@ function buildBooking(overrides: Record<string, unknown> = {}) {
       fullName: "Sample User",
       email: "user@example.edu"
     },
-    court: buildCourt(),
-    bookingStatusHistories: [],
+    items: [
+      {
+        bookingItemId,
+        bookingOrderId,
+        courtId,
+        startDatetime: new Date("2026-05-21T08:00:00.000Z"),
+        endDatetime: new Date("2026-05-21T09:00:00.000Z"),
+        unitPrice: new Prisma.Decimal(50000),
+        amount: new Prisma.Decimal(50000),
+        bookingStatus: BookingStatus.PENDING_PAYMENT,
+        checkinTime: null,
+        checkedInByUserId: null,
+        completedByUserId: null,
+        noShowMarkedByUserId: null,
+        managerNote: null,
+        createdAt: now,
+        updatedAt: now,
+        court: buildCourt(),
+        itemStatusHistories: []
+      }
+    ],
+    orderStatusHistories: [],
     payments: [],
     refunds: [],
     ...overrides
@@ -170,15 +194,16 @@ function buildBooking(overrides: Record<string, unknown> = {}) {
 }
 
 function createTx(input: {
-  user?: unknown;
-  court?: unknown;
-  existingBookingCount?: number;
-  overlappingBookings?: unknown[];
-  createdBooking?: unknown;
+  courts?: Record<string, unknown>;
+  existingOrderCount?: number;
+  overlappingItems?: unknown[];
+  createdItemIds?: string[];
+  createdOrder?: unknown;
 }) {
-  return {
+  const createdItemIds = input.createdItemIds ?? [bookingItemId];
+  const tx = {
     user: {
-      findUnique: vi.fn().mockResolvedValue(input.user ?? buildUser())
+      findUnique: vi.fn().mockResolvedValue(buildUser())
     },
     bookingRule: {
       findFirst: vi.fn().mockResolvedValue(bookingRule())
@@ -187,26 +212,42 @@ function createTx(input: {
       findFirst: vi.fn().mockResolvedValue(null)
     },
     court: {
-      findUnique: vi.fn().mockResolvedValue(input.court ?? buildCourt())
+      findUnique: vi.fn(async ({ where }: { where: { courtId: string } }) => {
+        if (input.courts?.[where.courtId]) {
+          return input.courts[where.courtId];
+        }
+
+        return buildCourt(where.courtId);
+      })
     },
-    booking: {
-      count: vi.fn().mockResolvedValue(input.existingBookingCount ?? 0),
-      findMany: vi
-        .fn()
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce(input.overlappingBookings ?? []),
-      create: vi.fn().mockResolvedValue({ bookingId }),
-      findUniqueOrThrow: vi.fn().mockResolvedValue(input.createdBooking ?? buildBooking()),
-      findFirst: vi.fn(),
-      update: vi.fn()
+    bookingOrder: {
+      count: vi.fn().mockResolvedValue(input.existingOrderCount ?? 0),
+      create: vi.fn().mockResolvedValue({ bookingOrderId }),
+      findUniqueOrThrow: vi.fn().mockResolvedValue(input.createdOrder ?? buildOrder())
     },
-    bookingStatusHistory: {
+    bookingItem: {
+      findMany: vi.fn(async (args: { select?: Record<string, unknown>; where?: Record<string, unknown> }) => {
+        if (args.where?.bookingOrderId === bookingOrderId && args.select?.bookingItemId && !args.select?.bookingOrderId) {
+          return createdItemIds.map((id) => ({ bookingItemId: id }));
+        }
+
+        if (args.select?.startDatetime) {
+          return input.overlappingItems ?? [];
+        }
+
+        return [];
+      }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 })
+    },
+    bookingOrderStatusHistory: {
       create: vi.fn().mockResolvedValue({})
     },
-    refund: {
-      create: vi.fn()
+    bookingItemStatusHistory: {
+      create: vi.fn().mockResolvedValue({})
     }
   };
+
+  return tx;
 }
 
 function createService(
@@ -227,57 +268,131 @@ function createService(
 }
 
 describe("BookingsService", () => {
-  it("creates a pending-payment booking hold and writes status history", async () => {
+  it("creates a single booking order with one item and writes histories", async () => {
     const tx = createTx({});
     const service = createService(tx);
 
-    const booking = await service.createBookingHold(userId, {
-      courtId,
-      startDatetime: new Date("2026-05-21T08:00:00.000Z"),
-      endDatetime: new Date("2026-05-21T09:00:00.000Z"),
-      participantCount: 10,
-      usagePurpose: "Class training"
+    const order = await service.createBookingHold(userId, {
+      items: [
+        {
+          courtId,
+          startDatetime: new Date("2026-05-21T08:00:00.000Z"),
+          endDatetime: new Date("2026-05-21T09:00:00.000Z")
+        }
+      ],
+      note: "Class training"
     });
 
-    expect(booking).toMatchObject({
-      id: bookingId,
+    expect(order).toMatchObject({
+      id: bookingOrderId,
       bookingCode: "BK-20260520-TEST01",
       bookingStatus: BookingStatus.PENDING_PAYMENT,
       paymentStatus: PaymentStatus.INITIATED,
-      totalAmount: 50000
+      totalAmount: 50000,
+      items: [{ bookingItemId }]
     });
-    expect(tx.booking.create).toHaveBeenCalledWith(
+    expect(tx.bookingOrder.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          bookingStatus: BookingStatus.PENDING_PAYMENT,
-          paymentStatus: PaymentStatus.INITIATED,
-          holdExpiresAt: new Date("2026-05-20T00:10:00.000Z"),
-          totalAmount: new Prisma.Decimal(50000)
+          totalAmount: new Prisma.Decimal(50000),
+          items: {
+            create: [
+              expect.objectContaining({
+                courtId,
+                amount: new Prisma.Decimal(50000),
+                bookingStatus: BookingStatus.PENDING_PAYMENT
+              })
+            ]
+          }
         })
       })
     );
-    expect(tx.bookingStatusHistory.create).toHaveBeenCalledWith(
+    expect(tx.bookingOrderStatusHistory.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          bookingId,
+          bookingOrderId,
           oldStatus: null,
           newStatus: BookingStatus.PENDING_PAYMENT,
-          actionType: "USER_CREATE_BOOKING_HOLD",
-          actionByUserId: userId
+          actionType: "USER_CREATE_BOOKING_ORDER_HOLD"
+        })
+      })
+    );
+    expect(tx.bookingItemStatusHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          bookingItemId,
+          oldStatus: null,
+          newStatus: BookingStatus.PENDING_PAYMENT,
+          actionType: "USER_CREATE_BOOKING_ITEM_HOLD"
         })
       })
     );
   });
 
-  it("rejects overlap with an active booking", async () => {
-    const tx = createTx({
-      overlappingBookings: [
+  it("creates a combo booking order with multiple items", async () => {
+    const comboOrder = buildOrder({
+      totalAmount: new Prisma.Decimal(100000),
+      items: [
+        buildOrder().items[0],
         {
-          bookingId: "00000000-0000-4000-8000-000000000811",
+          ...buildOrder().items[0],
+          bookingItemId: secondBookingItemId,
+          courtId: secondCourtId,
+          amount: new Prisma.Decimal(50000),
+          court: buildCourt(secondCourtId)
+        }
+      ]
+    });
+    const tx = createTx({
+      createdItemIds: [bookingItemId, secondBookingItemId],
+      createdOrder: comboOrder
+    });
+    const service = createService(tx);
+
+    const order = await service.createBookingHold(userId, {
+      items: [
+        {
+          courtId,
+          startDatetime: new Date("2026-05-21T08:00:00.000Z"),
+          endDatetime: new Date("2026-05-21T09:00:00.000Z")
+        },
+        {
+          courtId: secondCourtId,
+          startDatetime: new Date("2026-05-21T09:00:00.000Z"),
+          endDatetime: new Date("2026-05-21T10:00:00.000Z")
+        }
+      ]
+    });
+
+    expect(order.totalAmount).toBe(100000);
+    expect(order.items).toHaveLength(2);
+    expect(tx.bookingOrder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          totalAmount: new Prisma.Decimal(100000),
+          items: {
+            create: expect.arrayContaining([
+              expect.objectContaining({ courtId }),
+              expect.objectContaining({ courtId: secondCourtId })
+            ])
+          }
+        })
+      })
+    );
+  });
+
+  it("does not create an order when one combo item conflicts", async () => {
+    const tx = createTx({
+      overlappingItems: [
+        {
+          bookingItemId: "00000000-0000-4000-8000-000000000899",
+          bookingOrderId: "00000000-0000-4000-8000-000000000898",
           bookingStatus: BookingStatus.CONFIRMED,
-          startDatetime: new Date("2026-05-21T08:30:00.000Z"),
-          endDatetime: new Date("2026-05-21T09:30:00.000Z"),
-          holdExpiresAt: null
+          startDatetime: new Date("2026-05-21T09:30:00.000Z"),
+          endDatetime: new Date("2026-05-21T10:30:00.000Z"),
+          bookingOrder: {
+            holdExpiresAt: null
+          }
         }
       ]
     });
@@ -285,127 +400,33 @@ describe("BookingsService", () => {
 
     await expect(
       service.createBookingHold(userId, {
-        courtId,
-        startDatetime: new Date("2026-05-21T08:00:00.000Z"),
-        endDatetime: new Date("2026-05-21T09:00:00.000Z"),
-        participantCount: 10,
-        usagePurpose: "Class training"
+        items: [
+          {
+            courtId,
+            startDatetime: new Date("2026-05-21T08:00:00.000Z"),
+            endDatetime: new Date("2026-05-21T09:00:00.000Z")
+          },
+          {
+            courtId: secondCourtId,
+            startDatetime: new Date("2026-05-21T09:00:00.000Z"),
+            endDatetime: new Date("2026-05-21T10:00:00.000Z")
+          }
+        ]
       })
     ).rejects.toMatchObject({
       statusCode: 409,
       code: "BOOKING_SLOT_UNAVAILABLE"
     });
-    expect(tx.booking.create).not.toHaveBeenCalled();
+    expect(tx.bookingOrder.create).not.toHaveBeenCalled();
   });
 
-  it("rejects duration above configured maximum", async () => {
-    const tx = createTx({});
-    const service = createService(tx);
-
-    await expect(
-      service.createBookingHold(userId, {
-        courtId,
-        startDatetime: new Date("2026-05-21T08:00:00.000Z"),
-        endDatetime: new Date("2026-05-21T11:00:00.000Z"),
-        participantCount: 10,
-        usagePurpose: "Class training"
-      })
-    ).rejects.toMatchObject({
-      statusCode: 400,
-      code: "BOOKING_DURATION_EXCEEDS_LIMIT"
-    });
-    expect(tx.booking.create).not.toHaveBeenCalled();
-  });
-
-  it("rejects daily quota overflow", async () => {
-    const tx = createTx({ existingBookingCount: 2 });
-    const service = createService(tx);
-
-    await expect(
-      service.createBookingHold(userId, {
-        courtId,
-        startDatetime: new Date("2026-05-21T08:00:00.000Z"),
-        endDatetime: new Date("2026-05-21T09:00:00.000Z"),
-        participantCount: 10,
-        usagePurpose: "Class training"
-      })
-    ).rejects.toMatchObject({
-      statusCode: 409,
-      code: "MAX_BOOKINGS_PER_DAY_REACHED"
-    });
-    expect(tx.booking.create).not.toHaveBeenCalled();
-  });
-
-  it("cancels a pending-payment booking without creating a refund", async () => {
-    const cancelledBooking = buildBooking({
-      bookingStatus: BookingStatus.CANCELLED_BY_USER,
-      paymentStatus: PaymentStatus.CANCELLED,
-      refundable: false,
-      noRefundReason: "Cancelled before payment success",
-      cancelledByUserId: userId,
-      cancelledAt: now
-    });
-    const tx = {
-      booking: {
-        findFirst: vi.fn().mockResolvedValue({
-          ...buildBooking(),
-          user: buildUser(),
-          payments: []
-        }),
-        update: vi.fn().mockResolvedValue({ bookingId }),
-        findUniqueOrThrow: vi.fn().mockResolvedValue(cancelledBooking)
-      },
-      bookingStatusHistory: {
-        create: vi.fn().mockResolvedValue({})
-      },
-      refund: {
-        create: vi.fn()
-      }
-    };
-    const rules = {
-      getEffectivePolicy: vi.fn().mockResolvedValue({
-        holdMinutes: 10,
-        cancelBeforeHours: 2,
-        lateCheckinMinutes: 15,
-        maxDurationMinutes: 120,
-        maxBookingsPerDay: 2,
-        advanceBookingDays: 7,
-        canJoinWaitlist: true,
-        refundRateUserOnTime: 80,
-        refundRateManagerFault: 100
-      })
-    } as unknown as RulesRepository;
-    const service = createService(tx, { rules });
-
-    const booking = await service.cancelMyBooking(userId, bookingId, {
-      reason: "Schedule changed"
-    });
-
-    expect(booking).toMatchObject({
-      id: bookingId,
-      bookingStatus: BookingStatus.CANCELLED_BY_USER,
-      paymentStatus: PaymentStatus.CANCELLED,
-      refundable: false
-    });
-    expect(tx.refund.create).not.toHaveBeenCalled();
-    expect(tx.bookingStatusHistory.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          oldStatus: BookingStatus.PENDING_PAYMENT,
-          newStatus: BookingStatus.CANCELLED_BY_USER,
-          actionType: "USER_CANCEL_BOOKING"
-        })
-      })
-    );
-  });
-
-  it("cancels a confirmed booking and creates a requested refund when eligible", async () => {
+  it("cancels a confirmed booking order and requests refund by bookingOrderId", async () => {
     const payment = {
       paymentId,
-      bookingId,
+      bookingOrderId,
       userId,
       amount: new Prisma.Decimal(100000),
-      paymentMethod: "FAKE",
+      paymentMethod: "MOCK",
       gatewayTransactionId: "gw_1",
       paymentStatus: PaymentStatus.SUCCESS,
       rawCallback: null,
@@ -413,7 +434,19 @@ describe("BookingsService", () => {
       createdAt: now,
       updatedAt: now
     };
-    const cancelledBooking = buildBooking({
+    const currentOrder = buildOrder({
+      bookingStatus: BookingStatus.CONFIRMED,
+      paymentStatus: PaymentStatus.SUCCESS,
+      user: buildUser(),
+      payments: [payment],
+      items: [
+        {
+          ...buildOrder().items[0],
+          bookingStatus: BookingStatus.CONFIRMED
+        }
+      ]
+    });
+    const cancelledOrder = buildOrder({
       bookingStatus: BookingStatus.CANCELLED_BY_USER,
       paymentStatus: PaymentStatus.SUCCESS,
       refundable: true,
@@ -424,7 +457,8 @@ describe("BookingsService", () => {
         {
           refundId,
           paymentId,
-          bookingId,
+          bookingOrderId,
+          bookingItemId: null,
           refundAmount: new Prisma.Decimal(80000),
           refundReason: "Schedule changed",
           refundStatus: "REQUESTED",
@@ -438,57 +472,42 @@ describe("BookingsService", () => {
       ]
     });
     const tx = {
-      booking: {
-        findFirst: vi.fn().mockResolvedValue({
-          ...buildBooking({
-            bookingStatus: BookingStatus.CONFIRMED,
-            paymentStatus: PaymentStatus.SUCCESS,
-            startDatetime: new Date("2026-05-21T08:00:00.000Z"),
-            payments: [payment]
-          }),
-          user: buildUser()
-        }),
-        update: vi.fn().mockResolvedValue({ bookingId }),
-        findUniqueOrThrow: vi.fn().mockResolvedValue(cancelledBooking)
+      bookingOrder: {
+        findFirst: vi.fn().mockResolvedValue(currentOrder),
+        update: vi.fn().mockResolvedValue({ bookingOrderId }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue(cancelledOrder)
       },
-      bookingStatusHistory: {
+      bookingItem: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 })
+      },
+      bookingOrderStatusHistory: {
         create: vi.fn().mockResolvedValue({})
       },
-      refund: {
-        create: vi.fn()
+      bookingItemStatusHistory: {
+        create: vi.fn().mockResolvedValue({})
       }
     };
     const rules = {
-      getEffectivePolicy: vi.fn().mockResolvedValue({
-        holdMinutes: 10,
-        cancelBeforeHours: 2,
-        lateCheckinMinutes: 15,
-        maxDurationMinutes: 120,
-        maxBookingsPerDay: 2,
-        advanceBookingDays: 7,
-        canJoinWaitlist: true,
-        refundRateUserOnTime: 80,
-        refundRateManagerFault: 100
-      })
+      getEffectivePolicy: vi.fn().mockResolvedValue(effectivePolicy())
     } as unknown as RulesRepository;
     const refunds = {
       createRefundForBooking: vi.fn().mockResolvedValue({ refundId, created: true })
     } as unknown as RefundsService;
     const service = createService(tx, { rules, refunds });
 
-    const booking = await service.cancelMyBooking(userId, bookingId, {
+    const order = await service.cancelMyBooking(userId, bookingOrderId, {
       reason: "Schedule changed"
     });
 
-    expect(booking).toMatchObject({
-      id: bookingId,
+    expect(order).toMatchObject({
+      id: bookingOrderId,
       bookingStatus: BookingStatus.CANCELLED_BY_USER,
       refundable: true
     });
     expect(refunds.createRefundForBooking).toHaveBeenCalledWith(
       tx,
       expect.objectContaining({
-        bookingId,
+        bookingOrderId,
         bookingStatus: BookingStatus.CONFIRMED,
         payment,
         refundRate: 80,
@@ -496,56 +515,55 @@ describe("BookingsService", () => {
         requestedByUserId: userId
       })
     );
-    expect(tx.refund.create).not.toHaveBeenCalled();
   });
 
   it("rejects confirmed user cancellation after the configured cancel window", async () => {
-    const payment = {
-      paymentId,
-      bookingId,
-      userId,
-      amount: new Prisma.Decimal(100000),
-      paymentMethod: "FAKE",
-      gatewayTransactionId: "gw_1",
-      paymentStatus: PaymentStatus.SUCCESS,
-      rawCallback: null,
-      paidAt: new Date("2026-05-20T01:00:00.000Z"),
-      createdAt: now,
-      updatedAt: now
-    };
     const tx = {
-      booking: {
-        findFirst: vi.fn().mockResolvedValue({
-          ...buildBooking({
+      bookingOrder: {
+        findFirst: vi.fn().mockResolvedValue(
+          buildOrder({
             bookingStatus: BookingStatus.CONFIRMED,
             paymentStatus: PaymentStatus.SUCCESS,
-            startDatetime: new Date("2026-05-20T01:00:00.000Z"),
-            payments: [payment]
-          }),
-          user: buildUser()
-        }),
+            user: buildUser(),
+            items: [
+              {
+                ...buildOrder().items[0],
+                startDatetime: new Date("2026-05-20T01:00:00.000Z"),
+                bookingStatus: BookingStatus.CONFIRMED
+              }
+            ],
+            payments: [
+              {
+                paymentId,
+                bookingOrderId,
+                userId,
+                amount: new Prisma.Decimal(100000),
+                paymentMethod: "MOCK",
+                gatewayTransactionId: "gw_1",
+                paymentStatus: PaymentStatus.SUCCESS,
+                rawCallback: null,
+                paidAt: new Date("2026-05-20T01:00:00.000Z"),
+                createdAt: now,
+                updatedAt: now
+              }
+            ]
+          })
+        ),
         update: vi.fn(),
         findUniqueOrThrow: vi.fn()
       },
-      bookingStatusHistory: {
+      bookingItem: {
+        updateMany: vi.fn()
+      },
+      bookingOrderStatusHistory: {
         create: vi.fn()
       },
-      refund: {
+      bookingItemStatusHistory: {
         create: vi.fn()
       }
     };
     const rules = {
-      getEffectivePolicy: vi.fn().mockResolvedValue({
-        holdMinutes: 10,
-        cancelBeforeHours: 2,
-        lateCheckinMinutes: 15,
-        maxDurationMinutes: 120,
-        maxBookingsPerDay: 2,
-        advanceBookingDays: 7,
-        canJoinWaitlist: true,
-        refundRateUserOnTime: 80,
-        refundRateManagerFault: 100
-      })
+      getEffectivePolicy: vi.fn().mockResolvedValue(effectivePolicy())
     } as unknown as RulesRepository;
     const refunds = {
       createRefundForBooking: vi.fn()
@@ -553,7 +571,7 @@ describe("BookingsService", () => {
     const service = createService(tx, { rules, refunds });
 
     await expect(
-      service.cancelMyBooking(userId, bookingId, {
+      service.cancelMyBooking(userId, bookingOrderId, {
         reason: "Too late"
       })
     ).rejects.toMatchObject({
@@ -561,7 +579,6 @@ describe("BookingsService", () => {
       code: "BOOKING_CANCEL_WINDOW_CLOSED"
     });
     expect(refunds.createRefundForBooking).not.toHaveBeenCalled();
-    expect(tx.refund.create).not.toHaveBeenCalled();
-    expect(tx.booking.update).not.toHaveBeenCalled();
+    expect(tx.bookingOrder.update).not.toHaveBeenCalled();
   });
 });

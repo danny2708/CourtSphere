@@ -493,7 +493,7 @@ Request:
 
 ### `GET /api/courts`
 
-Lists courts. Supports optional filters: `keyword`, `courtTypeId`, `status`, `location`.
+Lists courts. Supports optional filters: `keyword`, `courtTypeId`, `status`.
 
 Response `200`:
 
@@ -503,8 +503,6 @@ Response `200`:
     {
       "id": "uuid",
       "courtName": "Main Field",
-      "location": "North Campus",
-      "capacity": 22,
       "description": "Full-size outdoor field",
       "imageUrl": "https://example.com/court.jpg",
       "status": "ACTIVE",
@@ -530,8 +528,6 @@ Response `200`:
   "court": {
     "id": "uuid",
     "courtName": "Main Field",
-    "location": "North Campus",
-    "capacity": 22,
     "status": "ACTIVE",
     "courtType": {
       "id": "uuid",
@@ -548,6 +544,7 @@ Response `200`:
 Requires `Authorization: Bearer <accessToken>`.
 
 Calculates generated slots for one court on one calendar date. The backend interprets `date` as a `YYYY-MM-DD` UTC calendar date and returns ISO timestamps.
+Availability and overlap checks are based on `booking_items`, not `booking_orders`.
 
 Query params:
 
@@ -568,8 +565,6 @@ Response `200`:
   "court": {
     "id": "uuid",
     "courtName": "Main Field",
-    "location": "North Campus",
-    "capacity": 22,
     "status": "ACTIVE",
     "courtType": {
       "id": "uuid",
@@ -602,7 +597,8 @@ Response `200`:
       "endDatetime": "2026-05-20T10:00:00.000Z",
       "status": "HOLD",
       "priceAmount": 50000,
-      "bookingId": "uuid",
+      "bookingOrderId": "uuid",
+      "bookingItemId": "uuid",
       "unavailableReason": "Slot is temporarily held pending payment"
     }
   ]
@@ -636,8 +632,6 @@ Request:
 {
   "courtTypeId": "uuid",
   "courtName": "Main Field",
-  "location": "North Campus",
-  "capacity": 22,
   "description": "Full-size outdoor field",
   "imageUrl": "https://example.com/court.jpg"
 }
@@ -761,17 +755,20 @@ User booking APIs do not expose check-in. Check-in is reserved for Field Manager
 
 ### `POST /api/bookings`
 
-Creates a temporary booking hold in `PENDING_PAYMENT`. The slot is held until `holdExpiresAt = now + holdMinutes` from active booking rules.
+Creates a temporary booking order hold in `PENDING_PAYMENT`. A booking order can contain one or more booking items. Each item is one court plus one time window. The hold expires at `holdExpiresAt = now + holdMinutes` from active booking rules.
 
 Request:
 
 ```json
 {
-  "courtId": "uuid",
-  "startDatetime": "2026-05-21T08:00:00.000Z",
-  "endDatetime": "2026-05-21T09:00:00.000Z",
-  "participantCount": 10,
-  "usagePurpose": "Class training"
+  "items": [
+    {
+      "courtId": "uuid",
+      "startDatetime": "2026-05-21T08:00:00.000Z",
+      "endDatetime": "2026-05-21T09:00:00.000Z"
+    }
+  ],
+  "note": "Class training"
 }
 ```
 
@@ -780,9 +777,11 @@ Validation:
 - User account must be `ACTIVE`.
 - User `bookingPermissionStatus` must be `ALLOWED`.
 - Court must be `ACTIVE`.
-- Booking must be in the future, inside `operating_hours`, and aligned to `slotDurationMinutes`.
-- Booking must not exceed `maxDurationMinutes`, `maxBookingsPerDay`, priority advance window, or court capacity.
-- Booking must not overlap active booking statuses: `PENDING_PAYMENT`, `PAYMENT_PROCESSING`, `CONFIRMED`, `IN_USE`.
+- Every item must be in the future, inside `operating_hours`, and aligned to `slotDurationMinutes`.
+- Every item must not exceed `maxDurationMinutes`, `maxBookingsPerDay`, or the priority advance window.
+- Overlap is checked on `booking_items`.
+- Active item statuses that occupy a slot: `PENDING_PAYMENT`, `PAYMENT_PROCESSING`, `CONFIRMED`, `IN_USE`.
+- Create is all-or-nothing: if one item is invalid or conflicts, no order or item is created.
 
 Response `201`:
 
@@ -790,27 +789,34 @@ Response `201`:
 {
   "booking": {
     "id": "uuid",
+    "bookingOrderId": "uuid",
     "bookingCode": "BK-20260520-ABC123",
     "bookingStatus": "PENDING_PAYMENT",
     "paymentStatus": "INITIATED",
-    "startDatetime": "2026-05-21T08:00:00.000Z",
-    "endDatetime": "2026-05-21T09:00:00.000Z",
-    "participantCount": 10,
-    "usagePurpose": "Class training",
     "totalAmount": 50000,
     "holdExpiresAt": "2026-05-20T00:10:00.000Z",
     "refundable": true,
-    "court": {
-      "id": "uuid",
-      "courtName": "Main Field",
-      "location": "North Campus",
-      "status": "ACTIVE"
-    },
+    "items": [
+      {
+        "id": "uuid",
+        "bookingItemId": "uuid",
+        "startDatetime": "2026-05-21T08:00:00.000Z",
+        "endDatetime": "2026-05-21T09:00:00.000Z",
+        "unitPrice": 50000,
+        "amount": 50000,
+        "bookingStatus": "PENDING_PAYMENT",
+        "court": {
+          "id": "uuid",
+          "courtName": "Main Field",
+          "status": "ACTIVE"
+        }
+      }
+    ],
     "statusHistories": [
       {
         "oldStatus": null,
         "newStatus": "PENDING_PAYMENT",
-        "actionType": "USER_CREATE_BOOKING_HOLD"
+        "actionType": "USER_CREATE_BOOKING_ORDER_HOLD"
       }
     ]
   }
@@ -826,19 +832,18 @@ Common errors:
 - `BOOKING_DURATION_EXCEEDS_LIMIT`
 - `ADVANCE_BOOKING_LIMIT_EXCEEDED`
 - `MAX_BOOKINGS_PER_DAY_REACHED`
-- `PARTICIPANT_COUNT_EXCEEDS_CAPACITY`
 - `BOOKING_SLOT_UNAVAILABLE`
 - `PRICING_RULE_NOT_FOUND`
 
 ### `GET /api/bookings/my`
 
-Lists bookings owned by the authenticated user.
+Lists booking orders owned by the authenticated user.
 
 Optional query params:
 
 - `status`: any `BookingStatus`.
-- `fromDate`: ISO datetime filter on `startDatetime`.
-- `toDate`: ISO datetime filter on `startDatetime`.
+- `fromDate`: ISO datetime filter on item `startDatetime`.
+- `toDate`: ISO datetime filter on item `startDatetime`.
 
 Response `200`:
 
@@ -847,17 +852,13 @@ Response `200`:
   "bookings": [
     {
       "id": "uuid",
+      "bookingOrderId": "uuid",
       "bookingCode": "BK-20260520-ABC123",
       "bookingStatus": "PENDING_PAYMENT",
       "paymentStatus": "INITIATED",
-      "startDatetime": "2026-05-21T08:00:00.000Z",
-      "endDatetime": "2026-05-21T09:00:00.000Z",
       "totalAmount": 50000,
       "holdExpiresAt": "2026-05-20T00:10:00.000Z",
-      "court": {
-        "id": "uuid",
-        "courtName": "Main Field"
-      }
+      "items": []
     }
   ]
 }
@@ -865,7 +866,7 @@ Response `200`:
 
 ### `GET /api/bookings/:id`
 
-Returns one owned booking with status history, payments, and refunds.
+Returns one owned booking order with items, order status history, item status history, payments, and refunds.
 
 Response `200`:
 
@@ -873,9 +874,11 @@ Response `200`:
 {
   "booking": {
     "id": "uuid",
+    "bookingOrderId": "uuid",
     "bookingCode": "BK-20260520-ABC123",
     "bookingStatus": "PENDING_PAYMENT",
     "paymentStatus": "INITIATED",
+    "items": [],
     "statusHistories": [],
     "payments": [],
     "refunds": []
@@ -883,11 +886,11 @@ Response `200`:
 }
 ```
 
-Users cannot view another user's booking through this endpoint.
+Users cannot view another user's booking order through this endpoint.
 
 ### `POST /api/bookings/:id/cancel`
 
-Cancels an owned booking when its status allows user cancellation.
+Cancels an owned booking order when its status allows user cancellation.
 
 Request:
 
@@ -900,10 +903,10 @@ Request:
 Rules:
 
 - `PENDING_PAYMENT` can be cancelled without refund.
-- `CONFIRMED` can be cancelled only before `cancelBeforeHours`.
-- If a `CONFIRMED` booking has a successful payment, the backend creates a `refunds` row with status `REQUESTED` using `refundRateUserOnTime`.
+- `CONFIRMED` can be cancelled only before `cancelBeforeHours`, calculated from the earliest item start time.
+- If a `CONFIRMED` order has a successful payment, the backend creates a whole-order `refunds` row with status `REQUESTED` using `refundRateUserOnTime`.
 - `CHECKIN_EXPIRED` and `NO_SHOW` are not cancellable by user and do not create refunds.
-- Every cancellation writes `booking_status_histories`.
+- Every cancellation writes `booking_order_status_histories` and item histories for changed items.
 
 Response `200`:
 
@@ -911,6 +914,7 @@ Response `200`:
 {
   "booking": {
     "id": "uuid",
+    "bookingOrderId": "uuid",
     "bookingStatus": "CANCELLED_BY_USER",
     "cancelReason": "Schedule changed",
     "cancelledAt": "2026-05-20T00:00:00.000Z",
@@ -918,7 +922,7 @@ Response `200`:
       {
         "oldStatus": "PENDING_PAYMENT",
         "newStatus": "CANCELLED_BY_USER",
-        "actionType": "USER_CANCEL_BOOKING"
+        "actionType": "USER_CANCEL_BOOKING_ORDER"
       }
     ]
   }
@@ -937,9 +941,9 @@ These APIs implement a mock/sandbox payment flow for MVP. They do not integrate 
 
 ### `POST /api/bookings/:id/payments`
 
-Requires `Authorization: Bearer <accessToken>` and role `USER`. Only the booking owner can create a payment.
+Requires `Authorization: Bearer <accessToken>` and role `USER`. `:id` is the `bookingOrderId`; only the booking order owner can create a payment.
 
-Creates or returns a mock payment for a booking that is still payable. Creating payment moves the booking from `PENDING_PAYMENT` to `PAYMENT_PROCESSING`; the booking is confirmed only after a successful callback.
+Creates or returns a mock payment for a booking order that is still payable. Creating payment moves the order and pending items from `PENDING_PAYMENT` to `PAYMENT_PROCESSING`; the order/items are confirmed only after a successful callback.
 
 Request:
 
@@ -951,11 +955,11 @@ Request:
 
 Rules:
 
-- Booking must belong to the authenticated user.
-- Booking status must be `PENDING_PAYMENT` or `PAYMENT_PROCESSING`.
-- Booking hold must not be expired.
-- `amount` must equal `booking.totalAmount`.
-- No deposit flow exists; payment is always for 100% of the booking total.
+- Booking order must belong to the authenticated user.
+- Booking order status must be `PENDING_PAYMENT` or `PAYMENT_PROCESSING`.
+- Booking order hold must not be expired.
+- `amount` must equal `bookingOrder.totalAmount`.
+- No deposit flow exists; payment is always for 100% of the order total.
 
 Response `201`:
 
@@ -968,12 +972,14 @@ Response `201`:
     "gatewayTransactionId": "mock_uuid",
     "paymentStatus": "PROCESSING",
     "paymentUrl": "/mock-payment/mock_uuid",
-    "booking": {
+    "bookingOrder": {
       "id": "uuid",
+      "bookingOrderId": "uuid",
       "bookingCode": "BK-20260520-ABC123",
       "bookingStatus": "PAYMENT_PROCESSING",
       "paymentStatus": "PROCESSING",
-      "totalAmount": 50000
+      "totalAmount": 50000,
+      "items": []
     }
   }
 }
@@ -1012,23 +1018,24 @@ Success behavior:
 
 - Payment changes to `SUCCESS`.
 - `paidAt` is set.
-- Booking changes from `PENDING_PAYMENT` or `PAYMENT_PROCESSING` to `CONFIRMED`.
-- Booking `paymentStatus` changes to `SUCCESS`.
-- A `booking_status_histories` record is created with:
+- Booking order changes from `PENDING_PAYMENT` or `PAYMENT_PROCESSING` to `CONFIRMED`.
+- All pending/payment-processing booking items on the order change to `CONFIRMED`.
+- Booking order `paymentStatus` changes to `SUCCESS`.
+- `booking_order_status_histories` and `booking_item_status_histories` records are created with:
   - `actionType = PAYMENT_SUCCESS_CONFIRM_BOOKING`
-  - `note = Thanh toán thành công, booking được xác nhận`
+  - `note = Thanh toan thanh cong, booking order duoc xac nhan`
 
 Idempotency:
 
-- Repeating a `SUCCESS` callback for an already successful payment returns the current payment and does not create another booking history row.
+- Repeating a `SUCCESS` callback for an already successful payment returns the current payment and does not create duplicate order/item history rows.
 - Terminal payments `FAILED`, `CANCELLED`, or `EXPIRED` cannot be switched to a different terminal status by a later callback.
-- If a success callback arrives after `holdExpiresAt`, the backend does not confirm the booking; it marks the payment/booking as expired.
+- If a success callback arrives after `holdExpiresAt`, the backend does not confirm the order; it marks the payment/order/items as expired.
 
 Failed/cancelled behavior:
 
 - Payment status changes to the callback status.
-- Booking is not confirmed.
-- If callback status is `EXPIRED` or the hold is already expired, booking changes to `PAYMENT_EXPIRED` and history is written.
+- Booking order is not confirmed.
+- If callback status is `EXPIRED` or the hold is already expired, order/items change to `PAYMENT_EXPIRED` and history is written.
 - Notifications are not emitted yet; this is deferred to the Notifications module.
 
 Common errors:
@@ -1052,8 +1059,9 @@ Response `200`:
     "gatewayTransactionId": "mock_uuid",
     "paymentStatus": "SUCCESS",
     "paidAt": "2026-05-20T00:00:00.000Z",
-    "booking": {
+    "bookingOrder": {
       "id": "uuid",
+      "bookingOrderId": "uuid",
       "bookingCode": "BK-20260520-ABC123",
       "bookingStatus": "CONFIRMED",
       "paymentStatus": "SUCCESS"
@@ -1084,8 +1092,9 @@ Response `200`:
       "amount": 50000,
       "paymentMethod": "MOCK",
       "paymentStatus": "SUCCESS",
-      "booking": {
+      "bookingOrder": {
         "id": "uuid",
+        "bookingOrderId": "uuid",
         "bookingCode": "BK-20260520-ABC123"
       },
       "user": {
@@ -1108,8 +1117,9 @@ Refund invariants:
 - `CHECKIN_EXPIRED` and `NO_SHOW` never create refunds.
 - User on-time cancellation uses `refundRateUserOnTime`.
 - Manager/Admin cancellation due to court issue uses `refundRateManagerFault`, defaulting to `100`.
-- Duplicate active/success refunds for the same booking/payment are not created.
-- Manager/Admin cancellation writes `booking_status_histories` and `audit_logs`.
+- Duplicate active/success refunds for the same booking order/payment/item scope are not created.
+- Refunds store `bookingOrderId` and optional `bookingItemId` to support whole-order or partial-item refunds.
+- Manager/Admin cancellation writes `booking_order_status_histories`, `booking_item_status_histories`, and `audit_logs`.
 - Admin retry/manual refund handling writes `audit_logs`.
 
 ### `GET /api/admin/refunds`
@@ -1133,7 +1143,8 @@ Response `200`:
     {
       "id": "uuid",
       "paymentId": "uuid",
-      "bookingId": "uuid",
+      "bookingOrderId": "uuid",
+      "bookingItemId": null,
       "refundAmount": 50000,
       "refundReason": "Court maintenance",
       "refundStatus": "REQUESTED",
@@ -1146,12 +1157,15 @@ Response `200`:
         "paymentStatus": "SUCCESS",
         "paidAt": "2026-05-20T00:00:00.000Z"
       },
-      "booking": {
+      "bookingOrder": {
         "id": "uuid",
+        "bookingOrderId": "uuid",
         "bookingCode": "BK-20260520-ABC123",
         "bookingStatus": "CANCELLED_BY_MANAGER",
-        "paymentStatus": "SUCCESS"
-      }
+        "paymentStatus": "SUCCESS",
+        "items": []
+      },
+      "bookingItem": null
     }
   ]
 }
@@ -1161,7 +1175,7 @@ Response `200`:
 
 Requires `Authorization: Bearer <accessToken>` and `ADMIN`.
 
-Returns one refund with payment, booking, requester, and processor summary.
+Returns one refund with payment, booking order, optional booking item, requester, and processor summary.
 
 Common errors:
 
@@ -1207,7 +1221,7 @@ Common errors:
 
 Requires `Authorization: Bearer <accessToken>` and role `FIELD_MANAGER` or `ADMIN`.
 
-Cancels a `CONFIRMED` or `IN_USE` booking due to court issue, maintenance, incident, or system/operator fault. This endpoint is not a generic manual approval flow.
+Cancels a `CONFIRMED` or `IN_USE` booking order due to court issue, maintenance, incident, or system/operator fault. This endpoint is not a generic manual approval flow.
 
 Request:
 
@@ -1219,20 +1233,21 @@ Request:
 
 Rules:
 
-- `FIELD_MANAGER` changes the booking to `CANCELLED_BY_MANAGER`.
-- `ADMIN` changes the booking to `CANCELLED_BY_ADMIN`.
-- `COMPLETED`, `NO_SHOW`, `CHECKIN_EXPIRED`, `PAYMENT_EXPIRED`, and already-cancelled bookings cannot be cancelled here.
+- `FIELD_MANAGER` changes the order and cancellable items to `CANCELLED_BY_MANAGER`.
+- `ADMIN` changes the order and cancellable items to `CANCELLED_BY_ADMIN`.
+- `COMPLETED`, `NO_SHOW`, `CHECKIN_EXPIRED`, `PAYMENT_EXPIRED`, and already-cancelled orders cannot be cancelled here.
 - If a successful payment exists, the backend creates a `refunds` row with `REQUESTED` status using `refundRateManagerFault`.
 - If there is no successful payment, cancellation still succeeds but no refund is created.
-- Every status change writes `booking_status_histories`.
+- Every status change writes order and item status history.
 - The cancellation writes `audit_logs`.
 
 Response `200`:
 
 ```json
 {
-  "booking": {
+  "bookingOrder": {
     "id": "uuid",
+    "bookingOrderId": "uuid",
     "bookingCode": "BK-20260520-ABC123",
     "bookingStatus": "CANCELLED_BY_MANAGER",
     "paymentStatus": "SUCCESS",
@@ -1240,12 +1255,13 @@ Response `200`:
     "cancelledByUserId": "uuid",
     "cancelledAt": "2026-05-20T00:00:00.000Z",
     "refundable": true,
-    "noRefundReason": null
+    "items": []
   },
   "refund": {
     "id": "uuid",
     "paymentId": "uuid",
-    "bookingId": "uuid",
+    "bookingOrderId": "uuid",
+    "bookingItemId": null,
     "refundAmount": 50000,
     "refundStatus": "REQUESTED"
   }
@@ -1281,10 +1297,12 @@ operating_hours
 pricing_rules
 booking_rules
 priority_policies
-bookings
+booking_orders
+booking_items
 payments
 refunds
-booking_status_histories
+booking_order_status_histories
+booking_item_status_histories
 court_status_histories
 violations
 notifications
@@ -1295,11 +1313,17 @@ audit_logs
 
 Booking invariants:
 
-- `bookings` uses `start_datetime` and `end_datetime`; there is no separate `booking_date`.
+- `booking_orders` represents the overall order and stores total amount, payment status, hold expiry, cancellation fields, and order-level status.
+- `booking_items` represents one court plus one time window and stores `start_datetime`, `end_datetime`, price, amount, item status, check-in/completion/no-show actor fields, and item histories.
+- `booking_items` uses `start_datetime` and `end_datetime`; there is no separate `booking_date`.
+- `courts` no longer stores `location` or `capacity`.
 - `refunds.payment_id` is required.
-- `violations.booking_id` and `notifications.booking_id` are optional but relational.
-- Booking action user FKs are present for cancellation, check-in, completion, and no-show marking.
-- PostgreSQL migration includes `no_overlapping_active_bookings` for active booking statuses: `PENDING_PAYMENT`, `PAYMENT_PROCESSING`, `CONFIRMED`, `IN_USE`.
+- `refunds.booking_order_id` is required and `refunds.booking_item_id` is optional for partial refunds.
+- `violations.booking_item_id` is optional but relational.
+- `notifications.booking_order_id` and `notifications.booking_item_id` are optional but relational.
+- Booking order cancellation actor FK and booking item check-in/completion/no-show actor FKs are present.
+- PostgreSQL migration includes `no_overlapping_active_booking_items` on `booking_items` for active statuses: `PENDING_PAYMENT`, `PAYMENT_PROCESSING`, `CONFIRMED`, `IN_USE`.
+- `waitlist_entries.expires_at` exists for waitlist expiration.
 
 Config tables:
 

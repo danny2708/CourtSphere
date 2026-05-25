@@ -60,8 +60,6 @@ function toCourtDto(court: CourtWithType | CourtDetail) {
   return {
     id: court.courtId,
     courtName: court.courtName,
-    location: court.location,
-    capacity: court.capacity,
     description: court.description,
     imageUrl: court.imageUrl,
     status: court.status,
@@ -195,25 +193,11 @@ export class CourtsService {
     const where: Prisma.CourtWhereInput = {
       ...(query.courtTypeId ? { courtTypeId: query.courtTypeId } : {}),
       ...(query.status ? { status: query.status } : {}),
-      ...(query.location
-        ? {
-            location: {
-              contains: query.location,
-              mode: "insensitive"
-            }
-          }
-        : {}),
       ...(query.keyword
         ? {
             OR: [
               {
                 courtName: {
-                  contains: query.keyword,
-                  mode: "insensitive"
-                }
-              },
-              {
-                location: {
                   contains: query.keyword,
                   mode: "insensitive"
                 }

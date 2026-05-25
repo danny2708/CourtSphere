@@ -1,5 +1,6 @@
 import {
   BookingStatus,
+  EntityStatus,
   PaymentStatus,
   Prisma,
   RefundStatus,
@@ -13,7 +14,8 @@ import { RefundsService } from "./refunds.service";
 const adminUserId = "00000000-0000-4000-8000-000000001201";
 const managerUserId = "00000000-0000-4000-8000-000000001202";
 const userId = "00000000-0000-4000-8000-000000001203";
-const bookingId = "00000000-0000-4000-8000-000000001204";
+const bookingOrderId = "00000000-0000-4000-8000-000000001204";
+const bookingItemId = "00000000-0000-4000-8000-000000001214";
 const paymentId = "00000000-0000-4000-8000-000000001205";
 const refundId = "00000000-0000-4000-8000-000000001206";
 const courtId = "00000000-0000-4000-8000-000000001207";
@@ -23,7 +25,7 @@ const now = new Date("2026-05-20T00:00:00.000Z");
 function buildPayment(overrides: Record<string, unknown> = {}) {
   return {
     paymentId,
-    bookingId,
+    bookingOrderId,
     userId,
     amount: new Prisma.Decimal(50000),
     paymentMethod: "MOCK",
@@ -37,31 +39,45 @@ function buildPayment(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function buildManagerBooking(overrides: Record<string, unknown> = {}) {
+function buildItem(overrides: Record<string, unknown> = {}) {
   return {
-    bookingId,
-    bookingCode: "BK-20260520-TEST01",
-    userId,
+    bookingItemId,
+    bookingOrderId,
     courtId,
     startDatetime: new Date("2026-05-21T08:00:00.000Z"),
     endDatetime: new Date("2026-05-21T09:00:00.000Z"),
-    participantCount: 10,
-    usagePurpose: "Class training",
+    unitPrice: new Prisma.Decimal(50000),
+    amount: new Prisma.Decimal(50000),
+    bookingStatus: BookingStatus.CONFIRMED,
+    checkinTime: null,
+    checkedInByUserId: null,
+    completedByUserId: null,
+    noShowMarkedByUserId: null,
+    managerNote: null,
+    createdAt: now,
+    updatedAt: now,
+    court: {
+      courtId,
+      courtName: "Main Field"
+    },
+    ...overrides
+  };
+}
+
+function buildManagerOrder(overrides: Record<string, unknown> = {}) {
+  return {
+    bookingOrderId,
+    bookingCode: "BK-20260520-TEST01",
+    userId,
     totalAmount: new Prisma.Decimal(50000),
     bookingStatus: BookingStatus.CONFIRMED,
     paymentStatus: PaymentStatus.SUCCESS,
     refundable: true,
     holdExpiresAt: null,
+    note: null,
     cancelReason: null,
     cancelledByUserId: null,
     cancelledAt: null,
-    checkedInByUserId: null,
-    completedByUserId: null,
-    noShowMarkedByUserId: null,
-    managerNote: null,
-    noRefundReason: null,
-    checkinTime: null,
-    checkoutTime: null,
     createdAt: now,
     updatedAt: now,
     user: {
@@ -91,11 +107,7 @@ function buildManagerBooking(overrides: Record<string, unknown> = {}) {
         updatedAt: now
       }
     },
-    court: {
-      courtId,
-      courtName: "Main Field",
-      location: "North Campus"
-    },
+    items: [buildItem()],
     payments: [buildPayment()],
     ...overrides
   };
@@ -103,12 +115,13 @@ function buildManagerBooking(overrides: Record<string, unknown> = {}) {
 
 function buildRefund(overrides: Record<string, unknown> = {}) {
   const payment = buildPayment();
-  const booking = buildManagerBooking({ payments: [payment] });
+  const bookingOrder = buildManagerOrder({ payments: [payment] });
 
   return {
     refundId,
     paymentId,
-    bookingId,
+    bookingOrderId,
+    bookingItemId: null,
     refundAmount: new Prisma.Decimal(50000),
     refundReason: "Court maintenance",
     refundStatus: RefundStatus.REQUESTED,
@@ -119,7 +132,8 @@ function buildRefund(overrides: Record<string, unknown> = {}) {
     processedAt: null,
     updatedAt: now,
     payment,
-    booking,
+    bookingOrder,
+    bookingItem: null,
     requestedBy: {
       userId: managerUserId,
       fullName: "Manager User",
@@ -143,7 +157,7 @@ function bookingRule(overrides: Record<string, unknown> = {}) {
     bookingBanDays: 7,
     refundRateUserOnTime: 100,
     refundRateManagerFault: 100,
-    status: "ACTIVE",
+    status: EntityStatus.ACTIVE,
     updatedByUserId: null,
     createdAt: now,
     updatedAt: now,
@@ -187,7 +201,7 @@ function createService(input: {
 }
 
 describe("RefundsService", () => {
-  it("creates a requested refund from a successful payment", async () => {
+  it("creates a requested refund from a successful order payment", async () => {
     const tx = {
       refund: {
         findFirst: vi.fn().mockResolvedValue(null),
@@ -197,7 +211,7 @@ describe("RefundsService", () => {
     const { service } = createService({});
 
     const result = await service.createRefundForBooking(tx as never, {
-      bookingId,
+      bookingOrderId,
       bookingStatus: BookingStatus.CONFIRMED,
       payment: buildPayment(),
       refundRate: 80,
@@ -210,7 +224,8 @@ describe("RefundsService", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           paymentId,
-          bookingId,
+          bookingOrderId,
+          bookingItemId: null,
           refundAmount: new Prisma.Decimal(40000),
           refundReason: "Schedule changed",
           refundStatus: RefundStatus.REQUESTED,
@@ -220,7 +235,38 @@ describe("RefundsService", () => {
     );
   });
 
-  it("does not create duplicate active refunds for the same booking/payment", async () => {
+  it("supports item-level refund references", async () => {
+    const tx = {
+      refund: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({ refundId })
+      }
+    };
+    const { service } = createService({});
+
+    const result = await service.createRefundForBooking(tx as never, {
+      bookingOrderId,
+      bookingItemId,
+      bookingStatus: BookingStatus.CONFIRMED,
+      payment: buildPayment(),
+      refundRate: 100,
+      refundReason: "Partial court issue",
+      requestedByUserId: managerUserId
+    });
+
+    expect(result).toEqual({ refundId, created: true });
+    expect(tx.refund.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          bookingOrderId,
+          bookingItemId,
+          refundAmount: new Prisma.Decimal(50000)
+        })
+      })
+    );
+  });
+
+  it("does not create duplicate active refunds for the same order/payment/item scope", async () => {
     const tx = {
       refund: {
         findFirst: vi.fn().mockResolvedValue({ refundId }),
@@ -230,7 +276,7 @@ describe("RefundsService", () => {
     const { service } = createService({});
 
     const result = await service.createRefundForBooking(tx as never, {
-      bookingId,
+      bookingOrderId,
       bookingStatus: BookingStatus.CONFIRMED,
       payment: buildPayment(),
       refundRate: 100,
@@ -242,7 +288,7 @@ describe("RefundsService", () => {
     expect(tx.refund.create).not.toHaveBeenCalled();
   });
 
-  it("does not create refunds for CHECKIN_EXPIRED or NO_SHOW bookings", async () => {
+  it("does not create refunds for CHECKIN_EXPIRED or NO_SHOW statuses", async () => {
     const tx = {
       refund: {
         findFirst: vi.fn(),
@@ -252,7 +298,7 @@ describe("RefundsService", () => {
     const { service } = createService({});
 
     const checkinExpired = await service.createRefundForBooking(tx as never, {
-      bookingId,
+      bookingOrderId,
       bookingStatus: BookingStatus.CHECKIN_EXPIRED,
       payment: buildPayment(),
       refundRate: 100,
@@ -260,7 +306,7 @@ describe("RefundsService", () => {
       requestedByUserId: userId
     });
     const noShow = await service.createRefundForBooking(tx as never, {
-      bookingId,
+      bookingOrderId,
       bookingStatus: BookingStatus.NO_SHOW,
       payment: buildPayment(),
       refundRate: 100,
@@ -273,18 +319,26 @@ describe("RefundsService", () => {
     expect(tx.refund.create).not.toHaveBeenCalled();
   });
 
-  it("manager cancel on confirmed booking creates CANCELLED_BY_MANAGER, refund, history, and audit", async () => {
+  it("manager cancel on confirmed order creates cancellation, refund, item history, and audit", async () => {
     const tx = {
-      booking: {
-        findUnique: vi.fn().mockResolvedValue(buildManagerBooking()),
+      bookingOrder: {
+        findUnique: vi.fn().mockResolvedValue(buildManagerOrder()),
         update: vi.fn().mockResolvedValue(
-          buildManagerBooking({
+          buildManagerOrder({
             bookingStatus: BookingStatus.CANCELLED_BY_MANAGER,
             cancelledByUserId: managerUserId,
             cancelledAt: now,
-            cancelReason: "Court maintenance"
+            cancelReason: "Court maintenance",
+            items: [
+              buildItem({
+                bookingStatus: BookingStatus.CANCELLED_BY_MANAGER
+              })
+            ]
           })
         )
+      },
+      bookingItem: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 })
       },
       bookingRule: {
         findFirst: vi.fn().mockResolvedValue(bookingRule())
@@ -296,7 +350,10 @@ describe("RefundsService", () => {
         findFirst: vi.fn().mockResolvedValue(null),
         create: vi.fn().mockResolvedValue({ refundId })
       },
-      bookingStatusHistory: {
+      bookingOrderStatusHistory: {
+        create: vi.fn().mockResolvedValue({})
+      },
+      bookingItemStatusHistory: {
         create: vi.fn().mockResolvedValue({})
       },
       auditLog: {
@@ -306,7 +363,7 @@ describe("RefundsService", () => {
     const { service } = createService({ tx, refund: buildRefund() });
 
     const result = await service.cancelBookingDueToCourtIssue(
-      bookingId,
+      bookingOrderId,
       { reason: "Court maintenance" },
       {
         actorUserId: managerUserId,
@@ -314,7 +371,7 @@ describe("RefundsService", () => {
       }
     );
 
-    expect(result.booking.bookingStatus).toBe(BookingStatus.CANCELLED_BY_MANAGER);
+    expect(result.bookingOrder.bookingStatus).toBe(BookingStatus.CANCELLED_BY_MANAGER);
     expect(result.refund).toMatchObject({
       id: refundId,
       refundStatus: RefundStatus.REQUESTED,
@@ -329,7 +386,7 @@ describe("RefundsService", () => {
         })
       })
     );
-    expect(tx.bookingStatusHistory.create).toHaveBeenCalledWith(
+    expect(tx.bookingOrderStatusHistory.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           oldStatus: BookingStatus.CONFIRMED,
@@ -339,29 +396,45 @@ describe("RefundsService", () => {
         })
       })
     );
+    expect(tx.bookingItemStatusHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          oldStatus: BookingStatus.CONFIRMED,
+          newStatus: BookingStatus.CANCELLED_BY_MANAGER
+        })
+      })
+    );
     expect(tx.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           actorUserId: managerUserId,
-          entityType: "BOOKING",
+          entityType: "BOOKING_ORDER",
           action: "MANAGER_CANCEL_BOOKING"
         })
       })
     );
   });
 
-  it("admin cancel on confirmed booking creates CANCELLED_BY_ADMIN and refund", async () => {
+  it("admin cancel on confirmed order creates CANCELLED_BY_ADMIN and refund", async () => {
     const tx = {
-      booking: {
-        findUnique: vi.fn().mockResolvedValue(buildManagerBooking()),
+      bookingOrder: {
+        findUnique: vi.fn().mockResolvedValue(buildManagerOrder()),
         update: vi.fn().mockResolvedValue(
-          buildManagerBooking({
+          buildManagerOrder({
             bookingStatus: BookingStatus.CANCELLED_BY_ADMIN,
             cancelledByUserId: adminUserId,
             cancelledAt: now,
-            cancelReason: "System incident"
+            cancelReason: "System incident",
+            items: [
+              buildItem({
+                bookingStatus: BookingStatus.CANCELLED_BY_ADMIN
+              })
+            ]
           })
         )
+      },
+      bookingItem: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 })
       },
       bookingRule: {
         findFirst: vi.fn().mockResolvedValue(bookingRule())
@@ -373,7 +446,10 @@ describe("RefundsService", () => {
         findFirst: vi.fn().mockResolvedValue(null),
         create: vi.fn().mockResolvedValue({ refundId })
       },
-      bookingStatusHistory: {
+      bookingOrderStatusHistory: {
+        create: vi.fn().mockResolvedValue({})
+      },
+      bookingItemStatusHistory: {
         create: vi.fn().mockResolvedValue({})
       },
       auditLog: {
@@ -383,7 +459,7 @@ describe("RefundsService", () => {
     const { service } = createService({ tx, refund: buildRefund() });
 
     const result = await service.cancelBookingDueToCourtIssue(
-      bookingId,
+      bookingOrderId,
       { reason: "System incident" },
       {
         actorUserId: adminUserId,
@@ -391,9 +467,9 @@ describe("RefundsService", () => {
       }
     );
 
-    expect(result.booking.bookingStatus).toBe(BookingStatus.CANCELLED_BY_ADMIN);
+    expect(result.bookingOrder.bookingStatus).toBe(BookingStatus.CANCELLED_BY_ADMIN);
     expect(result.refund?.refundAmount).toBe(50000);
-    expect(tx.bookingStatusHistory.create).toHaveBeenCalledWith(
+    expect(tx.bookingOrderStatusHistory.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           newStatus: BookingStatus.CANCELLED_BY_ADMIN,
@@ -428,7 +504,7 @@ describe("RefundsService", () => {
         where: expect.objectContaining({
           refundStatus: RefundStatus.REQUESTED,
           paymentId,
-          booking: expect.objectContaining({
+          bookingOrder: expect.objectContaining({
             userId,
             bookingCode: expect.objectContaining({
               contains: "BK"

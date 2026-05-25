@@ -1,10 +1,10 @@
 import { BookingStatus, PaymentStatus, Prisma } from "@prisma/client";
 
 export class BookingStateService {
-  async recordStatusHistory(
+  async recordOrderStatusHistory(
     tx: Prisma.TransactionClient,
     input: {
-      bookingId: string;
+      bookingOrderId: string;
       oldStatus?: BookingStatus | null;
       newStatus: BookingStatus;
       actionType: string;
@@ -12,9 +12,32 @@ export class BookingStateService {
       note?: string | null;
     }
   ): Promise<void> {
-    await tx.bookingStatusHistory.create({
+    await tx.bookingOrderStatusHistory.create({
       data: {
-        bookingId: input.bookingId,
+        bookingOrderId: input.bookingOrderId,
+        oldStatus: input.oldStatus ?? null,
+        newStatus: input.newStatus,
+        actionType: input.actionType,
+        actionByUserId: input.actionByUserId ?? null,
+        note: input.note ?? null
+      }
+    });
+  }
+
+  async recordItemStatusHistory(
+    tx: Prisma.TransactionClient,
+    input: {
+      bookingItemId: string;
+      oldStatus?: BookingStatus | null;
+      newStatus: BookingStatus;
+      actionType: string;
+      actionByUserId?: string | null;
+      note?: string | null;
+    }
+  ): Promise<void> {
+    await tx.bookingItemStatusHistory.create({
+      data: {
+        bookingItemId: input.bookingItemId,
         oldStatus: input.oldStatus ?? null,
         newStatus: input.newStatus,
         actionType: input.actionType,
@@ -33,12 +56,14 @@ export class BookingStateService {
       now: Date;
     }
   ): Promise<void> {
-    const expiredHolds = await tx.booking.findMany({
+    const expiredHolds = await tx.bookingItem.findMany({
       where: {
         courtId: input.courtId,
         bookingStatus: BookingStatus.PENDING_PAYMENT,
-        holdExpiresAt: {
-          lte: input.now
+        bookingOrder: {
+          holdExpiresAt: {
+            lte: input.now
+          }
         },
         startDatetime: {
           lt: input.endDatetime
@@ -48,32 +73,62 @@ export class BookingStateService {
         }
       },
       select: {
-        bookingId: true,
-        bookingStatus: true
+        bookingItemId: true,
+        bookingOrderId: true,
+        bookingStatus: true,
+        bookingOrder: {
+          select: {
+            bookingStatus: true
+          }
+        }
       }
     });
 
-    for (const booking of expiredHolds) {
-      const updated = await tx.booking.updateMany({
+    const expiredOrderIds = [...new Set(expiredHolds.map((item) => item.bookingOrderId))];
+
+    for (const bookingOrderId of expiredOrderIds) {
+      const order = expiredHolds.find((item) => item.bookingOrderId === bookingOrderId)?.bookingOrder;
+      const updatedOrder = await tx.bookingOrder.updateMany({
         where: {
-          bookingId: booking.bookingId,
+          bookingOrderId,
           bookingStatus: BookingStatus.PENDING_PAYMENT
         },
         data: {
           bookingStatus: BookingStatus.PAYMENT_EXPIRED,
           paymentStatus: PaymentStatus.EXPIRED,
-          refundable: false,
-          noRefundReason: "Payment hold expired"
+          refundable: false
         }
       });
 
-      if (updated.count === 0) {
+      if (updatedOrder.count > 0) {
+        await this.recordOrderStatusHistory(tx, {
+          bookingOrderId,
+          oldStatus: order?.bookingStatus ?? BookingStatus.PENDING_PAYMENT,
+          newStatus: BookingStatus.PAYMENT_EXPIRED,
+          actionType: "AUTO_EXPIRE_PAYMENT_HOLD",
+          note: "Expired pending-payment hold before creating a new booking hold"
+        });
+      }
+    }
+
+    for (const item of expiredHolds) {
+      const updatedItem = await tx.bookingItem.updateMany({
+        where: {
+          bookingItemId: item.bookingItemId,
+          bookingStatus: BookingStatus.PENDING_PAYMENT
+        },
+        data: {
+          bookingStatus: BookingStatus.PAYMENT_EXPIRED
+        }
+      });
+
+      if (updatedItem.count === 0) {
         continue;
       }
 
-      await this.recordStatusHistory(tx, {
-        bookingId: booking.bookingId,
-        oldStatus: booking.bookingStatus,
+      await this.recordItemStatusHistory(tx, {
+        bookingItemId: item.bookingItemId,
+        oldStatus: item.bookingStatus,
         newStatus: BookingStatus.PAYMENT_EXPIRED,
         actionType: "AUTO_EXPIRE_PAYMENT_HOLD",
         note: "Expired pending-payment hold before creating a new booking hold"

@@ -8,7 +8,7 @@ import { PaymentsController } from "./payments.controller";
 import { createPaymentsRouter } from "./payments.routes";
 
 const userId = "00000000-0000-4000-8000-000000001001";
-const bookingId = "00000000-0000-4000-8000-000000001002";
+const bookingOrderId = "00000000-0000-4000-8000-000000001002";
 const paymentId = "00000000-0000-4000-8000-000000001003";
 const tokenService = new TokenService();
 
@@ -56,12 +56,12 @@ describe("payments routes", () => {
     vi.clearAllMocks();
   });
 
-  it("allows USER to create payment for own booking", async () => {
+  it("allows USER to create payment for own booking order", async () => {
     const controller = createMockController();
     const app = createTestApp(controller);
 
     const response = await request(app)
-      .post(`/api/bookings/${bookingId}/payments`)
+      .post(`/api/bookings/${bookingOrderId}/payments`)
       .set("Authorization", bearerToken(["USER"]))
       .send({ amount: 50000 });
 
@@ -78,7 +78,7 @@ describe("payments routes", () => {
     const app = createTestApp(controller);
 
     const response = await request(app)
-      .post(`/api/bookings/${bookingId}/payments`)
+      .post(`/api/bookings/${bookingOrderId}/payments`)
       .set("Authorization", bearerToken(["FIELD_MANAGER"]))
       .send({ amount: 50000 });
 

@@ -6,7 +6,7 @@ import { requireRole } from "../../middlewares/rbac.middleware";
 import { validateRequest } from "../../middlewares/validate-request.middleware";
 import { bookingsController, type BookingsController } from "./bookings.controller";
 import {
-  bookingIdParamSchema,
+  bookingOrderIdParamSchema,
   cancelBookingSchema,
   createBookingSchema,
   listMyBookingsQuerySchema
@@ -31,12 +31,12 @@ export function createBookingsRouter(
   );
   router.get(
     "/:id",
-    validateRequest({ params: bookingIdParamSchema }),
+    validateRequest({ params: bookingOrderIdParamSchema }),
     asyncHandler(controller.getBookingDetail)
   );
   router.post(
     "/:id/cancel",
-    validateRequest({ params: bookingIdParamSchema, body: cancelBookingSchema }),
+    validateRequest({ params: bookingOrderIdParamSchema, body: cancelBookingSchema }),
     asyncHandler(controller.cancelMyBooking)
   );
 

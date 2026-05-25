@@ -25,7 +25,7 @@ import type {
 } from "./bookings.types";
 import { bookingStateService, type BookingStateService } from "./booking-state.service";
 
-const bookingInclude = {
+const bookingOrderInclude = {
   user: {
     select: {
       userId: true,
@@ -33,12 +33,31 @@ const bookingInclude = {
       email: true
     }
   },
-  court: {
+  items: {
     include: {
-      courtType: true
-    }
+      court: {
+        include: {
+          courtType: true
+        }
+      },
+      itemStatusHistories: {
+        include: {
+          actionBy: {
+            select: {
+              userId: true,
+              fullName: true,
+              email: true
+            }
+          }
+        },
+        orderBy: {
+          changedAt: "asc" as const
+        }
+      }
+    },
+    orderBy: [{ startDatetime: "asc" as const }]
   },
-  bookingStatusHistories: {
+  orderStatusHistories: {
     include: {
       actionBy: {
         select: {
@@ -62,7 +81,7 @@ const bookingInclude = {
       requestedAt: "desc" as const
     }
   }
-} satisfies Prisma.BookingInclude;
+} satisfies Prisma.BookingOrderInclude;
 
 const courtBookingInclude = {
   courtType: true,
@@ -77,12 +96,24 @@ const courtBookingInclude = {
   }
 } satisfies Prisma.CourtInclude;
 
-type BookingWithRelations = Prisma.BookingGetPayload<{ include: typeof bookingInclude }>;
+type BookingOrderWithRelations = Prisma.BookingOrderGetPayload<{ include: typeof bookingOrderInclude }>;
 type CourtForBooking = Prisma.CourtGetPayload<{ include: typeof courtBookingInclude }>;
 type PricingRuleForBooking = CourtForBooking["pricingRules"][number];
 type OperatingHourForBooking = CourtForBooking["operatingHours"][number];
 type UserForBooking = Prisma.UserGetPayload<{ include: { priorityGroup: true } }>;
 type BookingDbClient = PrismaClient | Prisma.TransactionClient;
+const userCancellableItemStatuses: BookingStatus[] = [
+  BookingStatus.PENDING_PAYMENT,
+  BookingStatus.PAYMENT_PROCESSING,
+  BookingStatus.CONFIRMED
+];
+type PreparedBookingItem = {
+  courtId: string;
+  startDatetime: Date;
+  endDatetime: Date;
+  unitPrice: Prisma.Decimal;
+  amount: Prisma.Decimal;
+};
 
 function addMinutes(date: Date, minutes: number): Date {
   return new Date(date.getTime() + minutes * 60_000);
@@ -123,47 +154,72 @@ function normalizeOptional(value: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-function toBookingDto(booking: BookingWithRelations) {
+function earliestItemStart(order: BookingOrderWithRelations | { items: Array<{ startDatetime: Date }> }): Date {
+  return order.items.reduce((earliest, item) =>
+    item.startDatetime < earliest ? item.startDatetime : earliest,
+  order.items[0].startDatetime);
+}
+
+function toBookingOrderDto(order: BookingOrderWithRelations) {
   return {
-    id: booking.bookingId,
-    bookingCode: booking.bookingCode,
+    id: order.bookingOrderId,
+    bookingOrderId: order.bookingOrderId,
+    bookingCode: order.bookingCode,
     user: {
-      id: booking.user.userId,
-      fullName: booking.user.fullName,
-      email: booking.user.email
+      id: order.user.userId,
+      fullName: order.user.fullName,
+      email: order.user.email
     },
-    court: {
-      id: booking.court.courtId,
-      courtName: booking.court.courtName,
-      location: booking.court.location,
-      capacity: booking.court.capacity,
-      status: booking.court.status,
-      courtType: {
-        id: booking.court.courtType.courtTypeId,
-        typeName: booking.court.courtType.typeName
-      }
-    },
-    startDatetime: booking.startDatetime,
-    endDatetime: booking.endDatetime,
-    participantCount: booking.participantCount,
-    usagePurpose: booking.usagePurpose,
-    totalAmount: decimalToNumber(booking.totalAmount),
-    bookingStatus: booking.bookingStatus,
-    paymentStatus: booking.paymentStatus,
-    refundable: booking.refundable,
-    holdExpiresAt: booking.holdExpiresAt,
-    cancelReason: booking.cancelReason,
-    cancelledAt: booking.cancelledAt,
-    checkedInByUserId: booking.checkedInByUserId,
-    completedByUserId: booking.completedByUserId,
-    noShowMarkedByUserId: booking.noShowMarkedByUserId,
-    noRefundReason: booking.noRefundReason,
-    checkinTime: booking.checkinTime,
-    checkoutTime: booking.checkoutTime,
-    createdAt: booking.createdAt,
-    updatedAt: booking.updatedAt,
-    statusHistories: booking.bookingStatusHistories.map((history) => ({
-      id: history.bookingStatusHistoryId,
+    totalAmount: decimalToNumber(order.totalAmount),
+    bookingStatus: order.bookingStatus,
+    paymentStatus: order.paymentStatus,
+    refundable: order.refundable,
+    holdExpiresAt: order.holdExpiresAt,
+    note: order.note,
+    cancelReason: order.cancelReason,
+    cancelledAt: order.cancelledAt,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+    items: order.items.map((item) => ({
+      id: item.bookingItemId,
+      bookingItemId: item.bookingItemId,
+      court: {
+        id: item.court.courtId,
+        courtName: item.court.courtName,
+        status: item.court.status,
+        courtType: {
+          id: item.court.courtType.courtTypeId,
+          typeName: item.court.courtType.typeName
+        }
+      },
+      startDatetime: item.startDatetime,
+      endDatetime: item.endDatetime,
+      unitPrice: decimalToNumber(item.unitPrice),
+      amount: decimalToNumber(item.amount),
+      bookingStatus: item.bookingStatus,
+      checkinTime: item.checkinTime,
+      checkedInByUserId: item.checkedInByUserId,
+      completedByUserId: item.completedByUserId,
+      noShowMarkedByUserId: item.noShowMarkedByUserId,
+      managerNote: item.managerNote,
+      statusHistories: item.itemStatusHistories.map((history) => ({
+        id: history.bookingItemStatusHistoryId,
+        oldStatus: history.oldStatus,
+        newStatus: history.newStatus,
+        actionType: history.actionType,
+        note: history.note,
+        changedAt: history.changedAt,
+        actionByUser: history.actionBy
+          ? {
+              id: history.actionBy.userId,
+              fullName: history.actionBy.fullName,
+              email: history.actionBy.email
+            }
+          : null
+      }))
+    })),
+    statusHistories: order.orderStatusHistories.map((history) => ({
+      id: history.bookingOrderStatusHistoryId,
       oldStatus: history.oldStatus,
       newStatus: history.newStatus,
       actionType: history.actionType,
@@ -177,7 +233,7 @@ function toBookingDto(booking: BookingWithRelations) {
           }
         : null
     })),
-    payments: booking.payments.map((payment) => ({
+    payments: order.payments.map((payment) => ({
       id: payment.paymentId,
       amount: decimalToNumber(payment.amount),
       paymentMethod: payment.paymentMethod,
@@ -186,9 +242,11 @@ function toBookingDto(booking: BookingWithRelations) {
       paidAt: payment.paidAt,
       createdAt: payment.createdAt
     })),
-    refunds: booking.refunds.map((refund) => ({
+    refunds: order.refunds.map((refund) => ({
       id: refund.refundId,
       paymentId: refund.paymentId,
+      bookingOrderId: refund.bookingOrderId,
+      bookingItemId: refund.bookingItemId,
       refundAmount: decimalToNumber(refund.refundAmount),
       refundReason: refund.refundReason,
       refundStatus: refund.refundStatus,
@@ -201,7 +259,7 @@ function toBookingDto(booking: BookingWithRelations) {
 function handleKnownPrismaError(error: unknown): never {
   const message = error instanceof Error ? error.message : "";
 
-  if (message.includes("no_overlapping_active_bookings")) {
+  if (message.includes("no_overlapping_active_booking_items")) {
     throw new AppError(409, "Selected slot is no longer available", "BOOKING_SLOT_UNAVAILABLE");
   }
 
@@ -237,7 +295,7 @@ export class BookingsService {
     const now = this.nowProvider();
 
     try {
-      const booking = await this.db.$transaction(
+      const order = await this.db.$transaction(
         async (tx) => {
           const user = await tx.user.findUnique({
             where: { userId },
@@ -254,129 +312,171 @@ export class BookingsService {
             priorityGroupId: user.priorityGroupId,
             priorityGroupAdvanceBookingDays: user.priorityGroup?.advanceBookingDays ?? null
           });
-          const court = await tx.court.findUnique({
-            where: { courtId: input.courtId },
-            include: courtBookingInclude
-          });
+          await this.assertDailyQuotaAvailableForItems(tx, userId, input.items, now, policy.maxBookingsPerDay);
 
-          if (!court) {
-            throw new AppError(404, "Court not found", "COURT_NOT_FOUND");
+          const preparedItems: PreparedBookingItem[] = [];
+          for (const item of input.items) {
+            const court = await tx.court.findUnique({
+              where: { courtId: item.courtId },
+              include: courtBookingInclude
+            });
+
+            if (!court) {
+              throw new AppError(404, "Court not found", "COURT_NOT_FOUND");
+            }
+
+            this.assertBookingWindow(item.startDatetime, item.endDatetime, now);
+            this.assertCourtCanBeBooked(court);
+            const operatingHour = this.getOperatingHourOrThrow(court, item.startDatetime);
+            this.assertWithinOperatingHours(item.startDatetime, item.endDatetime, operatingHour);
+            this.assertSlotAligned(item.startDatetime, item.endDatetime, operatingHour);
+            this.assertDurationAllowed(item.startDatetime, item.endDatetime, policy.maxDurationMinutes);
+            this.assertAdvanceBookingAllowed(item.startDatetime, policy.advanceBookingDays, now);
+
+            await this.state.expireOverlappingPaymentHolds(tx, {
+              courtId: item.courtId,
+              startDatetime: item.startDatetime,
+              endDatetime: item.endDatetime,
+              now
+            });
+            await this.assertNoActiveOverlap(tx, item.courtId, item.startDatetime, item.endDatetime, now);
+
+            const pricing = this.calculateItemAmount({
+              startDatetime: item.startDatetime,
+              endDatetime: item.endDatetime,
+              slotDurationMinutes: operatingHour.slotDurationMinutes,
+              pricingRules: court.pricingRules,
+              userPriorityGroupId: user.priorityGroupId,
+              weekday: getIsoWeekday(item.startDatetime)
+            });
+
+            preparedItems.push({
+              courtId: item.courtId,
+              startDatetime: item.startDatetime,
+              endDatetime: item.endDatetime,
+              unitPrice: pricing.unitPrice,
+              amount: pricing.amount
+            });
           }
 
-          this.assertBookingWindow(input.startDatetime, input.endDatetime, now);
-          this.assertCourtCanBeBooked(court);
-          const operatingHour = this.getOperatingHourOrThrow(court, input.startDatetime);
-          this.assertWithinOperatingHours(input.startDatetime, input.endDatetime, operatingHour);
-          this.assertSlotAligned(input.startDatetime, input.endDatetime, operatingHour);
-          this.assertDurationAllowed(input.startDatetime, input.endDatetime, policy.maxDurationMinutes);
-          this.assertAdvanceBookingAllowed(input.startDatetime, policy.advanceBookingDays, now);
-          this.assertParticipantCountAllowed(input.participantCount, court.capacity);
-
-          await this.assertDailyQuotaAvailable(tx, userId, input.startDatetime, now, policy.maxBookingsPerDay);
-          await this.state.expireOverlappingPaymentHolds(tx, {
-            courtId: input.courtId,
-            startDatetime: input.startDatetime,
-            endDatetime: input.endDatetime,
-            now
-          });
-          await this.assertNoActiveOverlap(tx, input.courtId, input.startDatetime, input.endDatetime, now);
-
-          const totalAmount = this.calculateTotalAmount({
-            startDatetime: input.startDatetime,
-            endDatetime: input.endDatetime,
-            slotDurationMinutes: operatingHour.slotDurationMinutes,
-            pricingRules: court.pricingRules,
-            userPriorityGroupId: user.priorityGroupId,
-            weekday: getIsoWeekday(input.startDatetime)
-          });
-          const createdBooking = await tx.booking.create({
+          const totalAmount = preparedItems.reduce(
+            (sum, item) => sum.add(item.amount),
+            new Prisma.Decimal(0)
+          );
+          const createdOrder = await tx.bookingOrder.create({
             data: {
               bookingCode: this.codeGenerator(now),
               userId,
-              courtId: input.courtId,
-              startDatetime: input.startDatetime,
-              endDatetime: input.endDatetime,
-              participantCount: input.participantCount,
-              usagePurpose: input.usagePurpose.trim(),
               totalAmount,
               bookingStatus: BookingStatus.PENDING_PAYMENT,
               paymentStatus: PaymentStatus.INITIATED,
               holdExpiresAt: addMinutes(now, policy.holdMinutes),
-              refundable: true
+              refundable: true,
+              note: normalizeOptional(input.note),
+              items: {
+                create: preparedItems.map((item) => ({
+                  courtId: item.courtId,
+                  startDatetime: item.startDatetime,
+                  endDatetime: item.endDatetime,
+                  unitPrice: item.unitPrice,
+                  amount: item.amount,
+                  bookingStatus: BookingStatus.PENDING_PAYMENT
+                }))
+              }
             },
             select: {
-              bookingId: true
+              bookingOrderId: true
             }
           });
 
-          await this.state.recordStatusHistory(tx, {
-            bookingId: createdBooking.bookingId,
-            oldStatus: null,
-            newStatus: BookingStatus.PENDING_PAYMENT,
-            actionType: "USER_CREATE_BOOKING_HOLD",
-            actionByUserId: userId,
-            note: "Booking hold created pending full payment"
+          const createdItems = await tx.bookingItem.findMany({
+            where: { bookingOrderId: createdOrder.bookingOrderId },
+            select: { bookingItemId: true }
           });
 
-          return this.getBookingById(tx, createdBooking.bookingId);
+          await this.state.recordOrderStatusHistory(tx, {
+            bookingOrderId: createdOrder.bookingOrderId,
+            oldStatus: null,
+            newStatus: BookingStatus.PENDING_PAYMENT,
+            actionType: "USER_CREATE_BOOKING_ORDER_HOLD",
+            actionByUserId: userId,
+            note: "Booking order hold created pending full payment"
+          });
+
+          for (const item of createdItems) {
+            await this.state.recordItemStatusHistory(tx, {
+              bookingItemId: item.bookingItemId,
+              oldStatus: null,
+              newStatus: BookingStatus.PENDING_PAYMENT,
+              actionType: "USER_CREATE_BOOKING_ITEM_HOLD",
+              actionByUserId: userId,
+              note: "Booking item hold created pending full payment"
+            });
+          }
+
+          return this.getBookingOrderById(tx, createdOrder.bookingOrderId);
         },
         {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable
         }
       );
 
-      return toBookingDto(booking);
+      return toBookingOrderDto(order);
     } catch (error) {
       return handleKnownPrismaError(error);
     }
   }
 
   async listMyBookings(userId: string, query: ListMyBookingsQuery) {
-    const bookings = await this.db.booking.findMany({
+    const orders = await this.db.bookingOrder.findMany({
       where: {
         userId,
         ...(query.status ? { bookingStatus: query.status } : {}),
         ...(query.fromDate || query.toDate
           ? {
-              startDatetime: {
-                ...(query.fromDate ? { gte: query.fromDate } : {}),
-                ...(query.toDate ? { lte: query.toDate } : {})
+              items: {
+                some: {
+                  startDatetime: {
+                    ...(query.fromDate ? { gte: query.fromDate } : {}),
+                    ...(query.toDate ? { lte: query.toDate } : {})
+                  }
+                }
               }
             }
           : {})
       },
-      include: bookingInclude,
-      orderBy: [{ startDatetime: "desc" }]
+      include: bookingOrderInclude,
+      orderBy: [{ createdAt: "desc" }]
     });
 
-    return bookings.map(toBookingDto);
+    return orders.map(toBookingOrderDto);
   }
 
-  async getBookingDetail(userId: string, bookingId: string) {
-    const booking = await this.db.booking.findFirst({
+  async getBookingDetail(userId: string, bookingOrderId: string) {
+    const order = await this.db.bookingOrder.findFirst({
       where: {
-        bookingId,
+        bookingOrderId,
         userId
       },
-      include: bookingInclude
+      include: bookingOrderInclude
     });
 
-    if (!booking) {
-      throw new AppError(404, "Booking not found", "BOOKING_NOT_FOUND");
+    if (!order) {
+      throw new AppError(404, "Booking order not found", "BOOKING_NOT_FOUND");
     }
 
-    return toBookingDto(booking);
+    return toBookingOrderDto(order);
   }
 
-  async cancelMyBooking(userId: string, bookingId: string, input: CancelBookingInput) {
+  async cancelMyBooking(userId: string, bookingOrderId: string, input: CancelBookingInput) {
     const now = this.nowProvider();
 
     try {
-      const booking = await this.db.$transaction(
+      const order = await this.db.$transaction(
         async (tx) => {
-          const currentBooking = await tx.booking.findFirst({
+          const currentOrder = await tx.bookingOrder.findFirst({
             where: {
-              bookingId,
+              bookingOrderId,
               userId
             },
             include: {
@@ -385,6 +485,7 @@ export class BookingsService {
                   priorityGroup: true
                 }
               },
+              items: true,
               payments: {
                 orderBy: {
                   createdAt: "desc"
@@ -393,98 +494,121 @@ export class BookingsService {
             }
           });
 
-          if (!currentBooking) {
-            throw new AppError(404, "Booking not found", "BOOKING_NOT_FOUND");
+          if (!currentOrder) {
+            throw new AppError(404, "Booking order not found", "BOOKING_NOT_FOUND");
           }
 
           const policy = await this.rules.getEffectivePolicy({
-            priorityGroupId: currentBooking.user.priorityGroupId,
+            priorityGroupId: currentOrder.user.priorityGroupId,
             priorityGroupAdvanceBookingDays:
-              currentBooking.user.priorityGroup?.advanceBookingDays ?? null
+              currentOrder.user.priorityGroup?.advanceBookingDays ?? null
           });
 
-          let paymentStatus = currentBooking.paymentStatus;
+          let paymentStatus = currentOrder.paymentStatus;
           let refundable = false;
-          let noRefundReason: string | null = null;
 
-          if (currentBooking.bookingStatus === BookingStatus.PENDING_PAYMENT) {
+          if (currentOrder.bookingStatus === BookingStatus.PENDING_PAYMENT) {
             paymentStatus = PaymentStatus.CANCELLED;
-            noRefundReason = "Cancelled before payment success";
-          } else if (currentBooking.bookingStatus === BookingStatus.CONFIRMED) {
-            this.assertCancellationWindowOpen(currentBooking.startDatetime, policy.cancelBeforeHours, now);
-            const successfulPayment = currentBooking.payments.find(
+          } else if (currentOrder.bookingStatus === BookingStatus.CONFIRMED) {
+            this.assertCancellationWindowOpen(earliestItemStart(currentOrder), policy.cancelBeforeHours, now);
+            const successfulPayment = currentOrder.payments.find(
               (payment) => payment.paymentStatus === PaymentStatus.SUCCESS
             );
 
             if (successfulPayment && policy.refundRateUserOnTime > 0) {
               const refundResult = await this.refunds.createRefundForBooking(tx, {
-                bookingId: currentBooking.bookingId,
-                bookingStatus: currentBooking.bookingStatus,
+                bookingOrderId: currentOrder.bookingOrderId,
+                bookingStatus: currentOrder.bookingStatus,
                 payment: successfulPayment,
                 refundRate: policy.refundRateUserOnTime,
-                refundReason: input.reason ?? "User cancelled booking within allowed window",
+                refundReason: input.reason ?? "User cancelled booking order within allowed window",
                 requestedByUserId: userId
               });
 
               refundable = refundResult !== null;
-            } else if (!successfulPayment) {
-              noRefundReason = "No successful payment found";
-            } else {
-              noRefundReason = "User cancellation refund rate is 0";
             }
           } else {
             throw new AppError(
               409,
-              "Booking cannot be cancelled by user in its current status",
+              "Booking order cannot be cancelled by user in its current status",
               "BOOKING_CANNOT_BE_CANCELLED"
             );
           }
 
-          const updatedBooking = await tx.booking.update({
+          const updatedOrder = await tx.bookingOrder.update({
             where: {
-              bookingId: currentBooking.bookingId
+              bookingOrderId: currentOrder.bookingOrderId
             },
             data: {
               bookingStatus: BookingStatus.CANCELLED_BY_USER,
               paymentStatus,
               refundable,
-              noRefundReason,
               cancelReason: normalizeOptional(input.reason),
               cancelledByUserId: userId,
               cancelledAt: now,
               holdExpiresAt: null
             },
             select: {
-              bookingId: true
+              bookingOrderId: true
             }
           });
 
-          await this.state.recordStatusHistory(tx, {
-            bookingId: updatedBooking.bookingId,
-            oldStatus: currentBooking.bookingStatus,
+          const cancellableItems = currentOrder.items.filter((item) =>
+            userCancellableItemStatuses.includes(item.bookingStatus)
+          );
+
+          await tx.bookingItem.updateMany({
+            where: {
+              bookingOrderId: currentOrder.bookingOrderId,
+              bookingStatus: {
+                in: userCancellableItemStatuses
+              }
+            },
+            data: {
+              bookingStatus: BookingStatus.CANCELLED_BY_USER
+            }
+          });
+
+          await this.state.recordOrderStatusHistory(tx, {
+            bookingOrderId: updatedOrder.bookingOrderId,
+            oldStatus: currentOrder.bookingStatus,
             newStatus: BookingStatus.CANCELLED_BY_USER,
-            actionType: "USER_CANCEL_BOOKING",
+            actionType: "USER_CANCEL_BOOKING_ORDER",
             actionByUserId: userId,
             note: input.reason ?? null
           });
 
-          return this.getBookingById(tx, updatedBooking.bookingId);
+          for (const item of cancellableItems) {
+            await this.state.recordItemStatusHistory(tx, {
+              bookingItemId: item.bookingItemId,
+              oldStatus: item.bookingStatus,
+              newStatus: BookingStatus.CANCELLED_BY_USER,
+              actionType: "USER_CANCEL_BOOKING_ITEM",
+              actionByUserId: userId,
+              note: input.reason ?? null
+            });
+          }
+
+          return this.getBookingOrderById(tx, updatedOrder.bookingOrderId);
         },
         {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable
         }
       );
 
-      return toBookingDto(booking);
+      return toBookingOrderDto(order);
     } catch (error) {
       return handleKnownPrismaError(error);
     }
   }
 
-  private async getBookingById(db: BookingDbClient, bookingId: string): Promise<BookingWithRelations> {
-    return db.booking.findUniqueOrThrow({
-      where: { bookingId },
-      include: bookingInclude
+  private async getBookingOrderById(
+    db: BookingDbClient,
+    bookingOrderId: string
+  ): Promise<BookingOrderWithRelations> {
+    return db.bookingOrder.findUniqueOrThrow({
+      where: { bookingOrderId },
+      include: bookingOrderInclude
     });
   }
 
@@ -608,58 +732,57 @@ export class BookingsService {
     }
   }
 
-  private assertParticipantCountAllowed(participantCount: number, courtCapacity: number): void {
-    if (participantCount > courtCapacity) {
-      throw new AppError(
-        400,
-        "Participant count exceeds court capacity",
-        "PARTICIPANT_COUNT_EXCEEDS_CAPACITY"
-      );
-    }
-  }
-
-  private async assertDailyQuotaAvailable(
+  private async assertDailyQuotaAvailableForItems(
     tx: Prisma.TransactionClient,
     userId: string,
-    startDatetime: Date,
+    items: CreateBookingInput["items"],
     now: Date,
     maxBookingsPerDay: number
   ): Promise<void> {
-    const dayStart = startOfUtcDay(startDatetime);
-    const dayEnd = addDays(dayStart, 1);
-    const existingCount = await tx.booking.count({
-      where: {
-        userId,
-        startDatetime: {
-          gte: dayStart,
-          lt: dayEnd
-        },
-        OR: [
-          {
-            bookingStatus: {
-              in: [
-                BookingStatus.PAYMENT_PROCESSING,
-                BookingStatus.CONFIRMED,
-                BookingStatus.IN_USE
-              ]
+    const uniqueDayStarts = [
+      ...new Set(items.map((item) => startOfUtcDay(item.startDatetime).toISOString()))
+    ].map((value) => new Date(value));
+
+    for (const dayStart of uniqueDayStarts) {
+      const dayEnd = addDays(dayStart, 1);
+      const existingCount = await tx.bookingOrder.count({
+        where: {
+          userId,
+          items: {
+            some: {
+              startDatetime: {
+                gte: dayStart,
+                lt: dayEnd
+              }
             }
           },
-          {
-            bookingStatus: BookingStatus.PENDING_PAYMENT,
-            holdExpiresAt: {
-              gt: now
+          OR: [
+            {
+              bookingStatus: {
+                in: [
+                  BookingStatus.PAYMENT_PROCESSING,
+                  BookingStatus.CONFIRMED,
+                  BookingStatus.IN_USE
+                ]
+              }
+            },
+            {
+              bookingStatus: BookingStatus.PENDING_PAYMENT,
+              holdExpiresAt: {
+                gt: now
+              }
             }
-          }
-        ]
-      }
-    });
+          ]
+        }
+      });
 
-    if (existingCount >= maxBookingsPerDay) {
-      throw new AppError(
-        409,
-        "User has reached the maximum bookings per day",
-        "MAX_BOOKINGS_PER_DAY_REACHED"
-      );
+      if (existingCount >= maxBookingsPerDay) {
+        throw new AppError(
+          409,
+          "User has reached the maximum bookings per day",
+          "MAX_BOOKINGS_PER_DAY_REACHED"
+        );
+      }
     }
   }
 
@@ -670,7 +793,7 @@ export class BookingsService {
     endDatetime: Date,
     now: Date
   ): Promise<void> {
-    const existingBookings = await tx.booking.findMany({
+    const existingItems = await tx.bookingItem.findMany({
       where: {
         courtId,
         bookingStatus: {
@@ -684,17 +807,29 @@ export class BookingsService {
         }
       },
       select: {
-        bookingId: true,
+        bookingItemId: true,
+        bookingOrderId: true,
         bookingStatus: true,
         startDatetime: true,
         endDatetime: true,
-        holdExpiresAt: true
+        bookingOrder: {
+          select: {
+            holdExpiresAt: true
+          }
+        }
       }
     });
 
     const conflict = this.conflicts.findConflict(
       { startDatetime, endDatetime },
-      existingBookings,
+      existingItems.map((item) => ({
+        bookingItemId: item.bookingItemId,
+        bookingOrderId: item.bookingOrderId,
+        bookingStatus: item.bookingStatus,
+        startDatetime: item.startDatetime,
+        endDatetime: item.endDatetime,
+        holdExpiresAt: item.bookingOrder.holdExpiresAt
+      })),
       now
     );
 
@@ -703,15 +838,16 @@ export class BookingsService {
     }
   }
 
-  private calculateTotalAmount(input: {
+  private calculateItemAmount(input: {
     startDatetime: Date;
     endDatetime: Date;
     slotDurationMinutes: number;
     pricingRules: PricingRuleForBooking[];
     userPriorityGroupId: string | null;
     weekday: number;
-  }): Prisma.Decimal {
-    let totalAmount = new Prisma.Decimal(0);
+  }): { unitPrice: Prisma.Decimal; amount: Prisma.Decimal } {
+    let amount = new Prisma.Decimal(0);
+    let unitPrice: Prisma.Decimal | null = null;
 
     for (
       let cursor = input.startDatetime;
@@ -735,10 +871,15 @@ export class BookingsService {
         weekday: input.weekday
       });
 
-      totalAmount = totalAmount.add(priceRule.priceAmount);
+      unitPrice ??= priceRule.priceAmount;
+      amount = amount.add(priceRule.priceAmount);
     }
 
-    return totalAmount;
+    if (!unitPrice) {
+      throw new AppError(400, "No pricing rule covers the requested slot", "PRICING_RULE_NOT_FOUND");
+    }
+
+    return { unitPrice, amount };
   }
 
   private resolvePricingRule(input: {
@@ -792,7 +933,7 @@ export class BookingsService {
     if (now > latestCancellationTime) {
       throw new AppError(
         409,
-        "Booking can no longer be cancelled by user",
+        "Booking order can no longer be cancelled by user",
         "BOOKING_CANCEL_WINDOW_CLOSED"
       );
     }

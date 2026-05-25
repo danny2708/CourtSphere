@@ -203,10 +203,12 @@ court_types
 courts
 operating_hours
 pricing_rules
-bookings
+booking_orders
+booking_items
 payments
 refunds
-booking_status_histories
+booking_order_status_histories
+booking_item_status_histories
 court_status_histories
 violations
 notifications
@@ -379,10 +381,12 @@ Checklist:
 - [x] Tạo model `PricingRule` map bảng `pricing_rules`.
 - [x] Tạo model `BookingRule` map bảng `booking_rules`.
 - [x] Tạo model `PriorityPolicy` map bảng `priority_policies`.
-- [x] Tạo model `Booking` map bảng `bookings`.
+- [x] Tạo model `BookingOrder` map bảng `booking_orders`.
+- [x] Tạo model `BookingItem` map bảng `booking_items`.
 - [x] Tạo model `Payment` map bảng `payments`.
 - [x] Tạo model `Refund` map bảng `refunds`.
-- [x] Tạo model `BookingStatusHistory` map bảng `booking_status_histories`.
+- [x] Tạo model `BookingOrderStatusHistory` map bảng `booking_order_status_histories`.
+- [x] Tạo model `BookingItemStatusHistory` map bảng `booking_item_status_histories`.
 - [x] Tạo model `CourtStatusHistory` map bảng `court_status_histories`.
 - [x] Tạo model `Violation` map bảng `violations`.
 - [x] Tạo model `Notification` map bảng `notifications`.
@@ -548,7 +552,7 @@ Checklist:
 - [x] API `GET /api/courts/:id/availability?date=YYYY-MM-DD`.
 - [x] Lấy operating hours theo sân và thứ trong tuần.
 - [x] Sinh slot theo `slot_duration_minutes`.
-- [x] Lấy active bookings trong ngày.
+- [x] Lấy active booking items trong ngày.
 - [x] Đánh dấu slot unavailable nếu overlap.
 - [x] Đánh dấu slot đang hold nếu `PENDING_PAYMENT` còn hạn.
 - [x] Tính giá slot theo pricing rules.
@@ -579,10 +583,10 @@ Checklist:
 - [x] Validate advance booking window.
 - [x] Validate max duration.
 - [x] Validate max bookings per day.
-- [x] Validate participant count <= court capacity nếu áp dụng.
+- [x] Không dùng participant count/court capacity theo schema mới.
 - [x] Validate overlap trong service layer.
 - [x] Tạo booking trong transaction.
-- [x] Ghi `booking_status_histories` khi tạo booking.
+- [x] Ghi `booking_order_status_histories` và `booking_item_status_histories` khi tạo booking.
 - [x] Bắt lỗi DB overlap constraint và trả message thân thiện.
 - [x] API cancel by user.
 - [x] Tạo refund nếu user cancel hợp lệ.
@@ -666,7 +670,7 @@ Checklist:
 - [ ] No-show không tạo refund.
 - [ ] No-show tạo violation nếu policy yêu cầu.
 - [x] Manager cancel tạo refund 100% mặc định.
-- [ ] Mọi chuyển trạng thái ghi `booking_status_histories`.
+- [ ] Mọi chuyển trạng thái ghi order/item status histories tương ứng.
 
 Acceptance criteria:
 
@@ -788,6 +792,39 @@ Acceptance criteria:
 
 - [ ] Admin xem được số liệu cơ bản.
 - [ ] Query không quá chậm với dataset mẫu.
+
+---
+
+### 6.18 Database refactor sync: BookingOrder/BookingItem
+
+Mục tiêu: đồng bộ backend theo thiết kế DB mới `booking_orders` + `booking_items`.
+
+Checklist:
+
+- [x] Thay Prisma model `Booking` bằng `BookingOrder` và `BookingItem`.
+- [x] Bỏ `location` và `capacity` khỏi `courts`.
+- [x] Bỏ `participantCount`, `usagePurpose`, `checkoutTime`, `noRefundReason` khỏi booking flow.
+- [x] Thêm `booking_order_status_histories` và `booking_item_status_histories`.
+- [x] Chuyển overlap/availability sang `booking_items`.
+- [x] Chuyển payment sang `booking_orders`.
+- [x] Chuyển refund sang `booking_orders` và optional `booking_items`.
+- [x] Chuyển violations sang optional `booking_item_id`.
+- [x] Chuyển notifications sang optional `booking_order_id` và `booking_item_id`.
+- [x] Giữ `waitlist_entries.expires_at`.
+- [x] Thêm migration SQL `no_overlapping_active_booking_items`.
+- [x] Cập nhật seed data tương thích schema mới.
+- [x] Cập nhật API contract.
+- [x] Re-verify auth/RBAC/courts/rules/availability/bookings/payments/refunds tests.
+
+Acceptance criteria:
+
+- [x] Single booking order với 1 item tạo được.
+- [x] Combo booking order nhiều item tạo được.
+- [x] Combo all-or-nothing khi 1 item conflict.
+- [x] Availability block slot theo `booking_items`.
+- [x] Payment success confirm order và items.
+- [x] Payment callback idempotent không tạo duplicate history.
+- [x] Refund gắn order và hỗ trợ optional item.
 
 ---
 
@@ -1202,7 +1239,7 @@ Một module được coi là hoàn thành khi:
 - [ ] Không dùng enum role trong `users` làm source of truth nếu đã dùng `roles` + `user_roles`.
 - [ ] Không bỏ qua DB-level overlap protection.
 - [ ] Không tạo refund cho no-show/check-in expired.
-- [ ] Không cập nhật booking status mà không ghi `booking_status_histories`.
+- [ ] Không cập nhật booking order/item status mà không ghi history tương ứng.
 - [ ] Không thay đổi schema mà quên migration.
 - [ ] Không thay đổi API mà quên cập nhật frontend types.
 
@@ -1213,16 +1250,17 @@ Một module được coi là hoàn thành khi:
 | Module | Owner | Status | Notes |
 |---|---|---|---|
 | Backend foundation | Codex | DONE | Express + TypeScript foundation verified: build/typecheck/lint/test/health |
-| Database & Prisma | Codex | DONE | Schema/migration/seed verified; overlap constraint restored and checked in PostgreSQL |
+| Database & Prisma | Codex | DONE | Refactored to booking_orders/booking_items; booking_items overlap constraint verified in PostgreSQL |
 | Auth | Codex | DONE | Auth APIs/JWT/password hashing verified; DB manual flow pending local PostgreSQL |
 | RBAC & Users | Codex | DONE | Admin user/role APIs, RBAC tests, and audit logs implemented |
 | Courts & Court Types | Codex | DONE | Court type/court APIs, filters, status updates, and status history implemented |
 | Operating Hours & Pricing | Codex | DONE | Admin CRUD APIs implemented; booking-impact warnings deferred until booking/availability modules |
 | Booking Rules & Priority | Codex | DONE | Admin config APIs, audit logs, and shared rules repository implemented |
-| Availability | Codex | DONE | Hold-aware slot generation, conflict detection, pricing, and policy response implemented |
-| Booking | Codex | DONE | Hold creation, user booking APIs, cancellation/refund request, and status history implemented |
-| Payment | Codex | DONE | Mock payment, callback idempotency, status query, admin list, and booking confirmation implemented |
-| Refund | Codex | DONE | Mock refund processor, admin refund APIs, retry audit logs, and manager/admin cancellation implemented |
+| Availability | Codex | DONE | Hold-aware slot generation now reads booking_items, conflict detection, pricing, and policy response implemented |
+| Booking | Codex | DONE | BookingOrder/BookingItem hold creation, combo all-or-nothing validation, user APIs, cancellation/refund request, and histories implemented |
+| Payment | Codex | DONE | Mock payment tied to booking_orders, callback idempotency, status query, admin list, and order/item confirmation implemented |
+| Refund | Codex | DONE | Mock refund processor tied to booking_orders with optional booking_items, admin APIs, retry audit logs, and manager/admin cancellation implemented |
+| DB refactor sync | Codex | DONE | Backend synced to new booking_orders/booking_items database design and re-verified |
 | Manager operations |  | TODO |  |
 | Jobs |  | TODO |  |
 | Waitlist |  | TODO |  |

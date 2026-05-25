@@ -23,7 +23,7 @@ import type {
 
 const refundInclude = {
   payment: true,
-  booking: {
+  bookingOrder: {
     include: {
       user: {
         select: {
@@ -32,11 +32,27 @@ const refundInclude = {
           email: true
         }
       },
+      items: {
+        include: {
+          court: {
+            select: {
+              courtId: true,
+              courtName: true
+            }
+          }
+        },
+        orderBy: {
+          startDatetime: "asc" as const
+        }
+      }
+    }
+  },
+  bookingItem: {
+    include: {
       court: {
         select: {
           courtId: true,
-          courtName: true,
-          location: true
+          courtName: true
         }
       }
     }
@@ -57,17 +73,23 @@ const refundInclude = {
   }
 } satisfies Prisma.RefundInclude;
 
-const managerCancelBookingInclude = {
+const managerCancelOrderInclude = {
   user: {
     include: {
       priorityGroup: true
     }
   },
-  court: {
-    select: {
-      courtId: true,
-      courtName: true,
-      location: true
+  items: {
+    include: {
+      court: {
+        select: {
+          courtId: true,
+          courtName: true
+        }
+      }
+    },
+    orderBy: {
+      startDatetime: "asc" as const
     }
   },
   payments: {
@@ -75,7 +97,7 @@ const managerCancelBookingInclude = {
       createdAt: "desc" as const
     }
   }
-} satisfies Prisma.BookingInclude;
+} satisfies Prisma.BookingOrderInclude;
 
 const retryableRefundStatuses: RefundStatus[] = [
   RefundStatus.FAILED,
@@ -89,10 +111,14 @@ const duplicateBlockingRefundStatuses: RefundStatus[] = [
   RefundStatus.SUCCESS,
   RefundStatus.MANUAL_REVIEW
 ];
+const managerCancellableItemStatuses: BookingStatus[] = [
+  BookingStatus.CONFIRMED,
+  BookingStatus.IN_USE
+];
 
 type RefundWithRelations = Prisma.RefundGetPayload<{ include: typeof refundInclude }>;
-type ManagerCancelBooking = Prisma.BookingGetPayload<{
-  include: typeof managerCancelBookingInclude;
+type ManagerCancelOrder = Prisma.BookingOrderGetPayload<{
+  include: typeof managerCancelOrderInclude;
 }>;
 type RefundDbClient = PrismaClient | Prisma.TransactionClient;
 
@@ -128,7 +154,8 @@ function toRefundDto(refund: RefundWithRelations) {
   return {
     id: refund.refundId,
     paymentId: refund.paymentId,
-    bookingId: refund.bookingId,
+    bookingOrderId: refund.bookingOrderId,
+    bookingItemId: refund.bookingItemId,
     refundAmount: decimalToNumber(refund.refundAmount),
     refundReason: refund.refundReason,
     refundStatus: refund.refundStatus,
@@ -142,25 +169,45 @@ function toRefundDto(refund: RefundWithRelations) {
       paymentStatus: refund.payment.paymentStatus,
       paidAt: refund.payment.paidAt
     },
-    booking: {
-      id: refund.booking.bookingId,
-      bookingCode: refund.booking.bookingCode,
-      bookingStatus: refund.booking.bookingStatus,
-      paymentStatus: refund.booking.paymentStatus,
-      startDatetime: refund.booking.startDatetime,
-      endDatetime: refund.booking.endDatetime,
-      totalAmount: decimalToNumber(refund.booking.totalAmount),
+    bookingOrder: {
+      id: refund.bookingOrder.bookingOrderId,
+      bookingOrderId: refund.bookingOrder.bookingOrderId,
+      bookingCode: refund.bookingOrder.bookingCode,
+      bookingStatus: refund.bookingOrder.bookingStatus,
+      paymentStatus: refund.bookingOrder.paymentStatus,
+      totalAmount: decimalToNumber(refund.bookingOrder.totalAmount),
       user: {
-        id: refund.booking.user.userId,
-        fullName: refund.booking.user.fullName,
-        email: refund.booking.user.email
+        id: refund.bookingOrder.user.userId,
+        fullName: refund.bookingOrder.user.fullName,
+        email: refund.bookingOrder.user.email
       },
-      court: {
-        id: refund.booking.court.courtId,
-        courtName: refund.booking.court.courtName,
-        location: refund.booking.court.location
-      }
+      items: refund.bookingOrder.items.map((item) => ({
+        id: item.bookingItemId,
+        bookingItemId: item.bookingItemId,
+        startDatetime: item.startDatetime,
+        endDatetime: item.endDatetime,
+        amount: decimalToNumber(item.amount),
+        bookingStatus: item.bookingStatus,
+        court: {
+          id: item.court.courtId,
+          courtName: item.court.courtName
+        }
+      }))
     },
+    bookingItem: refund.bookingItem
+      ? {
+          id: refund.bookingItem.bookingItemId,
+          bookingItemId: refund.bookingItem.bookingItemId,
+          startDatetime: refund.bookingItem.startDatetime,
+          endDatetime: refund.bookingItem.endDatetime,
+          amount: decimalToNumber(refund.bookingItem.amount),
+          bookingStatus: refund.bookingItem.bookingStatus,
+          court: {
+            id: refund.bookingItem.court.courtId,
+            courtName: refund.bookingItem.court.courtName
+          }
+        }
+      : null,
     requestedByUser: refund.requestedBy
       ? {
           id: refund.requestedBy.userId,
@@ -178,30 +225,35 @@ function toRefundDto(refund: RefundWithRelations) {
   };
 }
 
-function toCancelledBookingDto(booking: ManagerCancelBooking) {
+function toCancelledOrderDto(order: ManagerCancelOrder) {
   return {
-    id: booking.bookingId,
-    bookingCode: booking.bookingCode,
-    bookingStatus: booking.bookingStatus,
-    paymentStatus: booking.paymentStatus,
-    startDatetime: booking.startDatetime,
-    endDatetime: booking.endDatetime,
-    totalAmount: decimalToNumber(booking.totalAmount),
-    refundable: booking.refundable,
-    noRefundReason: booking.noRefundReason,
-    cancelReason: booking.cancelReason,
-    cancelledByUserId: booking.cancelledByUserId,
-    cancelledAt: booking.cancelledAt,
+    id: order.bookingOrderId,
+    bookingOrderId: order.bookingOrderId,
+    bookingCode: order.bookingCode,
+    bookingStatus: order.bookingStatus,
+    paymentStatus: order.paymentStatus,
+    totalAmount: decimalToNumber(order.totalAmount),
+    refundable: order.refundable,
+    cancelReason: order.cancelReason,
+    cancelledByUserId: order.cancelledByUserId,
+    cancelledAt: order.cancelledAt,
     user: {
-      id: booking.user.userId,
-      fullName: booking.user.fullName,
-      email: booking.user.email
+      id: order.user.userId,
+      fullName: order.user.fullName,
+      email: order.user.email
     },
-    court: {
-      id: booking.court.courtId,
-      courtName: booking.court.courtName,
-      location: booking.court.location
-    }
+    items: order.items.map((item) => ({
+      id: item.bookingItemId,
+      bookingItemId: item.bookingItemId,
+      startDatetime: item.startDatetime,
+      endDatetime: item.endDatetime,
+      amount: decimalToNumber(item.amount),
+      bookingStatus: item.bookingStatus,
+      court: {
+        id: item.court.courtId,
+        courtName: item.court.courtName
+      }
+    }))
   };
 }
 
@@ -250,7 +302,8 @@ export class RefundsService {
   async createRefundForBooking(
     tx: Prisma.TransactionClient,
     input: {
-      bookingId: string;
+      bookingOrderId: string;
+      bookingItemId?: string | null;
       bookingStatus: BookingStatus;
       payment: PaymentForRefund | null | undefined;
       refundRate: number;
@@ -275,7 +328,8 @@ export class RefundsService {
 
     const existingRefund = await tx.refund.findFirst({
       where: {
-        bookingId: input.bookingId,
+        bookingOrderId: input.bookingOrderId,
+        bookingItemId: input.bookingItemId ?? null,
         paymentId: input.payment.paymentId,
         refundStatus: {
           in: duplicateBlockingRefundStatuses
@@ -301,7 +355,8 @@ export class RefundsService {
     const refund = await tx.refund.create({
       data: {
         paymentId: input.payment.paymentId,
-        bookingId: input.bookingId,
+        bookingOrderId: input.bookingOrderId,
+        bookingItemId: input.bookingItemId ?? null,
         refundAmount,
         refundReason: input.refundReason,
         refundStatus: RefundStatus.REQUESTED,
@@ -333,7 +388,7 @@ export class RefundsService {
           : {}),
         ...(query.userId || query.bookingCode
           ? {
-              booking: {
+              bookingOrder: {
                 ...(query.userId ? { userId: query.userId } : {}),
                 ...(query.bookingCode
                   ? {
@@ -478,7 +533,7 @@ export class RefundsService {
   }
 
   async cancelBookingDueToCourtIssue(
-    bookingId: string,
+    bookingOrderId: string,
     input: ManagerCancelBookingInput,
     audit: AuditContext
   ) {
@@ -487,16 +542,16 @@ export class RefundsService {
     try {
       const result = await this.db.$transaction(
         async (tx) => {
-          const currentBooking = await tx.booking.findUnique({
-            where: { bookingId },
-            include: managerCancelBookingInclude
+          const currentOrder = await tx.bookingOrder.findUnique({
+            where: { bookingOrderId },
+            include: managerCancelOrderInclude
           });
 
-          if (!currentBooking) {
-            throw new AppError(404, "Booking not found", "BOOKING_NOT_FOUND");
+          if (!currentOrder) {
+            throw new AppError(404, "Booking order not found", "BOOKING_NOT_FOUND");
           }
 
-          this.assertManagerCanCancelBooking(currentBooking.bookingStatus);
+          this.assertManagerCanCancelBooking(currentOrder.bookingStatus);
 
           const adminActor = isAdmin(audit.roles);
           const newStatus = adminActor
@@ -504,71 +559,89 @@ export class RefundsService {
             : BookingStatus.CANCELLED_BY_MANAGER;
           const actionType = adminActor ? "ADMIN_CANCEL_BOOKING" : "MANAGER_CANCEL_BOOKING";
           const policy = await new RulesRepository(tx).getEffectivePolicy({
-            priorityGroupId: currentBooking.user.priorityGroupId,
+            priorityGroupId: currentOrder.user.priorityGroupId,
             priorityGroupAdvanceBookingDays:
-              currentBooking.user.priorityGroup?.advanceBookingDays ?? null
+              currentOrder.user.priorityGroup?.advanceBookingDays ?? null
           });
-          const successfulPayment = currentBooking.payments.find(
+          const successfulPayment = currentOrder.payments.find(
             (payment) => payment.paymentStatus === PaymentStatus.SUCCESS
           );
           const refundResult = await this.createRefundForBooking(tx, {
-            bookingId: currentBooking.bookingId,
-            bookingStatus: currentBooking.bookingStatus,
+            bookingOrderId: currentOrder.bookingOrderId,
+            bookingStatus: currentOrder.bookingStatus,
             payment: successfulPayment ?? null,
             refundRate: policy.refundRateManagerFault,
             refundReason: input.reason,
             requestedByUserId: audit.actorUserId
           });
-          const noRefundReason = this.resolveNoRefundReason({
-            payment: successfulPayment ?? null,
-            bookingStatus: currentBooking.bookingStatus,
-            refundRate: policy.refundRateManagerFault,
-            refundCreatedOrExisting: refundResult !== null
-          });
+          const cancellableItems = currentOrder.items.filter((item) =>
+            managerCancellableItemStatuses.includes(item.bookingStatus)
+          );
 
-          const updatedBooking = await tx.booking.update({
-            where: { bookingId: currentBooking.bookingId },
+          const updatedOrder = await tx.bookingOrder.update({
+            where: { bookingOrderId: currentOrder.bookingOrderId },
             data: {
               bookingStatus: newStatus,
               refundable: refundResult !== null,
-              noRefundReason,
               cancelReason: normalizeOptional(input.reason),
               cancelledByUserId: audit.actorUserId,
               cancelledAt: now,
               holdExpiresAt: null
             },
-            include: managerCancelBookingInclude
+            include: managerCancelOrderInclude
           });
 
-          await this.state.recordStatusHistory(tx, {
-            bookingId: currentBooking.bookingId,
-            oldStatus: currentBooking.bookingStatus,
+          await tx.bookingItem.updateMany({
+            where: {
+              bookingOrderId: currentOrder.bookingOrderId,
+              bookingStatus: {
+                in: managerCancellableItemStatuses
+              }
+            },
+            data: {
+              bookingStatus: newStatus,
+              managerNote: normalizeOptional(input.reason)
+            }
+          });
+
+          await this.state.recordOrderStatusHistory(tx, {
+            bookingOrderId: currentOrder.bookingOrderId,
+            oldStatus: currentOrder.bookingStatus,
             newStatus,
             actionType,
             actionByUserId: audit.actorUserId,
             note: input.reason
           });
 
+          for (const item of cancellableItems) {
+            await this.state.recordItemStatusHistory(tx, {
+              bookingItemId: item.bookingItemId,
+              oldStatus: item.bookingStatus,
+              newStatus,
+              actionType,
+              actionByUserId: audit.actorUserId,
+              note: input.reason
+            });
+          }
+
           await this.createAuditLog(tx, audit, {
-            entityType: "BOOKING",
-            entityId: currentBooking.bookingId,
+            entityType: "BOOKING_ORDER",
+            entityId: currentOrder.bookingOrderId,
             action: actionType,
             oldValue: {
-              bookingStatus: currentBooking.bookingStatus,
-              refundable: currentBooking.refundable,
-              noRefundReason: currentBooking.noRefundReason
+              bookingStatus: currentOrder.bookingStatus,
+              refundable: currentOrder.refundable
             },
             newValue: {
               bookingStatus: newStatus,
               reason: input.reason,
               refundId: refundResult?.refundId ?? null,
-              refundCreated: refundResult?.created ?? false,
-              noRefundReason
+              refundCreated: refundResult?.created ?? false
             }
           });
 
           return {
-            booking: updatedBooking,
+            order: updatedOrder,
             refundId: refundResult?.refundId ?? null
           };
         },
@@ -578,7 +651,7 @@ export class RefundsService {
       );
 
       return {
-        booking: toCancelledBookingDto(result.booking),
+        bookingOrder: toCancelledOrderDto(result.order),
         refund: result.refundId ? toRefundDto(await this.getRefundOrThrow(result.refundId)) : null
       };
     } catch (error) {
@@ -606,37 +679,9 @@ export class RefundsService {
 
     throw new AppError(
       409,
-      "Booking cannot be cancelled by manager/admin in its current status",
+      "Booking order cannot be cancelled by manager/admin in its current status",
       "BOOKING_CANNOT_BE_CANCELLED_BY_MANAGER"
     );
-  }
-
-  private resolveNoRefundReason(input: {
-    payment: PaymentForRefund | null;
-    bookingStatus: BookingStatus;
-    refundRate: number;
-    refundCreatedOrExisting: boolean;
-  }): string | null {
-    if (input.refundCreatedOrExisting) {
-      return null;
-    }
-
-    if (
-      input.bookingStatus === BookingStatus.CHECKIN_EXPIRED ||
-      input.bookingStatus === BookingStatus.NO_SHOW
-    ) {
-      return "Check-in expired and no-show bookings are not refundable";
-    }
-
-    if (!input.payment || input.payment.paymentStatus !== PaymentStatus.SUCCESS) {
-      return "No successful payment found";
-    }
-
-    if (input.refundRate <= 0) {
-      return "Manager/admin cancellation refund rate is 0";
-    }
-
-    return "Refund amount is 0";
   }
 
   private async createAuditLog(

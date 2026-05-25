@@ -14,18 +14,25 @@ import type {
 } from "./payments.types";
 
 const paymentInclude = {
-  booking: {
+  bookingOrder: {
     include: {
-      court: {
-        include: {
-          courtType: true
-        }
-      },
       user: {
         select: {
           userId: true,
           fullName: true,
           email: true
+        }
+      },
+      items: {
+        include: {
+          court: {
+            include: {
+              courtType: true
+            }
+          }
+        },
+        orderBy: {
+          startDatetime: "asc" as const
         }
       }
     }
@@ -40,6 +47,27 @@ const paymentInclude = {
 } satisfies Prisma.PaymentInclude;
 
 type PaymentWithRelations = Prisma.PaymentGetPayload<{ include: typeof paymentInclude }>;
+type PaymentOrder = {
+  bookingOrderId: string;
+  bookingStatus: BookingStatus;
+  paymentStatus: PaymentStatus;
+  holdExpiresAt: Date | null;
+  totalAmount: Prisma.Decimal;
+  items: Array<{
+    bookingItemId: string;
+    bookingStatus: BookingStatus;
+  }>;
+};
+const terminalPaymentStatuses: PaymentStatus[] = [
+  PaymentStatus.SUCCESS,
+  PaymentStatus.FAILED,
+  PaymentStatus.CANCELLED,
+  PaymentStatus.EXPIRED
+];
+const waitingPaymentItemStatuses: BookingStatus[] = [
+  BookingStatus.PENDING_PAYMENT,
+  BookingStatus.PAYMENT_PROCESSING
+];
 
 function decimalToNumber(value: Prisma.Decimal): number {
   return Number(value.toString());
@@ -61,24 +89,35 @@ function toPaymentDto(payment: PaymentWithRelations, paymentUrl?: string) {
       fullName: payment.user.fullName,
       email: payment.user.email
     },
-    booking: {
-      id: payment.booking.bookingId,
-      bookingCode: payment.booking.bookingCode,
-      bookingStatus: payment.booking.bookingStatus,
-      paymentStatus: payment.booking.paymentStatus,
-      startDatetime: payment.booking.startDatetime,
-      endDatetime: payment.booking.endDatetime,
-      totalAmount: decimalToNumber(payment.booking.totalAmount),
-      holdExpiresAt: payment.booking.holdExpiresAt,
-      court: {
-        id: payment.booking.court.courtId,
-        courtName: payment.booking.court.courtName,
-        location: payment.booking.court.location,
-        courtType: {
-          id: payment.booking.court.courtType.courtTypeId,
-          typeName: payment.booking.court.courtType.typeName
+    bookingOrder: {
+      id: payment.bookingOrder.bookingOrderId,
+      bookingOrderId: payment.bookingOrder.bookingOrderId,
+      bookingCode: payment.bookingOrder.bookingCode,
+      bookingStatus: payment.bookingOrder.bookingStatus,
+      paymentStatus: payment.bookingOrder.paymentStatus,
+      totalAmount: decimalToNumber(payment.bookingOrder.totalAmount),
+      holdExpiresAt: payment.bookingOrder.holdExpiresAt,
+      user: {
+        id: payment.bookingOrder.user.userId,
+        fullName: payment.bookingOrder.user.fullName,
+        email: payment.bookingOrder.user.email
+      },
+      items: payment.bookingOrder.items.map((item) => ({
+        id: item.bookingItemId,
+        bookingItemId: item.bookingItemId,
+        startDatetime: item.startDatetime,
+        endDatetime: item.endDatetime,
+        amount: decimalToNumber(item.amount),
+        bookingStatus: item.bookingStatus,
+        court: {
+          id: item.court.courtId,
+          courtName: item.court.courtName,
+          courtType: {
+            id: item.court.courtType.courtTypeId,
+            typeName: item.court.courtType.typeName
+          }
         }
-      }
+      }))
     }
   };
 }
@@ -88,14 +127,7 @@ function isAdmin(roles: string[]): boolean {
 }
 
 function isTerminalStatus(status: PaymentStatus): boolean {
-  const terminalStatuses: PaymentStatus[] = [
-    PaymentStatus.SUCCESS,
-    PaymentStatus.FAILED,
-    PaymentStatus.CANCELLED,
-    PaymentStatus.EXPIRED
-  ];
-
-  return terminalStatuses.includes(status);
+  return terminalPaymentStatuses.includes(status);
 }
 
 function paymentUrlForGatewayTransaction(gatewayTransactionId: string | null): string | undefined {
@@ -128,15 +160,15 @@ export class PaymentsService {
     private readonly nowProvider: () => Date = () => new Date()
   ) {}
 
-  async createPaymentForBooking(userId: string, bookingId: string, input: CreatePaymentInput) {
+  async createPaymentForBooking(userId: string, bookingOrderId: string, input: CreatePaymentInput) {
     const now = this.nowProvider();
 
     try {
       const result = await this.db.$transaction(
         async (tx) => {
-          const booking = await tx.booking.findFirst({
+          const order = await tx.bookingOrder.findFirst({
             where: {
-              bookingId,
+              bookingOrderId,
               userId
             },
             include: {
@@ -149,17 +181,23 @@ export class PaymentsService {
                 orderBy: {
                   createdAt: "desc"
                 }
+              },
+              items: {
+                select: {
+                  bookingItemId: true,
+                  bookingStatus: true
+                }
               }
             }
           });
 
-          if (!booking) {
-            throw new AppError(404, "Booking not found", "BOOKING_NOT_FOUND");
+          if (!order) {
+            throw new AppError(404, "Booking order not found", "BOOKING_NOT_FOUND");
           }
 
-          this.assertBookingCanCreatePayment(booking, input.amount, now);
+          this.assertOrderCanCreatePayment(order, input.amount, now);
 
-          const existingPayment = booking.payments[0];
+          const existingPayment = order.payments[0];
           if (existingPayment) {
             return {
               paymentId: existingPayment.paymentId,
@@ -170,9 +208,9 @@ export class PaymentsService {
           const gatewayTransaction = this.gateway.createTransaction();
           const payment = await tx.payment.create({
             data: {
-              bookingId: booking.bookingId,
+              bookingOrderId: order.bookingOrderId,
               userId,
-              amount: booking.totalAmount,
+              amount: order.totalAmount,
               paymentMethod: "MOCK",
               gatewayTransactionId: gatewayTransaction.gatewayTransactionId,
               paymentStatus: PaymentStatus.PROCESSING
@@ -182,26 +220,48 @@ export class PaymentsService {
             }
           });
 
-          if (booking.bookingStatus === BookingStatus.PENDING_PAYMENT) {
-            await tx.booking.update({
-              where: { bookingId: booking.bookingId },
+          if (order.bookingStatus === BookingStatus.PENDING_PAYMENT) {
+            await tx.bookingOrder.update({
+              where: { bookingOrderId: order.bookingOrderId },
               data: {
                 bookingStatus: BookingStatus.PAYMENT_PROCESSING,
                 paymentStatus: PaymentStatus.PROCESSING
               }
             });
+            await tx.bookingItem.updateMany({
+              where: {
+                bookingOrderId: order.bookingOrderId,
+                bookingStatus: BookingStatus.PENDING_PAYMENT
+              },
+              data: {
+                bookingStatus: BookingStatus.PAYMENT_PROCESSING
+              }
+            });
 
-            await this.state.recordStatusHistory(tx, {
-              bookingId: booking.bookingId,
+            await this.state.recordOrderStatusHistory(tx, {
+              bookingOrderId: order.bookingOrderId,
               oldStatus: BookingStatus.PENDING_PAYMENT,
               newStatus: BookingStatus.PAYMENT_PROCESSING,
               actionType: "USER_CREATE_PAYMENT",
               actionByUserId: userId,
-              note: "Tạo thanh toán mock, chờ callback"
+              note: "Mock payment created, waiting for callback"
             });
+
+            for (const item of order.items.filter(
+              (bookingItem) => bookingItem.bookingStatus === BookingStatus.PENDING_PAYMENT
+            )) {
+              await this.state.recordItemStatusHistory(tx, {
+                bookingItemId: item.bookingItemId,
+                oldStatus: BookingStatus.PENDING_PAYMENT,
+                newStatus: BookingStatus.PAYMENT_PROCESSING,
+                actionType: "USER_CREATE_PAYMENT",
+                actionByUserId: userId,
+                note: "Mock payment created, waiting for callback"
+              });
+            }
           } else {
-            await tx.booking.update({
-              where: { bookingId: booking.bookingId },
+            await tx.bookingOrder.update({
+              where: { bookingOrderId: order.bookingOrderId },
               data: {
                 paymentStatus: PaymentStatus.PROCESSING
               }
@@ -240,7 +300,16 @@ export class PaymentsService {
               gatewayTransactionId: input.gatewayTransactionId
             },
             include: {
-              booking: true
+              bookingOrder: {
+                include: {
+                  items: {
+                    select: {
+                      bookingItemId: true,
+                      bookingStatus: true
+                    }
+                  }
+                }
+              }
             }
           });
 
@@ -261,7 +330,7 @@ export class PaymentsService {
           }
 
           if (input.status === PaymentStatus.SUCCESS) {
-            if (payment.booking.holdExpiresAt && payment.booking.holdExpiresAt <= now) {
+            if (payment.bookingOrder.holdExpiresAt && payment.bookingOrder.holdExpiresAt <= now) {
               await tx.payment.update({
                 where: { paymentId: payment.paymentId },
                 data: {
@@ -270,7 +339,7 @@ export class PaymentsService {
                   paidAt: null
                 }
               });
-              await this.expireBookingIfStillWaiting(tx, payment.booking, now);
+              await this.expireOrderIfStillWaiting(tx, payment.bookingOrder, now);
 
               return payment.paymentId;
             }
@@ -285,25 +354,48 @@ export class PaymentsService {
             });
 
             if (
-              payment.booking.bookingStatus === BookingStatus.PENDING_PAYMENT ||
-              payment.booking.bookingStatus === BookingStatus.PAYMENT_PROCESSING
+              payment.bookingOrder.bookingStatus === BookingStatus.PENDING_PAYMENT ||
+              payment.bookingOrder.bookingStatus === BookingStatus.PAYMENT_PROCESSING
             ) {
-              await tx.booking.update({
-                where: { bookingId: payment.bookingId },
+              await tx.bookingOrder.update({
+                where: { bookingOrderId: payment.bookingOrderId },
                 data: {
                   bookingStatus: BookingStatus.CONFIRMED,
                   paymentStatus: PaymentStatus.SUCCESS,
                   holdExpiresAt: null
                 }
               });
+              await tx.bookingItem.updateMany({
+                where: {
+                  bookingOrderId: payment.bookingOrderId,
+                  bookingStatus: {
+                    in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAYMENT_PROCESSING]
+                  }
+                },
+                data: {
+                  bookingStatus: BookingStatus.CONFIRMED
+                }
+              });
 
-              await this.state.recordStatusHistory(tx, {
-                bookingId: payment.bookingId,
-                oldStatus: payment.booking.bookingStatus,
+              await this.state.recordOrderStatusHistory(tx, {
+                bookingOrderId: payment.bookingOrderId,
+                oldStatus: payment.bookingOrder.bookingStatus,
                 newStatus: BookingStatus.CONFIRMED,
                 actionType: "PAYMENT_SUCCESS_CONFIRM_BOOKING",
-                note: "Thanh toán thành công, booking được xác nhận"
+                note: "Thanh toan thanh cong, booking order duoc xac nhan"
               });
+
+              for (const item of payment.bookingOrder.items.filter((bookingItem) =>
+                waitingPaymentItemStatuses.includes(bookingItem.bookingStatus)
+              )) {
+                await this.state.recordItemStatusHistory(tx, {
+                  bookingItemId: item.bookingItemId,
+                  oldStatus: item.bookingStatus,
+                  newStatus: BookingStatus.CONFIRMED,
+                  actionType: "PAYMENT_SUCCESS_CONFIRM_BOOKING_ITEM",
+                  note: "Thanh toan thanh cong, booking item duoc xac nhan"
+                });
+              }
             }
 
             return payment.paymentId;
@@ -316,8 +408,8 @@ export class PaymentsService {
               rawCallback: input
             }
           });
-          await tx.booking.update({
-            where: { bookingId: payment.bookingId },
+          await tx.bookingOrder.update({
+            where: { bookingOrderId: payment.bookingOrderId },
             data: {
               paymentStatus: input.status
             }
@@ -325,9 +417,9 @@ export class PaymentsService {
 
           if (
             input.status === PaymentStatus.EXPIRED ||
-            (payment.booking.holdExpiresAt && payment.booking.holdExpiresAt <= now)
+            (payment.bookingOrder.holdExpiresAt && payment.bookingOrder.holdExpiresAt <= now)
           ) {
-            await this.expireBookingIfStillWaiting(tx, payment.booking, now);
+            await this.expireOrderIfStillWaiting(tx, payment.bookingOrder, now);
           }
 
           return payment.paymentId;
@@ -368,7 +460,7 @@ export class PaymentsService {
           : {}),
         ...(query.bookingCode
           ? {
-              booking: {
+              bookingOrder: {
                 bookingCode: {
                   contains: query.bookingCode,
                   mode: "insensitive"
@@ -397,53 +489,42 @@ export class PaymentsService {
     return payment;
   }
 
-  private assertBookingCanCreatePayment(
-    booking: {
-      bookingStatus: BookingStatus;
-      holdExpiresAt: Date | null;
-      totalAmount: Prisma.Decimal;
-    },
-    amount: number,
-    now: Date
-  ): void {
+  private assertOrderCanCreatePayment(order: PaymentOrder, amount: number, now: Date): void {
     if (
-      booking.bookingStatus !== BookingStatus.PENDING_PAYMENT &&
-      booking.bookingStatus !== BookingStatus.PAYMENT_PROCESSING
+      order.bookingStatus !== BookingStatus.PENDING_PAYMENT &&
+      order.bookingStatus !== BookingStatus.PAYMENT_PROCESSING
     ) {
       throw new AppError(
         409,
-        "Payment can only be created for pending-payment bookings",
+        "Payment can only be created for pending-payment booking orders",
         "BOOKING_NOT_PAYABLE"
       );
     }
 
-    if (!booking.holdExpiresAt || booking.holdExpiresAt <= now) {
+    if (!order.holdExpiresAt || order.holdExpiresAt <= now) {
       throw new AppError(409, "Booking payment hold has expired", "BOOKING_HOLD_EXPIRED");
     }
 
-    if (!new Prisma.Decimal(amount).equals(booking.totalAmount)) {
+    if (!new Prisma.Decimal(amount).equals(order.totalAmount)) {
       throw new AppError(400, "Payment amount must equal booking total amount", "PAYMENT_AMOUNT_MISMATCH");
     }
   }
 
-  private async expireBookingIfStillWaiting(
+  private async expireOrderIfStillWaiting(
     tx: Prisma.TransactionClient,
-    booking: {
-      bookingId: string;
-      bookingStatus: BookingStatus;
-    },
+    order: PaymentOrder,
     now: Date
   ): Promise<void> {
     if (
-      booking.bookingStatus !== BookingStatus.PENDING_PAYMENT &&
-      booking.bookingStatus !== BookingStatus.PAYMENT_PROCESSING
+      order.bookingStatus !== BookingStatus.PENDING_PAYMENT &&
+      order.bookingStatus !== BookingStatus.PAYMENT_PROCESSING
     ) {
       return;
     }
 
-    const updated = await tx.booking.updateMany({
+    const updatedOrder = await tx.bookingOrder.updateMany({
       where: {
-        bookingId: booking.bookingId,
+        bookingOrderId: order.bookingOrderId,
         bookingStatus: {
           in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAYMENT_PROCESSING]
         }
@@ -451,22 +532,45 @@ export class PaymentsService {
       data: {
         bookingStatus: BookingStatus.PAYMENT_EXPIRED,
         paymentStatus: PaymentStatus.EXPIRED,
-        refundable: false,
-        noRefundReason: "Payment callback arrived after hold expired"
+        refundable: false
       }
     });
 
-    if (updated.count === 0) {
+    if (updatedOrder.count === 0) {
       return;
     }
 
-    await this.state.recordStatusHistory(tx, {
-      bookingId: booking.bookingId,
-      oldStatus: booking.bookingStatus,
+    await tx.bookingItem.updateMany({
+      where: {
+        bookingOrderId: order.bookingOrderId,
+        bookingStatus: {
+          in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAYMENT_PROCESSING]
+        }
+      },
+      data: {
+        bookingStatus: BookingStatus.PAYMENT_EXPIRED
+      }
+    });
+
+    await this.state.recordOrderStatusHistory(tx, {
+      bookingOrderId: order.bookingOrderId,
+      oldStatus: order.bookingStatus,
       newStatus: BookingStatus.PAYMENT_EXPIRED,
       actionType: "PAYMENT_CALLBACK_EXPIRED_HOLD",
       note: `Payment callback processed after hold expired at ${now.toISOString()}`
     });
+
+    for (const item of order.items.filter((bookingItem) =>
+      waitingPaymentItemStatuses.includes(bookingItem.bookingStatus)
+    )) {
+      await this.state.recordItemStatusHistory(tx, {
+        bookingItemId: item.bookingItemId,
+        oldStatus: item.bookingStatus,
+        newStatus: BookingStatus.PAYMENT_EXPIRED,
+        actionType: "PAYMENT_CALLBACK_EXPIRED_HOLD",
+        note: `Payment callback processed after hold expired at ${now.toISOString()}`
+      });
+    }
   }
 }
 
