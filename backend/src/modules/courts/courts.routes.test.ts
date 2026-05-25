@@ -88,7 +88,7 @@ describe("courts routes", () => {
 
     const response = await request(app)
       .get("/api/courts")
-      .query({ keyword: "main", courtTypeId, status: "ACTIVE", location: "campus" })
+      .query({ keyword: "main", courtTypeId, status: "ACTIVE" })
       .set("Authorization", bearerToken(["USER"]));
 
     expect(response.status).toBe(200);
@@ -130,9 +130,7 @@ describe("courts routes", () => {
       .set("Authorization", bearerToken(["ADMIN"]))
       .send({
         courtTypeId,
-        courtName: "Main Field",
-        location: "North Campus",
-        capacity: 22
+        courtName: "Main Field"
       });
 
     expect(response.status).toBe(201);

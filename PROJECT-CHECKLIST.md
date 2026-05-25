@@ -203,10 +203,12 @@ court_types
 courts
 operating_hours
 pricing_rules
-bookings
+booking_orders
+booking_items
 payments
 refunds
-booking_status_histories
+booking_order_status_histories
+booking_item_status_histories
 court_status_histories
 violations
 notifications
@@ -379,10 +381,12 @@ Checklist:
 - [x] Tạo model `PricingRule` map bảng `pricing_rules`.
 - [x] Tạo model `BookingRule` map bảng `booking_rules`.
 - [x] Tạo model `PriorityPolicy` map bảng `priority_policies`.
-- [x] Tạo model `Booking` map bảng `bookings`.
+- [x] Tạo model `BookingOrder` map bảng `booking_orders`.
+- [x] Tạo model `BookingItem` map bảng `booking_items`.
 - [x] Tạo model `Payment` map bảng `payments`.
 - [x] Tạo model `Refund` map bảng `refunds`.
-- [x] Tạo model `BookingStatusHistory` map bảng `booking_status_histories`.
+- [x] Tạo model `BookingOrderStatusHistory` map bảng `booking_order_status_histories`.
+- [x] Tạo model `BookingItemStatusHistory` map bảng `booking_item_status_histories`.
 - [x] Tạo model `CourtStatusHistory` map bảng `court_status_histories`.
 - [x] Tạo model `Violation` map bảng `violations`.
 - [x] Tạo model `Notification` map bảng `notifications`.
@@ -548,7 +552,7 @@ Checklist:
 - [x] API `GET /api/courts/:id/availability?date=YYYY-MM-DD`.
 - [x] Lấy operating hours theo sân và thứ trong tuần.
 - [x] Sinh slot theo `slot_duration_minutes`.
-- [x] Lấy active bookings trong ngày.
+- [x] Lấy active booking items trong ngày.
 - [x] Đánh dấu slot unavailable nếu overlap.
 - [x] Đánh dấu slot đang hold nếu `PENDING_PAYMENT` còn hạn.
 - [x] Tính giá slot theo pricing rules.
@@ -569,30 +573,30 @@ Mục tiêu: tạo booking hold, validate nghiệp vụ, chống overlap.
 
 Checklist:
 
-- [ ] API `POST /api/bookings`.
-- [ ] API `GET /api/bookings/my`.
-- [ ] API `GET /api/bookings/:id`.
-- [ ] Validate user account active.
-- [ ] Validate booking permission not restricted.
-- [ ] Validate court active.
-- [ ] Validate operating hours.
-- [ ] Validate advance booking window.
-- [ ] Validate max duration.
-- [ ] Validate max bookings per day.
-- [ ] Validate participant count <= court capacity nếu áp dụng.
-- [ ] Validate overlap trong service layer.
-- [ ] Tạo booking trong transaction.
-- [ ] Ghi `booking_status_histories` khi tạo booking.
-- [ ] Bắt lỗi DB overlap constraint và trả message thân thiện.
-- [ ] API cancel by user.
-- [ ] Tạo refund nếu user cancel hợp lệ.
+- [x] API `POST /api/bookings`.
+- [x] API `GET /api/bookings/my`.
+- [x] API `GET /api/bookings/:id`.
+- [x] Validate user account active.
+- [x] Validate booking permission not restricted.
+- [x] Validate court active.
+- [x] Validate operating hours.
+- [x] Validate advance booking window.
+- [x] Validate max duration.
+- [x] Validate max bookings per day.
+- [x] Không dùng participant count/court capacity theo schema mới.
+- [x] Validate overlap trong service layer.
+- [x] Tạo booking trong transaction.
+- [x] Ghi `booking_order_status_histories` và `booking_item_status_histories` khi tạo booking.
+- [x] Bắt lỗi DB overlap constraint và trả message thân thiện.
+- [x] API cancel by user.
+- [x] Tạo refund nếu user cancel hợp lệ.
 
 Acceptance criteria:
 
-- [ ] User tạo được booking `PENDING_PAYMENT`.
-- [ ] Slot được hold đến `hold_expires_at`.
-- [ ] Không thể tạo 2 booking active overlap cùng sân.
-- [ ] User chỉ xem/sửa booking của chính mình trừ manager/admin.
+- [x] User tạo được booking `PENDING_PAYMENT`.
+- [x] Slot được hold đến `hold_expires_at`.
+- [x] Không thể tạo 2 booking active overlap cùng sân.
+- [x] User chỉ xem/sửa booking của chính mình trừ manager/admin.
 
 ---
 
@@ -602,24 +606,25 @@ Mục tiêu: thanh toán toàn bộ chi phí và confirm booking.
 
 Checklist:
 
-- [ ] API `POST /api/payments/create`.
-- [ ] API `POST /api/payments/callback/:provider`.
-- [ ] API `GET /api/payments/:id`.
-- [ ] Tạo payment record `INITIATED`.
-- [ ] Hỗ trợ payment sandbox/fake provider cho MVP.
-- [ ] Callback verify signature nếu dùng gateway thật.
-- [ ] Callback idempotent.
-- [ ] Payment success cập nhật booking `CONFIRMED` trong transaction.
-- [ ] Payment failed cập nhật payment `FAILED`.
-- [ ] Xử lý callback đến sau khi booking expired.
-- [ ] Ghi booking status history.
-- [ ] Gửi notification payment success/fail.
+- [x] API `POST /api/bookings/:id/payments`.
+- [x] API `POST /api/payments/callback/mock`.
+- [x] API `GET /api/payments/:id`.
+- [x] API `GET /api/admin/payments`.
+- [x] Tạo payment record `PROCESSING`.
+- [x] Hỗ trợ payment sandbox/fake provider cho MVP.
+- [x] Callback verify signature bằng `MOCK_PAYMENT_SECRET`.
+- [x] Callback idempotent.
+- [x] Payment success cập nhật booking `CONFIRMED` trong transaction.
+- [x] Payment failed cập nhật payment `FAILED`.
+- [x] Xử lý callback đến sau khi booking expired.
+- [x] Ghi booking status history.
+- [!] Gửi notification payment success/fail: hoãn đến module 6.16 Notifications.
 
 Acceptance criteria:
 
-- [ ] Thanh toán thành công thì booking thành `CONFIRMED`.
-- [ ] Callback gọi lại nhiều lần không làm sai dữ liệu.
-- [ ] Không confirm booking nếu hold đã hết hạn và không có logic đối soát hợp lệ.
+- [x] Thanh toán thành công thì booking thành `CONFIRMED`.
+- [x] Callback gọi lại nhiều lần không làm sai dữ liệu.
+- [x] Không confirm booking nếu hold đã hết hạn và không có logic đối soát hợp lệ.
 
 ---
 
@@ -629,21 +634,21 @@ Mục tiêu: tạo và xử lý hoàn tiền.
 
 Checklist:
 
-- [ ] Tạo refund khi user hủy đúng hạn.
-- [ ] Tạo refund khi manager/admin hủy do sân lỗi.
-- [ ] Không tạo refund cho no-show/check-in expired.
-- [ ] API admin list refunds.
-- [ ] API admin retry refund.
-- [ ] Refund phải liên kết `payment_id` bắt buộc.
-- [ ] Refund phải liên kết `booking_id`.
-- [ ] Ghi trạng thái refund.
-- [ ] Ghi audit log khi admin xử lý refund thủ công.
+- [x] Tạo refund khi user hủy đúng hạn.
+- [x] Tạo refund khi manager/admin hủy do sân lỗi.
+- [x] Không tạo refund cho no-show/check-in expired.
+- [x] API admin list refunds.
+- [x] API admin retry refund.
+- [x] Refund phải liên kết `payment_id` bắt buộc.
+- [x] Refund phải liên kết `booking_id`.
+- [x] Ghi trạng thái refund.
+- [x] Ghi audit log khi admin xử lý refund thủ công.
 
 Acceptance criteria:
 
-- [ ] Refund chỉ phát sinh từ payment thành công.
-- [ ] Refund policy đúng theo nguyên nhân hủy.
-- [ ] Có trạng thái để đối soát: `REQUESTED`, `PROCESSING`, `SUCCESS`, `FAILED`, `MANUAL_REVIEW`.
+- [x] Refund chỉ phát sinh từ payment thành công.
+- [x] Refund policy đúng theo nguyên nhân hủy.
+- [x] Có trạng thái để đối soát: `REQUESTED`, `PROCESSING`, `SUCCESS`, `FAILED`, `MANUAL_REVIEW`.
 
 ---
 
@@ -657,15 +662,15 @@ Checklist:
 - [ ] API `POST /api/manager/bookings/:id/check-in`.
 - [ ] API `POST /api/manager/bookings/:id/complete`.
 - [ ] API `POST /api/manager/bookings/:id/no-show`.
-- [ ] API `POST /api/manager/bookings/:id/cancel`.
+- [x] API `POST /api/manager/bookings/:id/cancel`.
 - [ ] Check-in chỉ cho booking `CONFIRMED` hoặc trạng thái hợp lệ theo spec.
 - [ ] Check-in ghi `checked_in_by_user_id`.
 - [ ] Complete chỉ cho booking `IN_USE`.
 - [ ] Complete ghi `completed_by_user_id`.
 - [ ] No-show không tạo refund.
 - [ ] No-show tạo violation nếu policy yêu cầu.
-- [ ] Manager cancel tạo refund 100% mặc định.
-- [ ] Mọi chuyển trạng thái ghi `booking_status_histories`.
+- [x] Manager cancel tạo refund 100% mặc định.
+- [ ] Mọi chuyển trạng thái ghi order/item status histories tương ứng.
 
 Acceptance criteria:
 
@@ -787,6 +792,39 @@ Acceptance criteria:
 
 - [ ] Admin xem được số liệu cơ bản.
 - [ ] Query không quá chậm với dataset mẫu.
+
+---
+
+### 6.18 Database refactor sync: BookingOrder/BookingItem
+
+Mục tiêu: đồng bộ backend theo thiết kế DB mới `booking_orders` + `booking_items`.
+
+Checklist:
+
+- [x] Thay Prisma model `Booking` bằng `BookingOrder` và `BookingItem`.
+- [x] Bỏ `location` và `capacity` khỏi `courts`.
+- [x] Bỏ `participantCount`, `usagePurpose`, `checkoutTime`, `noRefundReason` khỏi booking flow.
+- [x] Thêm `booking_order_status_histories` và `booking_item_status_histories`.
+- [x] Chuyển overlap/availability sang `booking_items`.
+- [x] Chuyển payment sang `booking_orders`.
+- [x] Chuyển refund sang `booking_orders` và optional `booking_items`.
+- [x] Chuyển violations sang optional `booking_item_id`.
+- [x] Chuyển notifications sang optional `booking_order_id` và `booking_item_id`.
+- [x] Giữ `waitlist_entries.expires_at`.
+- [x] Thêm migration SQL `no_overlapping_active_booking_items`.
+- [x] Cập nhật seed data tương thích schema mới.
+- [x] Cập nhật API contract.
+- [x] Re-verify auth/RBAC/courts/rules/availability/bookings/payments/refunds tests.
+
+Acceptance criteria:
+
+- [x] Single booking order với 1 item tạo được.
+- [x] Combo booking order nhiều item tạo được.
+- [x] Combo all-or-nothing khi 1 item conflict.
+- [x] Availability block slot theo `booking_items`.
+- [x] Payment success confirm order và items.
+- [x] Payment callback idempotent không tạo duplicate history.
+- [x] Refund gắn order và hỗ trợ optional item.
 
 ---
 
@@ -1030,24 +1068,25 @@ Acceptance criteria:
 
 ### 8.4 Booking APIs
 
-- [ ] `POST /api/bookings`
-- [ ] `GET /api/bookings/my`
-- [ ] `GET /api/bookings/:id`
-- [ ] `POST /api/bookings/:id/cancel`
+- [x] `POST /api/bookings`
+- [x] `GET /api/bookings/my`
+- [x] `GET /api/bookings/:id`
+- [x] `POST /api/bookings/:id/cancel`
 - [ ] `GET /api/manager/bookings/today`
 - [ ] `POST /api/manager/bookings/:id/check-in`
 - [ ] `POST /api/manager/bookings/:id/complete`
 - [ ] `POST /api/manager/bookings/:id/no-show`
-- [ ] `POST /api/manager/bookings/:id/cancel`
+- [x] `POST /api/manager/bookings/:id/cancel`
 
 ### 8.5 Payment & refund APIs
 
-- [ ] `POST /api/payments/create`
-- [ ] `POST /api/payments/callback/:provider`
-- [ ] `GET /api/payments/:id`
-- [ ] `GET /api/admin/payments`
-- [ ] `GET /api/admin/refunds`
-- [ ] `POST /api/admin/refunds/:id/retry`
+- [x] `POST /api/bookings/:id/payments`
+- [x] `POST /api/payments/callback/mock`
+- [x] `GET /api/payments/:id`
+- [x] `GET /api/admin/payments`
+- [x] `GET /api/admin/refunds`
+- [x] `GET /api/admin/refunds/:id`
+- [x] `POST /api/admin/refunds/:id/retry`
 
 ### 8.6 Admin config APIs
 
@@ -1075,25 +1114,25 @@ Acceptance criteria:
 ### 9.1 Unit tests
 
 - [x] Overlap detection.
-- [ ] Booking duration validation.
+- [x] Booking duration validation.
 - [x] Advance booking validation.
-- [ ] Cancel/refund eligibility.
+- [x] Cancel/refund eligibility.
 - [ ] Priority sorting.
 - [ ] Violation point calculation.
-- [ ] Payment callback idempotency logic.
+- [x] Payment callback idempotency logic.
 
 ### 9.2 Integration tests
 
 - [ ] Register/login flow.
-- [ ] Create booking hold.
-- [ ] Prevent double booking.
-- [ ] Payment success confirms booking.
+- [x] Create booking hold.
+- [x] Prevent double booking.
+- [x] Payment success confirms booking.
 - [ ] Expire pending payment booking.
 - [ ] Manager check-in.
 - [ ] Manager complete.
 - [ ] No-show creates violation.
-- [ ] User cancel creates refund when eligible.
-- [ ] Manager cancel creates refund.
+- [x] User cancel creates refund when eligible.
+- [x] Manager cancel creates refund.
 - [x] RBAC denies wrong role.
 
 ### 9.3 E2E tests
@@ -1130,8 +1169,8 @@ Acceptance criteria:
 
 - [ ] Booking hold.
 - [ ] Overlap prevention.
-- [ ] Payment sandbox.
-- [ ] Confirm booking after payment.
+- [x] Payment sandbox.
+- [x] Confirm booking after payment.
 - [ ] My bookings UI.
 - [ ] Booking detail UI.
 
@@ -1146,8 +1185,8 @@ Acceptance criteria:
 
 ### Sprint 4 — Refund, violation, jobs
 
-- [ ] User cancellation.
-- [ ] Refund module.
+- [x] User cancellation.
+- [x] Refund module.
 - [ ] Expire payment job.
 - [ ] Check-in expiration job.
 - [ ] Violation module.
@@ -1200,7 +1239,7 @@ Một module được coi là hoàn thành khi:
 - [ ] Không dùng enum role trong `users` làm source of truth nếu đã dùng `roles` + `user_roles`.
 - [ ] Không bỏ qua DB-level overlap protection.
 - [ ] Không tạo refund cho no-show/check-in expired.
-- [ ] Không cập nhật booking status mà không ghi `booking_status_histories`.
+- [ ] Không cập nhật booking order/item status mà không ghi history tương ứng.
 - [ ] Không thay đổi schema mà quên migration.
 - [ ] Không thay đổi API mà quên cập nhật frontend types.
 
@@ -1211,16 +1250,17 @@ Một module được coi là hoàn thành khi:
 | Module | Owner | Status | Notes |
 |---|---|---|---|
 | Backend foundation | Codex | DONE | Express + TypeScript foundation verified: build/typecheck/lint/test/health |
-| Database & Prisma | Codex | DONE | Schema/migration/seed verified; overlap constraint restored and checked in PostgreSQL |
+| Database & Prisma | Codex | DONE | Refactored to booking_orders/booking_items; booking_items overlap constraint verified in PostgreSQL |
 | Auth | Codex | DONE | Auth APIs/JWT/password hashing verified; DB manual flow pending local PostgreSQL |
 | RBAC & Users | Codex | DONE | Admin user/role APIs, RBAC tests, and audit logs implemented |
 | Courts & Court Types | Codex | DONE | Court type/court APIs, filters, status updates, and status history implemented |
 | Operating Hours & Pricing | Codex | DONE | Admin CRUD APIs implemented; booking-impact warnings deferred until booking/availability modules |
 | Booking Rules & Priority | Codex | DONE | Admin config APIs, audit logs, and shared rules repository implemented |
-| Availability | Codex | DONE | Hold-aware slot generation, conflict detection, pricing, and policy response implemented |
-| Booking |  | TODO |  |
-| Payment |  | TODO |  |
-| Refund |  | TODO |  |
+| Availability | Codex | DONE | Hold-aware slot generation now reads booking_items, conflict detection, pricing, and policy response implemented |
+| Booking | Codex | DONE | BookingOrder/BookingItem hold creation, combo all-or-nothing validation, user APIs, cancellation/refund request, and histories implemented |
+| Payment | Codex | DONE | Mock payment tied to booking_orders, callback idempotency, status query, admin list, and order/item confirmation implemented |
+| Refund | Codex | DONE | Mock refund processor tied to booking_orders with optional booking_items, admin APIs, retry audit logs, and manager/admin cancellation implemented |
+| DB refactor sync | Codex | DONE | Backend synced to new booking_orders/booking_items database design and re-verified |
 | Manager operations |  | TODO |  |
 | Jobs |  | TODO |  |
 | Waitlist |  | TODO |  |
