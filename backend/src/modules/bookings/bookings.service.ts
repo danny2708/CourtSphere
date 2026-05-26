@@ -4,6 +4,7 @@ import {
   BookingStatus,
   CourtStatus,
   EntityStatus,
+  NotificationType,
   PaymentStatus,
   Prisma,
   PrismaClient
@@ -16,8 +17,13 @@ import {
   bookingConflictService,
   type BookingConflictService
 } from "../availability/booking-conflict.service";
+import {
+  notificationsService,
+  type NotificationsService
+} from "../notifications/notifications.service";
 import { refundsService, type RefundsService } from "../refunds/refunds.service";
 import { RulesRepository, rulesRepository } from "../rules/rules.repository";
+import { violationsService, type ViolationsService } from "../violations/violations.service";
 import type {
   CancelBookingInput,
   CreateBookingInput,
@@ -287,8 +293,10 @@ export class BookingsService {
     private readonly state: BookingStateService = bookingStateService,
     private readonly rules: RulesRepository = rulesRepository,
     private readonly refunds: RefundsService = refundsService,
+    private readonly violations: ViolationsService = violationsService,
     private readonly nowProvider: () => Date = () => new Date(),
-    private readonly codeGenerator: (now: Date) => string = defaultBookingCode
+    private readonly codeGenerator: (now: Date) => string = defaultBookingCode,
+    private readonly notifications: NotificationsService = notificationsService
   ) {}
 
   async createBookingHold(userId: string, input: CreateBookingInput) {
@@ -385,7 +393,8 @@ export class BookingsService {
               }
             },
             select: {
-              bookingOrderId: true
+              bookingOrderId: true,
+              bookingCode: true
             }
           });
 
@@ -413,6 +422,14 @@ export class BookingsService {
               note: "Booking item hold created pending full payment"
             });
           }
+
+          await this.notifications.createBookingNotification(tx, {
+            userId,
+            bookingOrderId: createdOrder.bookingOrderId,
+            notificationType: NotificationType.BOOKING_CREATED,
+            title: "Booking hold created",
+            content: `Booking ${createdOrder.bookingCode} is pending full payment.`
+          });
 
           return this.getBookingOrderById(tx, createdOrder.bookingOrderId);
         },
@@ -510,12 +527,16 @@ export class BookingsService {
           if (currentOrder.bookingStatus === BookingStatus.PENDING_PAYMENT) {
             paymentStatus = PaymentStatus.CANCELLED;
           } else if (currentOrder.bookingStatus === BookingStatus.CONFIRMED) {
-            this.assertCancellationWindowOpen(earliestItemStart(currentOrder), policy.cancelBeforeHours, now);
+            const isOnTimeCancellation = this.isCancellationWindowOpen(
+              earliestItemStart(currentOrder),
+              policy.cancelBeforeHours,
+              now
+            );
             const successfulPayment = currentOrder.payments.find(
               (payment) => payment.paymentStatus === PaymentStatus.SUCCESS
             );
 
-            if (successfulPayment && policy.refundRateUserOnTime > 0) {
+            if (isOnTimeCancellation && successfulPayment && policy.refundRateUserOnTime > 0) {
               const refundResult = await this.refunds.createRefundForBooking(tx, {
                 bookingOrderId: currentOrder.bookingOrderId,
                 bookingStatus: currentOrder.bookingStatus,
@@ -526,6 +547,12 @@ export class BookingsService {
               });
 
               refundable = refundResult !== null;
+            } else if (!isOnTimeCancellation) {
+              await this.violations.createLateCancelViolationIfNeeded(tx, {
+                userId,
+                items: currentOrder.items,
+                reason: input.reason ?? null
+              });
             }
           } else {
             throw new AppError(
@@ -588,6 +615,14 @@ export class BookingsService {
               note: input.reason ?? null
             });
           }
+
+          await this.notifications.createBookingNotification(tx, {
+            userId,
+            bookingOrderId: currentOrder.bookingOrderId,
+            notificationType: NotificationType.BOOKING_CANCELLED,
+            title: "Booking cancelled",
+            content: `Booking ${currentOrder.bookingCode} was cancelled.`
+          });
 
           return this.getBookingOrderById(tx, updatedOrder.bookingOrderId);
         },
@@ -923,20 +958,14 @@ export class BookingsService {
     return selectedRule;
   }
 
-  private assertCancellationWindowOpen(
+  private isCancellationWindowOpen(
     startDatetime: Date,
     cancelBeforeHours: number,
     now: Date
-  ): void {
+  ): boolean {
     const latestCancellationTime = new Date(startDatetime.getTime() - cancelBeforeHours * 60 * 60_000);
 
-    if (now > latestCancellationTime) {
-      throw new AppError(
-        409,
-        "Booking order can no longer be cancelled by user",
-        "BOOKING_CANCEL_WINDOW_CLOSED"
-      );
-    }
+    return now <= latestCancellationTime;
   }
 }
 

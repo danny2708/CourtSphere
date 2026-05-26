@@ -1,4 +1,12 @@
-import { BookingStatus, CourtStatus, EntityStatus, PaymentStatus, Prisma, type PrismaClient } from "@prisma/client";
+import {
+  BookingStatus,
+  CourtStatus,
+  EntityStatus,
+  NotificationType,
+  PaymentStatus,
+  Prisma,
+  type PrismaClient
+} from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
 import { BookingStateService } from "../bookings/booking-state.service";
@@ -163,6 +171,10 @@ describe("PaymentsService", () => {
       },
       bookingItemStatusHistory: {
         create: vi.fn().mockResolvedValue({})
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
       }
     };
     const { service } = createService({ tx });
@@ -301,6 +313,10 @@ describe("PaymentsService", () => {
       },
       bookingItemStatusHistory: {
         create: vi.fn().mockResolvedValue({})
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
       }
     };
     const { service } = createService({
@@ -358,6 +374,15 @@ describe("PaymentsService", () => {
         data: expect.objectContaining({
           newStatus: BookingStatus.CONFIRMED,
           actionType: "PAYMENT_SUCCESS_CONFIRM_BOOKING_ITEM"
+        })
+      })
+    );
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          notificationType: NotificationType.PAYMENT_SUCCESS
         })
       })
     );
@@ -447,6 +472,10 @@ describe("PaymentsService", () => {
       },
       bookingOrderStatusHistory: {
         create: vi.fn()
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
       }
     };
     const { service } = createService({
@@ -479,6 +508,15 @@ describe("PaymentsService", () => {
     );
     expect(tx.bookingItem.updateMany).not.toHaveBeenCalled();
     expect(tx.bookingOrderStatusHistory.create).not.toHaveBeenCalled();
+    expect(tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingOrderId,
+          notificationType: NotificationType.SYSTEM
+        })
+      })
+    );
   });
 
   it("allows owner to get payment detail", async () => {

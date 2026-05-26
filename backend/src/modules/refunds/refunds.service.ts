@@ -1,6 +1,7 @@
 import {
   BookingStatus,
   PaymentStatus,
+  NotificationType,
   Prisma,
   PrismaClient,
   RefundStatus
@@ -9,6 +10,10 @@ import {
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../middlewares/error.middleware";
 import { bookingStateService, type BookingStateService } from "../bookings/booking-state.service";
+import {
+  notificationsService,
+  type NotificationsService
+} from "../notifications/notifications.service";
 import { RulesRepository } from "../rules/rules.repository";
 import {
   mockRefundGateway,
@@ -124,6 +129,7 @@ type RefundDbClient = PrismaClient | Prisma.TransactionClient;
 
 type PaymentForRefund = {
   paymentId: string;
+  userId: string;
   amount: Prisma.Decimal;
   paymentStatus: PaymentStatus;
 };
@@ -292,7 +298,8 @@ export class RefundsService {
     private readonly db: PrismaClient = prisma,
     private readonly gateway: MockRefundGateway = mockRefundGateway,
     private readonly state: BookingStateService = bookingStateService,
-    private readonly nowProvider: () => Date = () => new Date()
+    private readonly nowProvider: () => Date = () => new Date(),
+    private readonly notifications: NotificationsService = notificationsService
   ) {}
 
   calculateRefundAmount(paymentAmount: Prisma.Decimal, refundRate: number): Prisma.Decimal {
@@ -365,6 +372,15 @@ export class RefundsService {
       select: {
         refundId: true
       }
+    });
+
+    await this.notifications.createRefundNotification(tx, {
+      userId: input.payment.userId,
+      bookingOrderId: input.bookingOrderId,
+      bookingItemId: input.bookingItemId ?? null,
+      notificationType: NotificationType.REFUND_REQUESTED,
+      title: "Refund requested",
+      content: "A refund request has been created for your booking."
     });
 
     return {
@@ -500,7 +516,7 @@ export class RefundsService {
       gatewayRefundId?: string | null;
     }
   ): Promise<RefundWithRelations> {
-    return db.refund.update({
+    const refund = await db.refund.update({
       where: { refundId: input.refundId },
       data: {
         refundStatus: RefundStatus.SUCCESS,
@@ -510,6 +526,17 @@ export class RefundsService {
       },
       include: refundInclude
     });
+
+    await this.notifications.createRefundNotification(db, {
+      userId: refund.bookingOrder.user.userId,
+      bookingOrderId: refund.bookingOrderId,
+      bookingItemId: refund.bookingItemId,
+      notificationType: NotificationType.REFUND_SUCCESS,
+      title: "Refund successful",
+      content: "Your refund has been processed successfully."
+    });
+
+    return refund;
   }
 
   async markRefundFailed(
@@ -521,7 +548,7 @@ export class RefundsService {
       gatewayRefundId?: string | null;
     }
   ): Promise<RefundWithRelations> {
-    return db.refund.update({
+    const refund = await db.refund.update({
       where: { refundId: input.refundId },
       data: {
         refundStatus: input.refundStatus,
@@ -530,6 +557,17 @@ export class RefundsService {
       },
       include: refundInclude
     });
+
+    await this.notifications.createRefundNotification(db, {
+      userId: refund.bookingOrder.user.userId,
+      bookingOrderId: refund.bookingOrderId,
+      bookingItemId: refund.bookingItemId,
+      notificationType: NotificationType.REFUND_FAILED,
+      title: "Refund needs attention",
+      content: `Your refund status is ${input.refundStatus}.`
+    });
+
+    return refund;
   }
 
   async cancelBookingDueToCourtIssue(
@@ -638,6 +676,14 @@ export class RefundsService {
               refundId: refundResult?.refundId ?? null,
               refundCreated: refundResult?.created ?? false
             }
+          });
+
+          await this.notifications.createBookingNotification(tx, {
+            userId: currentOrder.userId,
+            bookingOrderId: currentOrder.bookingOrderId,
+            notificationType: NotificationType.BOOKING_CANCELLED,
+            title: "Booking cancelled by operator",
+            content: `Booking ${currentOrder.bookingCode} was cancelled: ${input.reason}`
           });
 
           return {

@@ -354,7 +354,11 @@ async function seedSystemSettings(adminUserId: string) {
     ["violation_threshold", "3", "Ngưỡng điểm vi phạm để hạn chế đặt sân"],
     ["booking_ban_days", "7", "Số ngày khóa quyền đặt sân"],
     ["refund_rate_user_on_time", "100", "Tỷ lệ hoàn tiền khi user hủy đúng hạn"],
-    ["refund_rate_manager_fault", "100", "Tỷ lệ hoàn tiền khi phía sân hủy"]
+    ["refund_rate_manager_fault", "100", "Tỷ lệ hoàn tiền khi phía sân hủy"],
+    ["waitlist_response_minutes", "10", "Số phút user được phản hồi sau khi được notify waitlist"],
+    ["no_show_penalty_points", "1", "Điểm phạt khi manager xác nhận no-show"],
+    ["late_cancellation_violation_enabled", "true", "Bật ghi vi phạm khi user hủy sát giờ"],
+    ["late_cancellation_penalty_points", "1", "Điểm phạt khi user hủy sát giờ"]
   ] as const;
 
   for (const [settingKey, settingValue, description] of settings) {

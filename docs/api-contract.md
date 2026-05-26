@@ -903,8 +903,9 @@ Request:
 Rules:
 
 - `PENDING_PAYMENT` can be cancelled without refund.
-- `CONFIRMED` can be cancelled only before `cancelBeforeHours`, calculated from the earliest item start time.
-- If a `CONFIRMED` order has a successful payment, the backend creates a whole-order `refunds` row with status `REQUESTED` using `refundRateUserOnTime`.
+- `CONFIRMED` can be cancelled by the owner.
+- If cancellation is before `cancelBeforeHours`, calculated from the earliest item start time, and the order has a successful payment, the backend creates a whole-order `refunds` row with status `REQUESTED` using `refundRateUserOnTime`.
+- If cancellation is after the configured window, the order is cancelled without refund. When `system_settings.late_cancellation_violation_enabled = true`, the backend records a `LATE_CANCEL` violation against the earliest confirmed booking item using `late_cancellation_penalty_points`.
 - `CHECKIN_EXPIRED` and `NO_SHOW` are not cancellable by user and do not create refunds.
 - Every cancellation writes `booking_order_status_histories` and item histories for changed items.
 
@@ -933,7 +934,6 @@ Common errors:
 
 - `BOOKING_NOT_FOUND`
 - `BOOKING_CANNOT_BE_CANCELLED`
-- `BOOKING_CANCEL_WINDOW_CLOSED`
 
 ## Payment APIs
 
@@ -1036,7 +1036,7 @@ Failed/cancelled behavior:
 - Payment status changes to the callback status.
 - Booking order is not confirmed.
 - If callback status is `EXPIRED` or the hold is already expired, order/items change to `PAYMENT_EXPIRED` and history is written.
-- Notifications are not emitted yet; this is deferred to the Notifications module.
+- The Notifications module emits `PAYMENT_SUCCESS`, `PAYMENT_EXPIRED`, or a `SYSTEM` notification for failed/cancelled mock payments.
 
 Common errors:
 
@@ -1273,6 +1273,901 @@ Common errors:
 - `BOOKING_NOT_FOUND`
 - `BOOKING_CANNOT_BE_CANCELLED_BY_MANAGER`
 
+## Manager Operations APIs
+
+These APIs operate at `booking_items` level. Users never self check-in. `FIELD_MANAGER` or `ADMIN` performs check-in, no-show confirmation, and in-use exception handling.
+
+### `GET /api/manager/bookings/today`
+
+Requires `Authorization: Bearer <accessToken>` and role `FIELD_MANAGER` or `ADMIN`.
+
+Lists booking items whose `startDatetime` is within the current UTC day.
+
+Optional query params:
+
+- `courtId`: exact court ID.
+- `status`: any `BookingStatus`.
+
+Response `200`:
+
+```json
+{
+  "bookingItems": [
+    {
+      "id": "uuid",
+      "bookingItemId": "uuid",
+      "bookingOrderId": "uuid",
+      "bookingCode": "BK-20260520-ABC123",
+      "court": {
+        "id": "uuid",
+        "courtName": "Main Field",
+        "status": "ACTIVE",
+        "courtType": {
+          "id": "uuid",
+          "typeName": "Football"
+        }
+      },
+      "user": {
+        "id": "uuid",
+        "fullName": "Nguyen Van A",
+        "email": "user@example.com"
+      },
+      "startDatetime": "2026-05-20T08:00:00.000Z",
+      "endDatetime": "2026-05-20T09:00:00.000Z",
+      "unitPrice": 50000,
+      "amount": 50000,
+      "itemStatus": "CONFIRMED",
+      "paymentStatus": "SUCCESS",
+      "checkinTime": null,
+      "checkedInByUserId": null,
+      "completedByUserId": null,
+      "noShowMarkedByUserId": null,
+      "managerNote": null
+    }
+  ]
+}
+```
+
+### `POST /api/manager/booking-items/:id/check-in`
+
+Requires `FIELD_MANAGER` or `ADMIN`.
+
+Checks in a paid, confirmed booking item.
+
+Rules:
+
+- `booking_items.booking_status` must be `CONFIRMED`.
+- Parent `booking_orders.payment_status` must be `SUCCESS`.
+- Check-in must be within the configured `lateCheckinMinutes` window around the item start time.
+- The item changes to `IN_USE`.
+- `checkinTime` and `checkedInByUserId` are set.
+- `booking_item_status_histories` is written.
+- If the parent order is `CONFIRMED`, it may move to `IN_USE`.
+
+Response `200`:
+
+```json
+{
+  "bookingItem": {
+    "id": "uuid",
+    "bookingItemId": "uuid",
+    "itemStatus": "IN_USE",
+    "checkinTime": "2026-05-20T08:00:00.000Z",
+    "checkedInByUserId": "uuid"
+  }
+}
+```
+
+Common errors:
+
+- `BOOKING_ITEM_NOT_FOUND`
+- `BOOKING_ITEM_CANNOT_CHECK_IN`
+- `BOOKING_ORDER_NOT_PAID`
+- `CHECKIN_TOO_EARLY`
+- `CHECKIN_WINDOW_EXPIRED`
+
+### `POST /api/manager/booking-items/:id/override-checkin`
+
+Requires `FIELD_MANAGER` or `ADMIN`.
+
+Allows a manager/admin to check in a `CHECKIN_EXPIRED` booking item as an exception.
+
+Request:
+
+```json
+{
+  "reason": "User arrived late but court is still available"
+}
+```
+
+Rules:
+
+- `reason` is required.
+- Item status must be `CHECKIN_EXPIRED`.
+- Parent order payment must be `SUCCESS`.
+- The item must not conflict with another active booking item.
+- Item changes to `IN_USE`.
+- Writes `booking_item_status_histories` and `audit_logs`.
+
+Common errors:
+
+- `BOOKING_ITEM_OVERRIDE_NOT_ALLOWED`
+- `BOOKING_ORDER_NOT_PAID`
+- `BOOKING_ITEM_CONFLICT`
+
+### `POST /api/manager/booking-items/:id/no-show`
+
+Requires `FIELD_MANAGER` or `ADMIN`.
+
+Confirms a `CHECKIN_EXPIRED` booking item as no-show.
+
+Request:
+
+```json
+{
+  "reason": "User did not arrive"
+}
+```
+
+Rules:
+
+- Item status must be `CHECKIN_EXPIRED`.
+- Item changes to `NO_SHOW`.
+- `noShowMarkedByUserId` is set.
+- Creates a `violations` row with `violationType = NO_SHOW` and `bookingItemId`.
+- Increments user violation points.
+- If points reach active `booking_rules.violationThreshold`, sets `bookingPermissionStatus = RESTRICTED` and `bookingLockedUntil` from `bookingBanDays`.
+- Does not create refunds.
+- Writes `booking_item_status_histories` and `audit_logs`.
+- No-show penalty points are read from `system_settings.no_show_penalty_points`, with service fallback `1` if the setting is missing.
+
+Response `200`:
+
+```json
+{
+  "bookingItem": {
+    "id": "uuid",
+    "bookingItemId": "uuid",
+    "itemStatus": "NO_SHOW"
+  },
+  "violation": {
+    "id": "uuid",
+    "violationType": "NO_SHOW",
+    "penaltyPoints": 1
+  }
+}
+```
+
+Common errors:
+
+- `BOOKING_ITEM_NO_SHOW_NOT_ALLOWED`
+
+### `POST /api/manager/booking-items/:id/override-complete`
+
+Requires `FIELD_MANAGER` or `ADMIN`.
+
+Manually completes an `IN_USE` booking item for an exception or early close. This is not the default completion flow; automatic completion is deferred to the Jobs module.
+
+Request:
+
+```json
+{
+  "reason": "Closed early due to facility incident"
+}
+```
+
+Rules:
+
+- `reason` is required.
+- Item status must be `IN_USE`.
+- Item changes to `COMPLETED`.
+- `completedByUserId` is set.
+- Writes `booking_item_status_histories` and `audit_logs`.
+- If all items on the parent order are `COMPLETED`, the order changes to `COMPLETED` and writes `booking_order_status_histories`.
+
+Common errors:
+
+- `BOOKING_ITEM_COMPLETE_NOT_ALLOWED`
+
+## Violation APIs
+
+Violation APIs manage policy violations recorded against users. A violation can optionally link to a `bookingItemId`; no-show and late cancellation violations are item-level because check-in and slot usage happen per booking item.
+
+### `GET /api/admin/violations`
+
+Requires `Authorization: Bearer <accessToken>` and role `ADMIN` or `FIELD_MANAGER`.
+
+Supports optional filters: `userId`, `violationType`, `isWaived`, `fromDate`, `toDate`, `bookingItemId`.
+
+Response `200`:
+
+```json
+{
+  "violations": [
+    {
+      "id": "uuid",
+      "violationId": "uuid",
+      "userId": "uuid",
+      "bookingItemId": "uuid",
+      "violationType": "NO_SHOW",
+      "penaltyPoints": 1,
+      "description": "User did not arrive",
+      "recordedByUserId": "uuid",
+      "isWaived": false,
+      "recordedAt": "2026-05-20T00:00:00.000Z",
+      "user": {
+        "id": "uuid",
+        "fullName": "Nguyen Van A",
+        "email": "user@example.com",
+        "bookingPermissionStatus": "RESTRICTED",
+        "bookingLockedUntil": "2026-05-27T00:00:00.000Z",
+        "violationPoints": 3
+      },
+      "bookingItem": {
+        "id": "uuid",
+        "bookingOrderId": "uuid",
+        "startDatetime": "2026-05-20T08:00:00.000Z",
+        "endDatetime": "2026-05-20T09:00:00.000Z",
+        "bookingStatus": "NO_SHOW",
+        "court": {
+          "id": "uuid",
+          "courtName": "Main Field"
+        },
+        "bookingOrder": {
+          "id": "uuid",
+          "bookingCode": "BK-20260520-ABC123",
+          "bookingStatus": "CONFIRMED",
+          "paymentStatus": "SUCCESS"
+        }
+      },
+      "recordedByUser": {
+        "id": "uuid",
+        "fullName": "Field Manager",
+        "email": "manager@example.com"
+      }
+    }
+  ]
+}
+```
+
+### `POST /api/admin/violations/:id/waive`
+
+Requires `ADMIN`.
+
+Waives an unwaived violation, subtracts its penalty points from the user, and writes `audit_logs` with action `WAIVE_VIOLATION`.
+
+Request:
+
+```json
+{
+  "reason": "Valid documented reason"
+}
+```
+
+Response `200`:
+
+```json
+{
+  "violation": {
+    "id": "uuid",
+    "isWaived": true,
+    "penaltyPoints": 1
+  }
+}
+```
+
+Common errors:
+
+- `VIOLATION_NOT_FOUND`
+- `VIOLATION_ALREADY_WAIVED`
+
+### `POST /api/admin/violations/:id/adjust-points`
+
+Requires `ADMIN`.
+
+Adjusts `penaltyPoints`, applies the delta to `users.violationPoints`, re-checks the active threshold, and writes `audit_logs` with action `ADJUST_VIOLATION_POINTS`. If the updated total reaches the threshold, the user is restricted and receives `BOOKING_PERMISSION_RESTRICTED`.
+
+Request:
+
+```json
+{
+  "penaltyPoints": 2,
+  "reason": "Severity adjusted after review"
+}
+```
+
+Validation:
+
+- `penaltyPoints` must be an integer greater than or equal to `0`.
+- `reason` is required.
+
+Response `200`:
+
+```json
+{
+  "violation": {
+    "id": "uuid",
+    "penaltyPoints": 2,
+    "isWaived": false
+  }
+}
+```
+
+Internal violation creation rules:
+
+- Manager no-show confirmation creates `NO_SHOW`, records `bookingItemId`, increments user points, and sends `VIOLATION_RECORDED`.
+- Late user cancellation creates `LATE_CANCEL` only when `late_cancellation_violation_enabled` is enabled.
+- Duplicate prevention uses `bookingItemId + violationType` for item-linked violations.
+
+## Waitlist APIs
+
+Waitlist APIs are in-app runtime behavior for users. Priority never steals a held or confirmed slot; it only orders who gets notified after a slot becomes free.
+
+Active waitlist statuses for duplicate detection are `WAITING` and `NOTIFIED`. `BOOKED`, `CANCELLED`, and `EXPIRED` are terminal/non-active for duplicate checks.
+
+### `POST /api/waitlist`
+
+Requires `Authorization: Bearer <accessToken>` and role `USER`.
+
+Request:
+
+```json
+{
+  "courtId": "uuid",
+  "startDatetime": "2026-05-21T08:00:00.000Z",
+  "endDatetime": "2026-05-21T09:00:00.000Z"
+}
+```
+
+Rules:
+
+- User must be active and not booking-restricted.
+- Court must exist and be `ACTIVE`.
+- Time must be in the future, inside active `operating_hours`, slot-aligned, and within priority advance booking days.
+- Priority policy must allow waitlist participation.
+- If the slot is available, returns `WAITLIST_SLOT_AVAILABLE`; users should book directly through `POST /api/bookings`.
+- Duplicate active waitlist entries for the same user/court/time range are rejected.
+- `priorityOrder` comes from active priority policy level, falling back to priority group level.
+
+Response `201`:
+
+```json
+{
+  "waitlistEntry": {
+    "waitlistEntryId": "uuid",
+    "court": {
+      "id": "uuid",
+      "courtName": "Main Field",
+      "status": "ACTIVE"
+    },
+    "desiredStartDatetime": "2026-05-21T08:00:00.000Z",
+    "desiredEndDatetime": "2026-05-21T09:00:00.000Z",
+    "priorityOrder": 2,
+    "status": "WAITING",
+    "registeredAt": "2026-05-20T00:00:00.000Z",
+    "notifiedAt": null,
+    "expiresAt": null
+  }
+}
+```
+
+Common errors:
+
+- `COURT_NOT_FOUND`
+- `COURT_NOT_AVAILABLE`
+- `BOOKING_PERMISSION_RESTRICTED`
+- `WAITLIST_NOT_ALLOWED`
+- `WAITLIST_SLOT_AVAILABLE`
+- `WAITLIST_ALREADY_EXISTS`
+
+### `GET /api/waitlist/my`
+
+Requires role `USER`.
+
+Returns waitlist entries owned by the authenticated user.
+
+Optional query params:
+
+- `status`: any `WaitlistStatus`.
+- `fromDate`: ISO datetime filter on `desiredStartDatetime`.
+- `toDate`: ISO datetime filter on `desiredStartDatetime`.
+
+### `DELETE /api/waitlist/:id`
+
+Requires role `USER`.
+
+Cancels the authenticated user's waitlist entry. The row is not deleted.
+
+Rules:
+
+- `WAITING` or `NOTIFIED` entries become `CANCELLED`.
+- Existing `CANCELLED` entries are returned idempotently.
+- `BOOKED` and `EXPIRED` entries cannot be cancelled.
+- Other users' entries are returned as not found.
+
+### `POST /api/waitlist/:id/book`
+
+Requires role `USER`.
+
+Creates a booking hold from a notified waitlist entry. This is the required waitlist confirmation flow; do not pass `waitlistEntryId` to `POST /api/bookings`.
+
+Rules:
+
+- Waitlist entry must belong to the authenticated user.
+- Waitlist entry status must be `NOTIFIED`.
+- `expiresAt` must still be in the future.
+- User and court must still be eligible.
+- The slot is checked again in the same transaction; priority does not bypass active `booking_items` overlap checks.
+- Waitlist entry becomes `BOOKED`.
+- Creates one `booking_orders` row and one `booking_items` row with status `PENDING_PAYMENT`.
+- `paymentStatus` is `INITIATED`; user must still pay 100% before booking becomes `CONFIRMED`.
+- Writes order and item status histories.
+- Emits `BOOKING_CREATED`.
+
+Response `201`:
+
+```json
+{
+  "booking": {
+    "bookingOrderId": "uuid",
+    "bookingCode": "BK-20260520-ABC123",
+    "orderStatus": "PENDING_PAYMENT",
+    "bookingStatus": "PENDING_PAYMENT",
+    "paymentStatus": "INITIATED",
+    "holdExpiresAt": "2026-05-20T00:10:00.000Z",
+    "totalAmount": 50000,
+    "items": [
+      {
+        "bookingItemId": "uuid",
+        "courtId": "uuid",
+        "startDatetime": "2026-05-21T08:00:00.000Z",
+        "endDatetime": "2026-05-21T09:00:00.000Z",
+        "itemStatus": "PENDING_PAYMENT",
+        "unitPrice": 50000,
+        "amount": 50000
+      }
+    ]
+  }
+}
+```
+
+Common errors:
+
+- `WAITLIST_ENTRY_NOT_FOUND`
+- `WAITLIST_ENTRY_NOT_NOTIFIED`
+- `WAITLIST_ENTRY_EXPIRED`
+- `WAITLIST_ENTRY_CANCELLED`
+- `WAITLIST_ENTRY_ALREADY_BOOKED`
+- `WAITLIST_SLOT_TAKEN`
+- `MAX_BOOKINGS_PER_DAY_REACHED`
+
+### Internal `notifyNextForSlot`
+
+Internal service function, not a public API.
+
+Behavior:
+
+- Confirms no active `booking_items` overlap exists.
+- Selects `WAITING` entries for the exact court/time range.
+- Sorts by `priorityOrder asc`, then `registeredAt asc`.
+- Updates one row from `WAITING` to `NOTIFIED` using a guarded update.
+- Sets `notifiedAt = now`.
+- Sets `expiresAt = now + waitlist_response_minutes`.
+- Emits `WAITLIST_NOTIFIED`.
+
+`waitlist_response_minutes` is read from `system_settings`; fallback is `10` minutes if absent or invalid.
+
+Current automatic integrations call this service after payment hold expiry and waitlist response expiry. User cancellation, manager/admin cancellation, and payment failure/expiry callbacks can call the same service after their item status transitions if realtime waitlist notification is required there.
+
+## Notification APIs
+
+Notifications are in-app only in the MVP. Email, SMS, and push delivery are not integrated yet. Notification records can link to a `bookingOrderId` and optionally a `bookingItemId`.
+
+Supported notification types:
+
+- `BOOKING_CREATED`
+- `PAYMENT_SUCCESS`
+- `PAYMENT_EXPIRED`
+- `BOOKING_CANCELLED`
+- `REFUND_REQUESTED`
+- `REFUND_SUCCESS`
+- `REFUND_FAILED`
+- `CHECKIN_EXPIRED`
+- `NO_SHOW`
+- `VIOLATION_RECORDED`
+- `BOOKING_PERMISSION_RESTRICTED`
+- `WAITLIST_NOTIFIED`
+- `WAITLIST_EXPIRED`
+- `SYSTEM`
+
+### `GET /api/notifications`
+
+Requires `Authorization: Bearer <accessToken>`.
+
+Lists notifications owned by the authenticated user.
+
+Optional query params:
+
+- `isRead`: `true` or `false`.
+- `type`: any supported `NotificationType`.
+- `page`: defaults to `1`.
+- `limit`: defaults to `20`, max `100`.
+
+Response `200`:
+
+```json
+{
+  "notifications": [
+    {
+      "id": "uuid",
+      "notificationId": "uuid",
+      "title": "Payment successful",
+      "content": "Payment for booking BK-20260520-ABC123 succeeded.",
+      "notificationType": "PAYMENT_SUCCESS",
+      "channel": "IN_APP",
+      "isRead": false,
+      "bookingOrderId": "uuid",
+      "bookingItemId": null,
+      "createdAt": "2026-05-20T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+### `GET /api/notifications/unread-count`
+
+Requires `Authorization: Bearer <accessToken>`.
+
+Response `200`:
+
+```json
+{
+  "count": 3
+}
+```
+
+### `PATCH /api/notifications/:id/read`
+
+Requires `Authorization: Bearer <accessToken>`. Only the notification owner can mark it as read.
+
+Response `200`:
+
+```json
+{
+  "notification": {
+    "id": "uuid",
+    "notificationId": "uuid",
+    "isRead": true
+  }
+}
+```
+
+Common errors:
+
+- `NOTIFICATION_NOT_FOUND`
+
+### `PATCH /api/notifications/read-all`
+
+Requires `Authorization: Bearer <accessToken>`.
+
+Marks all unread notifications for the authenticated user as read.
+
+Response `200`:
+
+```json
+{
+  "updatedCount": 2
+}
+```
+
+Lifecycle integrations:
+
+- Booking hold creation emits `BOOKING_CREATED`.
+- User, manager, or admin cancellation emits `BOOKING_CANCELLED`.
+- Payment success emits `PAYMENT_SUCCESS`.
+- Expired payment hold emits `PAYMENT_EXPIRED`.
+- Refund request emits `REFUND_REQUESTED`.
+- Refund success emits `REFUND_SUCCESS`.
+- Refund failed or manual review emits `REFUND_FAILED`.
+- Check-in expiry emits `CHECKIN_EXPIRED`.
+- No-show confirmation emits `NO_SHOW`.
+- No-show violation emits `VIOLATION_RECORDED`.
+- Automatic booking permission restriction emits `BOOKING_PERMISSION_RESTRICTED`.
+- Waitlist slot notification emits `WAITLIST_NOTIFIED`.
+- Waitlist response expiry emits `WAITLIST_EXPIRED`.
+- Booking from waitlist emits `BOOKING_CREATED` and still requires payment.
+
+Duplicate handling:
+
+- Jobs create notifications only after a real state transition succeeds.
+- `NotificationService` also deduplicates by user, type, order, item, title, and content before creating a row.
+
+## System Internal Jobs
+
+System jobs are internal backend operations, not public APIs. The MVP does not start a background cron process by default. A scheduler can call the runner, or a developer can run:
+
+```text
+npm run jobs:run-once
+```
+
+The runner executes jobs in this order with a default batch size of `100` records per job.
+
+### Expire Payment Holds
+
+Job name: `expire-payment-holds`.
+
+Rules:
+
+- Finds `booking_orders` with status `PENDING_PAYMENT` or `PAYMENT_PROCESSING`.
+- `holdExpiresAt < now`.
+- No related `payments` row has `paymentStatus = SUCCESS`.
+- Changes the order to `PAYMENT_EXPIRED`.
+- Changes pending/payment-processing `booking_items` on the order to `PAYMENT_EXPIRED`.
+- Changes `INITIATED` or `PROCESSING` payments to `EXPIRED`.
+- Writes `booking_order_status_histories` and `booking_item_status_histories`.
+- Creates an in-app `PAYMENT_EXPIRED` notification for the order owner.
+- Calls waitlist `notifyNextForSlot` for each expired booking item after the slot is released.
+
+Idempotency:
+
+- The job updates only rows still in eligible statuses.
+- Histories are written only after `updateMany.count > 0`.
+- Re-running the job does not create duplicate histories for already expired records.
+
+### Expire Check-In
+
+Job name: `expire-checkin`.
+
+Rules:
+
+- Reads `lateCheckinMinutes` from active booking rules.
+- Finds `booking_items` with status `CONFIRMED`, no `checkinTime`, parent order `paymentStatus = SUCCESS`, and `now > startDatetime + lateCheckinMinutes`.
+- Changes the item to `CHECKIN_EXPIRED`.
+- Writes `booking_item_status_histories` with `actionType = AUTO_EXPIRE_CHECKIN`.
+- Creates an in-app `CHECKIN_EXPIRED` notification for the order owner.
+- Does not create refund.
+- Does not create no-show violation; manager/admin confirms `NO_SHOW` later.
+
+### Auto Complete Booking Items
+
+Job name: `auto-complete-booking-items`.
+
+Rules:
+
+- Finds `booking_items` with status `IN_USE` and `now >= endDatetime`.
+- Changes the item to `COMPLETED`.
+- Sets `completedByUserId = null` because the system completed the item.
+- Writes `booking_item_status_histories` with `actionType = AUTO_COMPLETE_BOOKING_ITEM`.
+- Recomputes the parent order. If all items are `COMPLETED`, the order changes to `COMPLETED` and writes `booking_order_status_histories`.
+
+### Expire Waitlist Notifications
+
+Job name: `expire-waitlist-notifications`.
+
+Rules:
+
+- Finds `waitlist_entries` with status `NOTIFIED` and `expiresAt < now`.
+- Changes the entry to `EXPIRED`.
+- Creates a basic in-app `notifications` row with `notificationType = WAITLIST_EXPIRED`.
+- Writes an `audit_logs` record with `action = AUTO_EXPIRE_WAITLIST_ENTRY`.
+- Calls waitlist `notifyNextForSlot` for the same court/time range after the entry expires.
+
+## Reports APIs
+
+Reports are read-only admin APIs. All endpoints require `Authorization: Bearer <accessToken>` and role `ADMIN`.
+
+Default date range is the latest 30 days when `fromDate` and `toDate` are omitted. If only `toDate` is provided, `fromDate = toDate - 30 days`. If only `fromDate` is provided, `toDate = now`. `fromDate` must be earlier than or equal to `toDate`.
+
+Common query params:
+
+- `fromDate`: optional ISO datetime.
+- `toDate`: optional ISO datetime.
+- `groupBy`: `day` or `month` for grouped reports.
+
+### `GET /api/admin/reports/overview`
+
+Returns headline dashboard metrics.
+
+Formula:
+
+- `totalBookingOrders`: count `booking_orders.created_at` in range.
+- `totalBookingItems`: count `booking_items.start_datetime` in range.
+- `totalRevenue`: sum `payments.amount` where `paymentStatus = SUCCESS` and `paidAt` in range.
+- `totalRefundAmount`: sum `refunds.refundAmount` where `refundStatus = SUCCESS` and `processedAt` in range.
+- `totalCancelled`: count `booking_items` in range with `CANCELLED_BY_USER`, `CANCELLED_BY_MANAGER`, or `CANCELLED_BY_ADMIN`.
+- `totalNoShow`: count `booking_items` in range with `NO_SHOW`.
+- `totalUsers`: count users created up to `toDate`.
+- `activeCourts`: count courts with `status = ACTIVE`.
+- `waitlistCount`: count `waitlist_entries.registered_at` in range.
+- `violationCount`: count `violations.recorded_at` in range.
+
+Response `200`:
+
+```json
+{
+  "overview": {
+    "dateRange": {
+      "fromDate": "2026-05-01T00:00:00.000Z",
+      "toDate": "2026-05-31T23:59:59.999Z"
+    },
+    "totalBookingOrders": 10,
+    "totalBookingItems": 14,
+    "totalRevenue": 700000,
+    "totalRefundAmount": 50000,
+    "totalCancelled": 2,
+    "totalNoShow": 1,
+    "totalUsers": 42,
+    "activeCourts": 6,
+    "waitlistCount": 3,
+    "violationCount": 4
+  }
+}
+```
+
+### `GET /api/admin/reports/bookings`
+
+Query params:
+
+- `fromDate`, `toDate`.
+- `groupBy`: `day` or `month`, defaults to `day`.
+
+Counts booking orders by `booking_orders.created_at` and booking items by `booking_items.start_datetime`.
+
+Response `200`:
+
+```json
+{
+  "report": {
+    "groupBy": "day",
+    "buckets": [
+      {
+        "period": "2026-05-20",
+        "bookingOrdersCount": 4,
+        "bookingItemsCount": 6
+      }
+    ]
+  }
+}
+```
+
+### `GET /api/admin/reports/revenue`
+
+Query params:
+
+- `fromDate`, `toDate`.
+- `groupBy`: `day` or `month`, defaults to `day`.
+
+Formula:
+
+- `grossRevenue`: sum successful payment amount by `paidAt`.
+- `refundAmount`: sum successful refund amount by `processedAt`.
+- `netRevenue = grossRevenue - refundAmount`.
+
+Response `200`:
+
+```json
+{
+  "report": {
+    "groupBy": "month",
+    "buckets": [
+      {
+        "period": "2026-05",
+        "grossRevenue": 700000,
+        "refundAmount": 50000,
+        "netRevenue": 650000,
+        "successPaymentCount": 10,
+        "successRefundCount": 1
+      }
+    ],
+    "totals": {
+      "grossRevenue": 700000,
+      "refundAmount": 50000,
+      "netRevenue": 650000,
+      "successPaymentCount": 10,
+      "successRefundCount": 1
+    }
+  }
+}
+```
+
+### `GET /api/admin/reports/courts/usage`
+
+Returns courts sorted by `bookingItemCount desc`, then `totalBookedMinutes desc`.
+
+Formula:
+
+- `bookingItemCount`: all booking items with `startDatetime` in range.
+- `totalBookedMinutes`: duration for `CONFIRMED`, `IN_USE`, `COMPLETED`, and `NO_SHOW` items.
+- `completedCount`: count `COMPLETED`.
+- `noShowCount`: count `NO_SHOW`.
+- `cancelledCount`: count cancelled item statuses.
+
+Response `200`:
+
+```json
+{
+  "report": {
+    "courts": [
+      {
+        "courtId": "uuid",
+        "courtName": "Main Field",
+        "bookingItemCount": 8,
+        "totalBookedMinutes": 480,
+        "completedCount": 5,
+        "noShowCount": 1,
+        "cancelledCount": 2
+      }
+    ]
+  }
+}
+```
+
+### `GET /api/admin/reports/rates`
+
+Formula:
+
+- `cancellationRate = cancelledBookingItems / totalBookingItems * 100`.
+- `refundRate = successRefunds / successPayments * 100`.
+- `noShowRate = noShowBookingItems / totalBookingItems * 100`.
+- `paymentExpiredRate = paymentExpiredOrders / totalBookingOrders * 100`.
+- `waitlistExpiredRate = expiredWaitlistEntries / totalWaitlistEntries * 100`.
+
+Rates are percentages rounded to two decimals. Zero-denominator rates return `0`.
+
+Response `200`:
+
+```json
+{
+  "report": {
+    "cancellationRate": 20,
+    "refundRate": 25,
+    "noShowRate": 10,
+    "paymentExpiredRate": 5,
+    "waitlistExpiredRate": 12.5,
+    "counts": {
+      "totalBookingItems": 10,
+      "cancelledBookingItems": 2,
+      "noShowBookingItems": 1,
+      "totalBookingOrders": 20,
+      "paymentExpiredOrders": 1,
+      "successPayments": 4,
+      "successRefunds": 1,
+      "totalWaitlistEntries": 8,
+      "expiredWaitlistEntries": 1
+    }
+  }
+}
+```
+
+### `GET /api/admin/reports/violations`
+
+Query params:
+
+- `fromDate`, `toDate`.
+- `limit`: integer `1..100`, defaults to `10`.
+
+Groups non-waived violations by user, sorts by `totalPenaltyPoints desc`, then `violationCount desc`.
+
+Response `200`:
+
+```json
+{
+  "report": {
+    "users": [
+      {
+        "userId": "uuid",
+        "fullName": "Nguyen Van A",
+        "email": "user@example.com",
+        "violationCount": 2,
+        "totalPenaltyPoints": 4,
+        "currentViolationPoints": 4,
+        "bookingPermissionStatus": "RESTRICTED"
+      }
+    ]
+  }
+}
+```
+
 ## Database Contract Baseline
 
 The MVP database uses PostgreSQL through Prisma.
@@ -1320,14 +2215,19 @@ Booking invariants:
 - `refunds.payment_id` is required.
 - `refunds.booking_order_id` is required and `refunds.booking_item_id` is optional for partial refunds.
 - `violations.booking_item_id` is optional but relational.
+- `violations_booking_item_type_unique_idx` prevents duplicate item-linked violations for the same `booking_item_id` and `violation_type`.
 - `notifications.booking_order_id` and `notifications.booking_item_id` are optional but relational.
 - Booking order cancellation actor FK and booking item check-in/completion/no-show actor FKs are present.
 - PostgreSQL migration includes `no_overlapping_active_booking_items` on `booking_items` for active statuses: `PENDING_PAYMENT`, `PAYMENT_PROCESSING`, `CONFIRMED`, `IN_USE`.
 - `waitlist_entries.expires_at` exists for waitlist expiration.
+- `waitlist_entries_active_unique_idx` enforces duplicate prevention only for active waitlist statuses `WAITING` and `NOTIFIED`.
 
 Config tables:
 
 - `booking_rules` stores configurable hold/cancel/check-in/refund/violation defaults.
 - `priority_groups` stores unique `group_code`, rank, and advance-booking defaults.
 - `priority_policies` stores priority-level policy per priority group, including waitlist eligibility.
-- `system_settings` remains available for key-value settings needed by later modules.
+- `system_settings.waitlist_response_minutes` stores how long a notified waitlist entry can be claimed.
+- `system_settings.no_show_penalty_points` stores no-show violation points.
+- `system_settings.late_cancellation_violation_enabled` controls whether late user cancellation records a violation.
+- `system_settings.late_cancellation_penalty_points` stores late-cancellation violation points.

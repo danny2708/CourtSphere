@@ -77,10 +77,13 @@ enum NotificationType {
   BOOKING_CANCELLED
   REFUND_REQUESTED
   REFUND_SUCCESS
+  REFUND_FAILED
   CHECKIN_EXPIRED
   NO_SHOW
   VIOLATION_RECORDED
   BOOKING_PERMISSION_RESTRICTED
+  WAITLIST_NOTIFIED
+  WAITLIST_EXPIRED
   SYSTEM
 }
 
@@ -536,7 +539,6 @@ model WaitlistEntry {
   court         Court          @relation(fields: [courtId], references: [courtId])
   priorityGroup PriorityGroup? @relation(fields: [priorityGroupId], references: [priorityGroupId])
 
-  @@unique([userId, courtId, desiredStartDatetime, desiredEndDatetime])
   @@index([courtId, desiredStartDatetime, desiredEndDatetime])
   @@index([priorityGroupId])
   @@map("waitlist_entries")

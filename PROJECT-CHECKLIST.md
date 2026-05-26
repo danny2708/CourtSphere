@@ -618,7 +618,7 @@ Checklist:
 - [x] Payment failed cập nhật payment `FAILED`.
 - [x] Xử lý callback đến sau khi booking expired.
 - [x] Ghi booking status history.
-- [!] Gửi notification payment success/fail: hoãn đến module 6.16 Notifications.
+- [x] Gửi notification payment success/fail qua module 6.16 Notifications.
 
 Acceptance criteria:
 
@@ -658,26 +658,27 @@ Mục tiêu: vận hành sân hằng ngày.
 
 Checklist:
 
-- [ ] API `GET /api/manager/bookings/today`.
-- [ ] API `POST /api/manager/bookings/:id/check-in`.
-- [ ] API `POST /api/manager/bookings/:id/complete`.
-- [ ] API `POST /api/manager/bookings/:id/no-show`.
+- [x] API `GET /api/manager/bookings/today`.
+- [x] API `POST /api/manager/booking-items/:id/check-in`.
+- [x] API `POST /api/manager/booking-items/:id/override-checkin`.
+- [x] API `POST /api/manager/booking-items/:id/override-complete`.
+- [x] API `POST /api/manager/booking-items/:id/no-show`.
 - [x] API `POST /api/manager/bookings/:id/cancel`.
-- [ ] Check-in chỉ cho booking `CONFIRMED` hoặc trạng thái hợp lệ theo spec.
-- [ ] Check-in ghi `checked_in_by_user_id`.
-- [ ] Complete chỉ cho booking `IN_USE`.
-- [ ] Complete ghi `completed_by_user_id`.
-- [ ] No-show không tạo refund.
-- [ ] No-show tạo violation nếu policy yêu cầu.
+- [x] Check-in chỉ cho booking item `CONFIRMED` và order đã thanh toán `SUCCESS`.
+- [x] Check-in ghi `checked_in_by_user_id`.
+- [x] Complete exception chỉ cho booking item `IN_USE`.
+- [x] Complete ghi `completed_by_user_id`.
+- [x] No-show không tạo refund.
+- [x] No-show tạo violation nếu policy yêu cầu.
 - [x] Manager cancel tạo refund 100% mặc định.
-- [ ] Mọi chuyển trạng thái ghi order/item status histories tương ứng.
+- [x] Mọi chuyển trạng thái ghi order/item status histories tương ứng.
 
 Acceptance criteria:
 
-- [ ] Manager check-in được user tại sân.
-- [ ] User không tự check-in được.
-- [ ] Manager hoàn thành được buổi sử dụng.
-- [ ] Manager xác nhận no-show và tạo violation đúng.
+- [x] Manager check-in được user tại sân.
+- [x] User không tự check-in được.
+- [x] Manager xử lý hoàn thành ngoại lệ khi item đang `IN_USE`.
+- [x] Manager xác nhận no-show và tạo violation đúng.
 
 ---
 
@@ -687,19 +688,22 @@ Mục tiêu: xử lý tự động các nghiệp vụ theo thời gian.
 
 Checklist:
 
-- [ ] Job expire pending payment bookings chạy mỗi 1 phút.
-- [ ] Job chuyển booking quá giờ check-in.
-- [ ] Job gửi notification trước giờ sử dụng nếu cần.
-- [ ] Job notify waitlist khi slot được giải phóng.
-- [ ] Job phải idempotent.
-- [ ] Job ghi status history/audit log khi cập nhật trạng thái.
-- [ ] Có log lỗi và retry strategy cơ bản.
+- [x] Job expire pending payment bookings chạy qua runner nội bộ.
+- [x] Job chuyển booking item quá giờ check-in.
+- [x] Job tự hoàn thành booking item khi hết giờ sử dụng.
+- [x] Job expire waitlist notified entries quá `expires_at`.
+- [!] Job gửi reminder trước giờ sử dụng nếu cần: hoãn đến module reminder/scheduler sau.
+- [x] Job notify waitlist khi slot được giải phóng bởi payment hold expiry / waitlist response expiry.
+- [x] Job phải idempotent.
+- [x] Job ghi status history/audit log khi cập nhật trạng thái.
+- [x] Có runner `jobs:run-once` để scheduler gọi.
 
 Acceptance criteria:
 
-- [ ] Booking quá hạn thanh toán tự chuyển `PAYMENT_EXPIRED`.
-- [ ] Booking quá giờ check-in tự chuyển trạng thái đúng.
-- [ ] Không job nào update trùng gây sai dữ liệu.
+- [x] Booking quá hạn thanh toán tự chuyển `PAYMENT_EXPIRED`.
+- [x] Booking item quá giờ check-in tự chuyển `CHECKIN_EXPIRED`.
+- [x] Booking item `IN_USE` hết giờ tự chuyển `COMPLETED`.
+- [x] Không job nào update trùng gây sai dữ liệu.
 
 ---
 
@@ -709,20 +713,20 @@ Mục tiêu: cho phép user vào danh sách chờ khi slot đã kín.
 
 Checklist:
 
-- [ ] API join waitlist.
-- [ ] API leave waitlist.
-- [ ] API list my waitlist entries.
-- [ ] Không cho join trùng cùng court/time.
-- [ ] Sắp xếp theo priority group.
-- [ ] Sắp xếp theo registered_at.
-- [ ] Có thể tính điểm uy tín nếu áp dụng.
-- [ ] Notify user ưu tiên cao nhất khi slot available.
+- [x] API join waitlist.
+- [x] API leave waitlist.
+- [x] API list my waitlist entries.
+- [x] Không cho join trùng cùng court/time.
+- [x] Sắp xếp theo priority group.
+- [x] Sắp xếp theo registered_at.
+- [!] Có thể tính điểm uy tín nếu áp dụng: chưa áp dụng reputation scoring trong policy hiện tại.
+- [x] Notify user ưu tiên cao nhất khi slot available.
 
 Acceptance criteria:
 
-- [ ] User vào waitlist được.
-- [ ] Slot giải phóng thì user phù hợp được thông báo.
-- [ ] Priority chỉ ảnh hưởng thứ tự waitlist, không cướp slot active.
+- [x] User vào waitlist được.
+- [x] Slot giải phóng thì user phù hợp được thông báo.
+- [x] Priority chỉ ảnh hưởng thứ tự waitlist, không cướp slot active.
 
 ---
 
@@ -732,20 +736,20 @@ Mục tiêu: ghi nhận và xử lý điểm vi phạm.
 
 Checklist:
 
-- [ ] Tạo violation khi no-show.
-- [ ] Tạo violation khi late cancellation nếu policy yêu cầu.
-- [ ] API admin/manager list violations.
-- [ ] API admin waive violation.
-- [ ] API admin adjust violation points.
-- [ ] Cộng điểm vào user.
-- [ ] Kiểm tra threshold để khóa quyền đặt sân.
-- [ ] Ghi audit log khi admin can thiệp.
+- [x] Tạo violation khi no-show.
+- [x] Tạo violation khi late cancellation nếu policy yêu cầu.
+- [x] API admin/manager list violations.
+- [x] API admin waive violation.
+- [x] API admin adjust violation points.
+- [x] Cộng điểm vào user.
+- [x] Kiểm tra threshold để khóa quyền đặt sân.
+- [x] Ghi audit log khi admin can thiệp.
 
 Acceptance criteria:
 
-- [ ] No-show tạo violation đúng.
-- [ ] Vượt ngưỡng thì user bị restrict booking permission.
-- [ ] Admin có thể miễn/điều chỉnh vi phạm có lý do.
+- [x] No-show tạo violation đúng.
+- [x] Vượt ngưỡng thì user bị restrict booking permission.
+- [x] Admin có thể miễn/điều chỉnh vi phạm có lý do.
 
 ---
 
@@ -755,20 +759,20 @@ Mục tiêu: thông báo sự kiện quan trọng.
 
 Checklist:
 
-- [ ] API list my notifications.
-- [ ] API mark notification as read.
-- [ ] Tạo notification khi booking pending payment.
-- [ ] Tạo notification khi payment success/fail.
-- [ ] Tạo notification khi booking expired.
-- [ ] Tạo notification khi manager cancel.
-- [ ] Tạo notification khi refund status changed.
-- [ ] Tạo notification khi no-show/check-in expired.
-- [ ] Tạo notification khi booking permission restricted.
+- [x] API list my notifications.
+- [x] API mark notification as read.
+- [x] Tạo notification khi booking pending payment.
+- [x] Tạo notification khi payment success/fail.
+- [x] Tạo notification khi booking expired.
+- [x] Tạo notification khi manager cancel.
+- [x] Tạo notification khi refund status changed.
+- [x] Tạo notification khi no-show/check-in expired.
+- [x] Tạo notification khi booking permission restricted.
 
 Acceptance criteria:
 
-- [ ] User nhận được notification trong app.
-- [ ] Notification liên kết booking nếu có.
+- [x] User nhận được notification trong app.
+- [x] Notification liên kết booking nếu có.
 
 ---
 
@@ -778,20 +782,20 @@ Mục tiêu: báo cáo thống kê cho admin.
 
 Checklist:
 
-- [ ] API overview dashboard.
-- [ ] Báo cáo số lượt đặt theo ngày/tháng.
-- [ ] Báo cáo doanh thu từ payment success.
-- [ ] Báo cáo sân được sử dụng nhiều nhất.
-- [ ] Báo cáo tỷ lệ hủy.
-- [ ] Báo cáo tỷ lệ hoàn tiền.
-- [ ] Báo cáo tỷ lệ no-show.
-- [ ] Báo cáo user vi phạm nhiều.
-- [ ] Filter theo date range.
+- [x] API overview dashboard.
+- [x] Báo cáo số lượt đặt theo ngày/tháng.
+- [x] Báo cáo doanh thu từ payment success.
+- [x] Báo cáo sân được sử dụng nhiều nhất.
+- [x] Báo cáo tỷ lệ hủy.
+- [x] Báo cáo tỷ lệ hoàn tiền.
+- [x] Báo cáo tỷ lệ no-show.
+- [x] Báo cáo user vi phạm nhiều.
+- [x] Filter theo date range.
 
 Acceptance criteria:
 
-- [ ] Admin xem được số liệu cơ bản.
-- [ ] Query không quá chậm với dataset mẫu.
+- [x] Admin xem được số liệu cơ bản.
+- [x] Query không quá chậm với dataset mẫu.
 
 ---
 
@@ -1072,10 +1076,11 @@ Acceptance criteria:
 - [x] `GET /api/bookings/my`
 - [x] `GET /api/bookings/:id`
 - [x] `POST /api/bookings/:id/cancel`
-- [ ] `GET /api/manager/bookings/today`
-- [ ] `POST /api/manager/bookings/:id/check-in`
-- [ ] `POST /api/manager/bookings/:id/complete`
-- [ ] `POST /api/manager/bookings/:id/no-show`
+- [x] `GET /api/manager/bookings/today`
+- [x] `POST /api/manager/booking-items/:id/check-in`
+- [x] `POST /api/manager/booking-items/:id/override-checkin`
+- [x] `POST /api/manager/booking-items/:id/override-complete`
+- [x] `POST /api/manager/booking-items/:id/no-show`
 - [x] `POST /api/manager/bookings/:id/cancel`
 
 ### 8.5 Payment & refund APIs
@@ -1100,12 +1105,27 @@ Acceptance criteria:
 - [x] CRUD `/api/admin/operating-hours`
 - [x] CRUD `/api/admin/pricing-rules`
 
-### 8.7 Reports APIs
+### 8.7 Notification APIs
 
-- [ ] `GET /api/admin/reports/overview`
-- [ ] `GET /api/admin/reports/bookings`
-- [ ] `GET /api/admin/reports/revenue`
-- [ ] `GET /api/admin/reports/violations`
+- [x] `GET /api/notifications`
+- [x] `GET /api/notifications/unread-count`
+- [x] `PATCH /api/notifications/:id/read`
+- [x] `PATCH /api/notifications/read-all`
+
+### 8.8 Violation APIs
+
+- [x] `GET /api/admin/violations`
+- [x] `POST /api/admin/violations/:id/waive`
+- [x] `POST /api/admin/violations/:id/adjust-points`
+
+### 8.9 Reports APIs
+
+- [x] `GET /api/admin/reports/overview`
+- [x] `GET /api/admin/reports/bookings`
+- [x] `GET /api/admin/reports/revenue`
+- [x] `GET /api/admin/reports/courts/usage`
+- [x] `GET /api/admin/reports/rates`
+- [x] `GET /api/admin/reports/violations`
 
 ---
 
@@ -1118,7 +1138,7 @@ Acceptance criteria:
 - [x] Advance booking validation.
 - [x] Cancel/refund eligibility.
 - [ ] Priority sorting.
-- [ ] Violation point calculation.
+- [x] Violation point calculation.
 - [x] Payment callback idempotency logic.
 
 ### 9.2 Integration tests
@@ -1127,10 +1147,10 @@ Acceptance criteria:
 - [x] Create booking hold.
 - [x] Prevent double booking.
 - [x] Payment success confirms booking.
-- [ ] Expire pending payment booking.
-- [ ] Manager check-in.
-- [ ] Manager complete.
-- [ ] No-show creates violation.
+- [x] Expire pending payment booking.
+- [x] Manager check-in.
+- [x] Manager override complete exception.
+- [x] No-show creates violation.
 - [x] User cancel creates refund when eligible.
 - [x] Manager cancel creates refund.
 - [x] RBAC denies wrong role.
@@ -1187,8 +1207,8 @@ Acceptance criteria:
 
 - [x] User cancellation.
 - [x] Refund module.
-- [ ] Expire payment job.
-- [ ] Check-in expiration job.
+- [x] Expire payment job.
+- [x] Check-in expiration job.
 - [ ] Violation module.
 - [ ] Notifications.
 
@@ -1199,7 +1219,7 @@ Acceptance criteria:
 - [ ] Booking rules.
 - [ ] Priority groups.
 - [ ] Payment/refund management.
-- [ ] Reports dashboard.
+- [x] Reports dashboard.
 
 ### Sprint 6 — Polish & hardening
 
@@ -1261,12 +1281,12 @@ Một module được coi là hoàn thành khi:
 | Payment | Codex | DONE | Mock payment tied to booking_orders, callback idempotency, status query, admin list, and order/item confirmation implemented |
 | Refund | Codex | DONE | Mock refund processor tied to booking_orders with optional booking_items, admin APIs, retry audit logs, and manager/admin cancellation implemented |
 | DB refactor sync | Codex | DONE | Backend synced to new booking_orders/booking_items database design and re-verified |
-| Manager operations |  | TODO |  |
-| Jobs |  | TODO |  |
-| Waitlist |  | TODO |  |
-| Violations |  | TODO |  |
-| Notifications |  | TODO |  |
-| Reports |  | TODO |  |
+| Manager operations | Codex | DONE | Booking item schedule, manager/admin check-in, late override, no-show violation, and in-use exception close implemented |
+| Jobs | Codex | DONE | Internal run-once jobs for payment hold expiry, check-in expiry, auto-complete, waitlist expiry, idempotent updates, and histories verified |
+| Waitlist | Codex | DONE | Runtime waitlist APIs, active duplicate constraint, priority notification, book-from-waitlist flow, docs, and tests verified |
+| Violations | Codex | DONE | Admin/manager violation APIs, waive/adjust audit, shared violation service, late cancellation handling, and verification completed |
+| Notifications | Codex | DONE | In-app notification APIs/service, lifecycle integrations, enum migration, and tests verified |
+| Reports | Codex | DONE | Admin reports APIs, aggregate service, contract, tests, and verification completed |
 | Frontend foundation |  | TODO |  |
 | UI design system |  | TODO |  |
 | User pages |  | TODO |  |
