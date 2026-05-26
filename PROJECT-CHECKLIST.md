@@ -782,20 +782,20 @@ Mục tiêu: báo cáo thống kê cho admin.
 
 Checklist:
 
-- [ ] API overview dashboard.
-- [ ] Báo cáo số lượt đặt theo ngày/tháng.
-- [ ] Báo cáo doanh thu từ payment success.
-- [ ] Báo cáo sân được sử dụng nhiều nhất.
-- [ ] Báo cáo tỷ lệ hủy.
-- [ ] Báo cáo tỷ lệ hoàn tiền.
-- [ ] Báo cáo tỷ lệ no-show.
-- [ ] Báo cáo user vi phạm nhiều.
-- [ ] Filter theo date range.
+- [x] API overview dashboard.
+- [x] Báo cáo số lượt đặt theo ngày/tháng.
+- [x] Báo cáo doanh thu từ payment success.
+- [x] Báo cáo sân được sử dụng nhiều nhất.
+- [x] Báo cáo tỷ lệ hủy.
+- [x] Báo cáo tỷ lệ hoàn tiền.
+- [x] Báo cáo tỷ lệ no-show.
+- [x] Báo cáo user vi phạm nhiều.
+- [x] Filter theo date range.
 
 Acceptance criteria:
 
-- [ ] Admin xem được số liệu cơ bản.
-- [ ] Query không quá chậm với dataset mẫu.
+- [x] Admin xem được số liệu cơ bản.
+- [x] Query không quá chậm với dataset mẫu.
 
 ---
 
@@ -1120,10 +1120,12 @@ Acceptance criteria:
 
 ### 8.9 Reports APIs
 
-- [ ] `GET /api/admin/reports/overview`
-- [ ] `GET /api/admin/reports/bookings`
-- [ ] `GET /api/admin/reports/revenue`
-- [ ] `GET /api/admin/reports/violations`
+- [x] `GET /api/admin/reports/overview`
+- [x] `GET /api/admin/reports/bookings`
+- [x] `GET /api/admin/reports/revenue`
+- [x] `GET /api/admin/reports/courts/usage`
+- [x] `GET /api/admin/reports/rates`
+- [x] `GET /api/admin/reports/violations`
 
 ---
 
@@ -1217,7 +1219,7 @@ Acceptance criteria:
 - [ ] Booking rules.
 - [ ] Priority groups.
 - [ ] Payment/refund management.
-- [ ] Reports dashboard.
+- [x] Reports dashboard.
 
 ### Sprint 6 — Polish & hardening
 
@@ -1284,7 +1286,7 @@ Một module được coi là hoàn thành khi:
 | Waitlist | Codex | DONE | Runtime waitlist APIs, active duplicate constraint, priority notification, book-from-waitlist flow, docs, and tests verified |
 | Violations | Codex | DONE | Admin/manager violation APIs, waive/adjust audit, shared violation service, late cancellation handling, and verification completed |
 | Notifications | Codex | DONE | In-app notification APIs/service, lifecycle integrations, enum migration, and tests verified |
-| Reports |  | TODO |  |
+| Reports | Codex | DONE | Admin reports APIs, aggregate service, contract, tests, and verification completed |
 | Frontend foundation |  | TODO |  |
 | UI design system |  | TODO |  |
 | User pages |  | TODO |  |

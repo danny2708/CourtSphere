@@ -1952,6 +1952,222 @@ Rules:
 - Writes an `audit_logs` record with `action = AUTO_EXPIRE_WAITLIST_ENTRY`.
 - Calls waitlist `notifyNextForSlot` for the same court/time range after the entry expires.
 
+## Reports APIs
+
+Reports are read-only admin APIs. All endpoints require `Authorization: Bearer <accessToken>` and role `ADMIN`.
+
+Default date range is the latest 30 days when `fromDate` and `toDate` are omitted. If only `toDate` is provided, `fromDate = toDate - 30 days`. If only `fromDate` is provided, `toDate = now`. `fromDate` must be earlier than or equal to `toDate`.
+
+Common query params:
+
+- `fromDate`: optional ISO datetime.
+- `toDate`: optional ISO datetime.
+- `groupBy`: `day` or `month` for grouped reports.
+
+### `GET /api/admin/reports/overview`
+
+Returns headline dashboard metrics.
+
+Formula:
+
+- `totalBookingOrders`: count `booking_orders.created_at` in range.
+- `totalBookingItems`: count `booking_items.start_datetime` in range.
+- `totalRevenue`: sum `payments.amount` where `paymentStatus = SUCCESS` and `paidAt` in range.
+- `totalRefundAmount`: sum `refunds.refundAmount` where `refundStatus = SUCCESS` and `processedAt` in range.
+- `totalCancelled`: count `booking_items` in range with `CANCELLED_BY_USER`, `CANCELLED_BY_MANAGER`, or `CANCELLED_BY_ADMIN`.
+- `totalNoShow`: count `booking_items` in range with `NO_SHOW`.
+- `totalUsers`: count users created up to `toDate`.
+- `activeCourts`: count courts with `status = ACTIVE`.
+- `waitlistCount`: count `waitlist_entries.registered_at` in range.
+- `violationCount`: count `violations.recorded_at` in range.
+
+Response `200`:
+
+```json
+{
+  "overview": {
+    "dateRange": {
+      "fromDate": "2026-05-01T00:00:00.000Z",
+      "toDate": "2026-05-31T23:59:59.999Z"
+    },
+    "totalBookingOrders": 10,
+    "totalBookingItems": 14,
+    "totalRevenue": 700000,
+    "totalRefundAmount": 50000,
+    "totalCancelled": 2,
+    "totalNoShow": 1,
+    "totalUsers": 42,
+    "activeCourts": 6,
+    "waitlistCount": 3,
+    "violationCount": 4
+  }
+}
+```
+
+### `GET /api/admin/reports/bookings`
+
+Query params:
+
+- `fromDate`, `toDate`.
+- `groupBy`: `day` or `month`, defaults to `day`.
+
+Counts booking orders by `booking_orders.created_at` and booking items by `booking_items.start_datetime`.
+
+Response `200`:
+
+```json
+{
+  "report": {
+    "groupBy": "day",
+    "buckets": [
+      {
+        "period": "2026-05-20",
+        "bookingOrdersCount": 4,
+        "bookingItemsCount": 6
+      }
+    ]
+  }
+}
+```
+
+### `GET /api/admin/reports/revenue`
+
+Query params:
+
+- `fromDate`, `toDate`.
+- `groupBy`: `day` or `month`, defaults to `day`.
+
+Formula:
+
+- `grossRevenue`: sum successful payment amount by `paidAt`.
+- `refundAmount`: sum successful refund amount by `processedAt`.
+- `netRevenue = grossRevenue - refundAmount`.
+
+Response `200`:
+
+```json
+{
+  "report": {
+    "groupBy": "month",
+    "buckets": [
+      {
+        "period": "2026-05",
+        "grossRevenue": 700000,
+        "refundAmount": 50000,
+        "netRevenue": 650000,
+        "successPaymentCount": 10,
+        "successRefundCount": 1
+      }
+    ],
+    "totals": {
+      "grossRevenue": 700000,
+      "refundAmount": 50000,
+      "netRevenue": 650000,
+      "successPaymentCount": 10,
+      "successRefundCount": 1
+    }
+  }
+}
+```
+
+### `GET /api/admin/reports/courts/usage`
+
+Returns courts sorted by `bookingItemCount desc`, then `totalBookedMinutes desc`.
+
+Formula:
+
+- `bookingItemCount`: all booking items with `startDatetime` in range.
+- `totalBookedMinutes`: duration for `CONFIRMED`, `IN_USE`, `COMPLETED`, and `NO_SHOW` items.
+- `completedCount`: count `COMPLETED`.
+- `noShowCount`: count `NO_SHOW`.
+- `cancelledCount`: count cancelled item statuses.
+
+Response `200`:
+
+```json
+{
+  "report": {
+    "courts": [
+      {
+        "courtId": "uuid",
+        "courtName": "Main Field",
+        "bookingItemCount": 8,
+        "totalBookedMinutes": 480,
+        "completedCount": 5,
+        "noShowCount": 1,
+        "cancelledCount": 2
+      }
+    ]
+  }
+}
+```
+
+### `GET /api/admin/reports/rates`
+
+Formula:
+
+- `cancellationRate = cancelledBookingItems / totalBookingItems * 100`.
+- `refundRate = successRefunds / successPayments * 100`.
+- `noShowRate = noShowBookingItems / totalBookingItems * 100`.
+- `paymentExpiredRate = paymentExpiredOrders / totalBookingOrders * 100`.
+- `waitlistExpiredRate = expiredWaitlistEntries / totalWaitlistEntries * 100`.
+
+Rates are percentages rounded to two decimals. Zero-denominator rates return `0`.
+
+Response `200`:
+
+```json
+{
+  "report": {
+    "cancellationRate": 20,
+    "refundRate": 25,
+    "noShowRate": 10,
+    "paymentExpiredRate": 5,
+    "waitlistExpiredRate": 12.5,
+    "counts": {
+      "totalBookingItems": 10,
+      "cancelledBookingItems": 2,
+      "noShowBookingItems": 1,
+      "totalBookingOrders": 20,
+      "paymentExpiredOrders": 1,
+      "successPayments": 4,
+      "successRefunds": 1,
+      "totalWaitlistEntries": 8,
+      "expiredWaitlistEntries": 1
+    }
+  }
+}
+```
+
+### `GET /api/admin/reports/violations`
+
+Query params:
+
+- `fromDate`, `toDate`.
+- `limit`: integer `1..100`, defaults to `10`.
+
+Groups non-waived violations by user, sorts by `totalPenaltyPoints desc`, then `violationCount desc`.
+
+Response `200`:
+
+```json
+{
+  "report": {
+    "users": [
+      {
+        "userId": "uuid",
+        "fullName": "Nguyen Van A",
+        "email": "user@example.com",
+        "violationCount": 2,
+        "totalPenaltyPoints": 4,
+        "currentViolationPoints": 4,
+        "bookingPermissionStatus": "RESTRICTED"
+      }
+    ]
+  }
+}
+```
+
 ## Database Contract Baseline
 
 The MVP database uses PostgreSQL through Prisma.

@@ -11,6 +11,7 @@ import courtsRouter from "./modules/courts/courts.routes";
 import managerRouter from "./modules/manager/manager.routes";
 import notificationsRouter from "./modules/notifications/notifications.routes";
 import paymentsRouter from "./modules/payments/payments.routes";
+import reportsRouter from "./modules/reports/reports.routes";
 import refundsRouter from "./modules/refunds/refunds.routes";
 import rulesRouter from "./modules/rules/rules.routes";
 import usersRouter from "./modules/users/users.routes";
@@ -52,6 +53,7 @@ app.use("/api", managerRouter);
 app.use("/api/admin", rulesRouter);
 app.use("/api/admin", usersRouter);
 app.use("/api/admin", violationsRouter);
+app.use("/api/admin", reportsRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
