@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { RefundsService } from "../refunds/refunds.service";
 import { RulesRepository } from "../rules/rules.repository";
+import type { ViolationsService } from "../violations/violations.service";
 import { BookingsService } from "./bookings.service";
 
 const userId = "00000000-0000-4000-8000-000000000801";
@@ -256,7 +257,11 @@ function createTx(input: {
 
 function createService(
   tx: unknown,
-  overrides: { rules?: RulesRepository; refunds?: RefundsService } = {}
+  overrides: {
+    rules?: RulesRepository;
+    refunds?: RefundsService;
+    violations?: ViolationsService;
+  } = {}
 ) {
   return new BookingsService(
     {
@@ -266,6 +271,7 @@ function createService(
     undefined,
     overrides.rules,
     overrides.refunds,
+    overrides.violations,
     () => now,
     () => "BK-20260520-TEST01"
   );
@@ -543,49 +549,65 @@ describe("BookingsService", () => {
     );
   });
 
-  it("rejects confirmed user cancellation after the configured cancel window", async () => {
+  it("cancels confirmed booking after the cancel window without refund and records late-cancel violation", async () => {
+    const currentOrder = buildOrder({
+      bookingStatus: BookingStatus.CONFIRMED,
+      paymentStatus: PaymentStatus.SUCCESS,
+      user: buildUser(),
+      items: [
+        {
+          ...buildOrder().items[0],
+          startDatetime: new Date("2026-05-20T01:00:00.000Z"),
+          bookingStatus: BookingStatus.CONFIRMED
+        }
+      ],
+      payments: [
+        {
+          paymentId,
+          bookingOrderId,
+          userId,
+          amount: new Prisma.Decimal(100000),
+          paymentMethod: "MOCK",
+          gatewayTransactionId: "gw_1",
+          paymentStatus: PaymentStatus.SUCCESS,
+          rawCallback: null,
+          paidAt: new Date("2026-05-20T01:00:00.000Z"),
+          createdAt: now,
+          updatedAt: now
+        }
+      ]
+    });
+    const cancelledOrder = buildOrder({
+      bookingStatus: BookingStatus.CANCELLED_BY_USER,
+      paymentStatus: PaymentStatus.SUCCESS,
+      refundable: false,
+      cancelledByUserId: userId,
+      cancelledAt: now,
+      items: [
+        {
+          ...buildOrder().items[0],
+          bookingStatus: BookingStatus.CANCELLED_BY_USER
+        }
+      ]
+    });
     const tx = {
       bookingOrder: {
-        findFirst: vi.fn().mockResolvedValue(
-          buildOrder({
-            bookingStatus: BookingStatus.CONFIRMED,
-            paymentStatus: PaymentStatus.SUCCESS,
-            user: buildUser(),
-            items: [
-              {
-                ...buildOrder().items[0],
-                startDatetime: new Date("2026-05-20T01:00:00.000Z"),
-                bookingStatus: BookingStatus.CONFIRMED
-              }
-            ],
-            payments: [
-              {
-                paymentId,
-                bookingOrderId,
-                userId,
-                amount: new Prisma.Decimal(100000),
-                paymentMethod: "MOCK",
-                gatewayTransactionId: "gw_1",
-                paymentStatus: PaymentStatus.SUCCESS,
-                rawCallback: null,
-                paidAt: new Date("2026-05-20T01:00:00.000Z"),
-                createdAt: now,
-                updatedAt: now
-              }
-            ]
-          })
-        ),
-        update: vi.fn(),
-        findUniqueOrThrow: vi.fn()
+        findFirst: vi.fn().mockResolvedValue(currentOrder),
+        update: vi.fn().mockResolvedValue({ bookingOrderId }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue(cancelledOrder)
       },
       bookingItem: {
-        updateMany: vi.fn()
+        updateMany: vi.fn().mockResolvedValue({ count: 1 })
       },
       bookingOrderStatusHistory: {
-        create: vi.fn()
+        create: vi.fn().mockResolvedValue({})
       },
       bookingItemStatusHistory: {
-        create: vi.fn()
+        create: vi.fn().mockResolvedValue({})
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
       }
     };
     const rules = {
@@ -594,17 +616,39 @@ describe("BookingsService", () => {
     const refunds = {
       createRefundForBooking: vi.fn()
     } as unknown as RefundsService;
-    const service = createService(tx, { rules, refunds });
-
-    await expect(
-      service.cancelMyBooking(userId, bookingOrderId, {
-        reason: "Too late"
+    const violations = {
+      createLateCancelViolationIfNeeded: vi.fn().mockResolvedValue({
+        created: true,
+        restrictedUser: false
       })
-    ).rejects.toMatchObject({
-      statusCode: 409,
-      code: "BOOKING_CANCEL_WINDOW_CLOSED"
+    } as unknown as ViolationsService;
+    const service = createService(tx, { rules, refunds, violations });
+
+    const order = await service.cancelMyBooking(userId, bookingOrderId, {
+      reason: "Too late"
+    });
+
+    expect(order).toMatchObject({
+      id: bookingOrderId,
+      bookingStatus: BookingStatus.CANCELLED_BY_USER,
+      refundable: false
     });
     expect(refunds.createRefundForBooking).not.toHaveBeenCalled();
-    expect(tx.bookingOrder.update).not.toHaveBeenCalled();
+    expect(violations.createLateCancelViolationIfNeeded).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        userId,
+        items: currentOrder.items,
+        reason: "Too late"
+      })
+    );
+    expect(tx.bookingOrder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          bookingStatus: BookingStatus.CANCELLED_BY_USER,
+          refundable: false
+        })
+      })
+    );
   });
 });

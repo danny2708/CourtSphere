@@ -10,6 +10,7 @@ import {
 } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
+import { ViolationsService } from "../violations/violations.service";
 import { ManagerService } from "./manager.service";
 
 const managerUserId = "00000000-0000-4000-8000-000000001601";
@@ -144,7 +145,31 @@ function buildViolation() {
     penaltyPoints: 1,
     description: "User did not arrive",
     recordedByUserId: managerUserId,
-    recordedAt: now
+    isWaived: false,
+    recordedAt: now,
+    user: buildUser({
+      violationPoints: 3,
+      bookingPermissionStatus: BookingPermissionStatus.RESTRICTED,
+      bookingLockedUntil: new Date("2026-05-27T08:00:00.000Z")
+    }),
+    bookingItem: {
+      ...buildItem(),
+      bookingOrder: {
+        bookingOrderId,
+        bookingCode: "BK-20260520-TEST01",
+        bookingStatus: BookingStatus.CHECKIN_EXPIRED,
+        paymentStatus: PaymentStatus.SUCCESS
+      },
+      court: {
+        courtId,
+        courtName: "Main Field"
+      }
+    },
+    recordedBy: {
+      userId: managerUserId,
+      fullName: "Manager User",
+      email: "manager@example.edu"
+    }
   };
 }
 
@@ -173,6 +198,9 @@ function createTx(input: {
     bookingRule: {
       findFirst: vi.fn().mockResolvedValue(input.bookingRule ?? bookingRule())
     },
+    systemSetting: {
+      findUnique: vi.fn().mockResolvedValue({ settingValue: "1" })
+    },
     bookingItemStatusHistory: {
       create: vi.fn().mockResolvedValue({})
     },
@@ -183,9 +211,16 @@ function createTx(input: {
       create: vi.fn().mockResolvedValue({})
     },
     violation: {
+      findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue(buildViolation())
     },
     user: {
+      findUnique: vi.fn().mockResolvedValue({
+        userId,
+        violationPoints: 0,
+        bookingPermissionStatus: BookingPermissionStatus.ALLOWED,
+        bookingLockedUntil: null
+      }),
       update: vi.fn().mockResolvedValue({})
     },
     refund: {
@@ -212,7 +247,14 @@ function createService(input: {
   } as unknown as PrismaClient;
 
   return {
-    service: new ManagerService(db, undefined, undefined, () => now),
+    service: new ManagerService(
+      db,
+      undefined,
+      undefined,
+      () => now,
+      undefined,
+      new ViolationsService(db, () => now)
+    ),
     db: db as unknown as {
       $transaction: ReturnType<typeof vi.fn>;
       bookingItem: {
@@ -391,6 +433,12 @@ describe("ManagerService", () => {
         })
       })
     });
+    tx.user.findUnique.mockResolvedValue({
+      userId,
+      violationPoints: 2,
+      bookingPermissionStatus: BookingPermissionStatus.ALLOWED,
+      bookingLockedUntil: null
+    });
     const { service } = createService({
       tx,
       finalItem: buildItem({
@@ -426,9 +474,7 @@ describe("ManagerService", () => {
     expect(tx.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          violationPoints: {
-            increment: 1
-          },
+          violationPoints: 3,
           bookingPermissionStatus: BookingPermissionStatus.RESTRICTED,
           bookingLockedUntil: new Date("2026-05-27T08:00:00.000Z")
         })

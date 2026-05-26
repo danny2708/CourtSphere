@@ -14,6 +14,7 @@ import paymentsRouter from "./modules/payments/payments.routes";
 import refundsRouter from "./modules/refunds/refunds.routes";
 import rulesRouter from "./modules/rules/rules.routes";
 import usersRouter from "./modules/users/users.routes";
+import violationsRouter from "./modules/violations/violations.routes";
 import waitlistRouter from "./modules/waitlist/waitlist.routes";
 import healthRouter from "./routes/health.routes";
 
@@ -50,6 +51,7 @@ app.use("/api", refundsRouter);
 app.use("/api", managerRouter);
 app.use("/api/admin", rulesRouter);
 app.use("/api/admin", usersRouter);
+app.use("/api/admin", violationsRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -737,19 +737,19 @@ Mục tiêu: ghi nhận và xử lý điểm vi phạm.
 Checklist:
 
 - [x] Tạo violation khi no-show.
-- [ ] Tạo violation khi late cancellation nếu policy yêu cầu.
-- [ ] API admin/manager list violations.
-- [ ] API admin waive violation.
-- [ ] API admin adjust violation points.
+- [x] Tạo violation khi late cancellation nếu policy yêu cầu.
+- [x] API admin/manager list violations.
+- [x] API admin waive violation.
+- [x] API admin adjust violation points.
 - [x] Cộng điểm vào user.
 - [x] Kiểm tra threshold để khóa quyền đặt sân.
-- [ ] Ghi audit log khi admin can thiệp.
+- [x] Ghi audit log khi admin can thiệp.
 
 Acceptance criteria:
 
-- [ ] No-show tạo violation đúng.
-- [ ] Vượt ngưỡng thì user bị restrict booking permission.
-- [ ] Admin có thể miễn/điều chỉnh vi phạm có lý do.
+- [x] No-show tạo violation đúng.
+- [x] Vượt ngưỡng thì user bị restrict booking permission.
+- [x] Admin có thể miễn/điều chỉnh vi phạm có lý do.
 
 ---
 
@@ -1112,7 +1112,13 @@ Acceptance criteria:
 - [x] `PATCH /api/notifications/:id/read`
 - [x] `PATCH /api/notifications/read-all`
 
-### 8.8 Reports APIs
+### 8.8 Violation APIs
+
+- [x] `GET /api/admin/violations`
+- [x] `POST /api/admin/violations/:id/waive`
+- [x] `POST /api/admin/violations/:id/adjust-points`
+
+### 8.9 Reports APIs
 
 - [ ] `GET /api/admin/reports/overview`
 - [ ] `GET /api/admin/reports/bookings`
@@ -1130,7 +1136,7 @@ Acceptance criteria:
 - [x] Advance booking validation.
 - [x] Cancel/refund eligibility.
 - [ ] Priority sorting.
-- [ ] Violation point calculation.
+- [x] Violation point calculation.
 - [x] Payment callback idempotency logic.
 
 ### 9.2 Integration tests
@@ -1276,7 +1282,7 @@ Một module được coi là hoàn thành khi:
 | Manager operations | Codex | DONE | Booking item schedule, manager/admin check-in, late override, no-show violation, and in-use exception close implemented |
 | Jobs | Codex | DONE | Internal run-once jobs for payment hold expiry, check-in expiry, auto-complete, waitlist expiry, idempotent updates, and histories verified |
 | Waitlist | Codex | DONE | Runtime waitlist APIs, active duplicate constraint, priority notification, book-from-waitlist flow, docs, and tests verified |
-| Violations |  | TODO |  |
+| Violations | Codex | DONE | Admin/manager violation APIs, waive/adjust audit, shared violation service, late cancellation handling, and verification completed |
 | Notifications | Codex | DONE | In-app notification APIs/service, lifecycle integrations, enum migration, and tests verified |
 | Reports |  | TODO |  |
 | Frontend foundation |  | TODO |  |

@@ -1,5 +1,4 @@
 import {
-  BookingPermissionStatus,
   BookingStatus,
   PaymentStatus,
   NotificationType,
@@ -22,6 +21,7 @@ import {
   type NotificationsService
 } from "../notifications/notifications.service";
 import { RulesRepository } from "../rules/rules.repository";
+import { violationsService, type ViolationsService } from "../violations/violations.service";
 import type {
   AuditContext,
   ManagerNoShowInput,
@@ -65,8 +65,6 @@ const notCheckInableStatuses: BookingStatus[] = [
   BookingStatus.COMPLETED,
   BookingStatus.NO_SHOW
 ];
-// TODO: Move no-show penalty points into booking_rules/system_settings when the DB spec adds it.
-const noShowPenaltyPoints = 1;
 
 function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60_000);
@@ -127,29 +125,6 @@ function toManagerBookingItemDto(item: ManagerBookingItem) {
   };
 }
 
-function toViolationDto(violation: {
-  violationId: string;
-  userId: string;
-  bookingItemId: string | null;
-  violationType: ViolationType;
-  penaltyPoints: number;
-  description: string | null;
-  recordedByUserId: string | null;
-  recordedAt: Date;
-}) {
-  return {
-    id: violation.violationId,
-    violationId: violation.violationId,
-    userId: violation.userId,
-    bookingItemId: violation.bookingItemId,
-    violationType: violation.violationType,
-    penaltyPoints: violation.penaltyPoints,
-    description: violation.description,
-    recordedByUserId: violation.recordedByUserId,
-    recordedAt: violation.recordedAt
-  };
-}
-
 function handleKnownPrismaError(error: unknown): never {
   const message = error instanceof Error ? error.message : "";
 
@@ -176,7 +151,8 @@ export class ManagerService {
     private readonly state: BookingStateService = bookingStateService,
     private readonly conflicts: BookingConflictService = bookingConflictService,
     private readonly nowProvider: () => Date = () => new Date(),
-    private readonly notifications: NotificationsService = notificationsService
+    private readonly notifications: NotificationsService = notificationsService,
+    private readonly violations: ViolationsService = violationsService
   ) {}
 
   async getTodaySchedule(query: ManagerTodayScheduleQuery) {
@@ -305,8 +281,6 @@ export class ManagerService {
   }
 
   async markNoShow(bookingItemId: string, input: ManagerNoShowInput, audit: AuditContext) {
-    const now = this.nowProvider();
-
     try {
       const result = await this.db.$transaction(
         async (tx) => {
@@ -319,14 +293,8 @@ export class ManagerService {
             "BOOKING_ITEM_NO_SHOW_NOT_ALLOWED"
           );
 
-          const bookingRule = await new RulesRepository(tx).getBookingRuleForPolicy();
-          const nextViolationPoints = item.bookingOrder.user.violationPoints + noShowPenaltyPoints;
-          const shouldRestrictUser = nextViolationPoints >= bookingRule.violationThreshold;
-          const bookingLockedUntil =
-            shouldRestrictUser && bookingRule.bookingBanDays > 0
-              ? addDays(now, bookingRule.bookingBanDays)
-              : null;
           const note = normalizeOptional(input.reason) ?? "No-show confirmed by field manager/admin";
+          const penaltyPoints = await new RulesRepository(tx).getNoShowPenaltyPoints();
 
           await tx.bookingItem.update({
             where: { bookingItemId },
@@ -345,41 +313,6 @@ export class ManagerService {
             note
           });
 
-          const violation = await tx.violation.create({
-            data: {
-              userId: item.bookingOrder.userId,
-              bookingItemId,
-              violationType: ViolationType.NO_SHOW,
-              penaltyPoints: noShowPenaltyPoints,
-              description: note,
-              recordedByUserId: audit.actorUserId
-            },
-            select: {
-              violationId: true,
-              userId: true,
-              bookingItemId: true,
-              violationType: true,
-              penaltyPoints: true,
-              description: true,
-              recordedByUserId: true,
-              recordedAt: true
-            }
-          });
-
-          await tx.user.update({
-            where: { userId: item.bookingOrder.userId },
-            data: {
-              violationPoints: {
-                increment: noShowPenaltyPoints
-              },
-              ...(shouldRestrictUser
-                ? {
-                    bookingPermissionStatus: BookingPermissionStatus.RESTRICTED,
-                    bookingLockedUntil
-                  }
-                : {})
-            }
-          });
           await this.notifications.createBookingNotification(tx, {
             userId: item.bookingOrder.userId,
             bookingOrderId: item.bookingOrderId,
@@ -388,24 +321,14 @@ export class ManagerService {
             title: "No-show recorded",
             content: `Booking ${item.bookingOrder.bookingCode} was marked no-show.`
           });
-          await this.notifications.createViolationNotification(tx, {
+          const violationResult = await this.violations.createViolation(tx, {
             userId: item.bookingOrder.userId,
-            bookingOrderId: item.bookingOrderId,
             bookingItemId,
-            notificationType: NotificationType.VIOLATION_RECORDED,
-            title: "Violation recorded",
-            content: "A no-show violation was recorded on your account."
+            violationType: ViolationType.NO_SHOW,
+            penaltyPoints,
+            description: note,
+            recordedByUserId: audit.actorUserId
           });
-          if (shouldRestrictUser) {
-            await this.notifications.createViolationNotification(tx, {
-              userId: item.bookingOrder.userId,
-              bookingOrderId: item.bookingOrderId,
-              bookingItemId,
-              notificationType: NotificationType.BOOKING_PERMISSION_RESTRICTED,
-              title: "Booking permission restricted",
-              content: "Your booking permission has been restricted due to policy violations."
-            });
-          }
           await this.createAuditLog(tx, audit, {
             entityType: "BOOKING_ITEM",
             entityId: bookingItemId,
@@ -416,17 +339,16 @@ export class ManagerService {
             },
             newValue: {
               bookingStatus: BookingStatus.NO_SHOW,
-              violationId: violation.violationId,
-              penaltyPoints: noShowPenaltyPoints,
-              userViolationPoints: nextViolationPoints,
-              userRestricted: shouldRestrictUser,
-              bookingLockedUntil,
+              violationId: violationResult.violation.violationId,
+              penaltyPoints,
+              violationCreated: violationResult.created,
+              userRestricted: violationResult.restrictedUser,
               reason: note
             }
           });
           await this.recomputeOrderStatusIfNeeded(tx, item.bookingOrderId, audit.actorUserId);
 
-          return violation;
+          return violationResult.violation;
         },
         {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable
@@ -435,7 +357,7 @@ export class ManagerService {
 
       return {
         bookingItem: toManagerBookingItemDto(await this.getBookingItemOrThrow(this.db, bookingItemId)),
-        violation: toViolationDto(result)
+        violation: result
       };
     } catch (error) {
       return handleKnownPrismaError(error);

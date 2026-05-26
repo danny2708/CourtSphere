@@ -20,6 +20,9 @@ export const FALLBACK_BOOKING_RULES = {
   refundRateManagerFault: 100
 } as const;
 export const FALLBACK_WAITLIST_RESPONSE_MINUTES = 10;
+export const FALLBACK_NO_SHOW_PENALTY_POINTS = 1;
+export const FALLBACK_LATE_CANCELLATION_VIOLATION_ENABLED = true;
+export const FALLBACK_LATE_CANCELLATION_PENALTY_POINTS = 1;
 
 const bookingRuleSelect = {
   bookingRuleId: true,
@@ -67,15 +70,41 @@ export class RulesRepository {
   }
 
   async getWaitlistResponseMinutes(): Promise<number> {
-    const setting = await this.db.systemSetting.findUnique({
-      where: { settingKey: "waitlist_response_minutes" },
-      select: { settingValue: true }
-    });
-    const parsedValue = Number.parseInt(setting?.settingValue ?? "", 10);
+    return this.getPositiveIntegerSetting(
+      "waitlist_response_minutes",
+      FALLBACK_WAITLIST_RESPONSE_MINUTES
+    );
+  }
 
-    return Number.isInteger(parsedValue) && parsedValue > 0
-      ? parsedValue
-      : FALLBACK_WAITLIST_RESPONSE_MINUTES;
+  async getNoShowPenaltyPoints(): Promise<number> {
+    return this.getPositiveIntegerSetting(
+      "no_show_penalty_points",
+      FALLBACK_NO_SHOW_PENALTY_POINTS
+    );
+  }
+
+  async getLateCancellationViolationConfig(): Promise<{
+    enabled: boolean;
+    penaltyPoints: number;
+  }> {
+    const [enabledSetting, penaltyPoints] = await Promise.all([
+      this.db.systemSetting.findUnique({
+        where: { settingKey: "late_cancellation_violation_enabled" },
+        select: { settingValue: true }
+      }),
+      this.getPositiveIntegerSetting(
+        "late_cancellation_penalty_points",
+        FALLBACK_LATE_CANCELLATION_PENALTY_POINTS
+      )
+    ]);
+
+    return {
+      enabled:
+        enabledSetting?.settingValue === undefined
+          ? FALLBACK_LATE_CANCELLATION_VIOLATION_ENABLED
+          : enabledSetting.settingValue.toLowerCase() === "true",
+      penaltyPoints
+    };
   }
 
   async getPriorityPolicyByGroupId(priorityGroupId: string | null): Promise<PriorityPolicyRecord | null> {
@@ -114,6 +143,16 @@ export class RulesRepository {
       refundRateUserOnTime: bookingRule.refundRateUserOnTime,
       refundRateManagerFault: bookingRule.refundRateManagerFault
     };
+  }
+
+  private async getPositiveIntegerSetting(settingKey: string, fallback: number): Promise<number> {
+    const setting = await this.db.systemSetting.findUnique({
+      where: { settingKey },
+      select: { settingValue: true }
+    });
+    const parsedValue = Number.parseInt(setting?.settingValue ?? "", 10);
+
+    return Number.isInteger(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
   }
 }
 

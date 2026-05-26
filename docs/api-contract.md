@@ -903,8 +903,9 @@ Request:
 Rules:
 
 - `PENDING_PAYMENT` can be cancelled without refund.
-- `CONFIRMED` can be cancelled only before `cancelBeforeHours`, calculated from the earliest item start time.
-- If a `CONFIRMED` order has a successful payment, the backend creates a whole-order `refunds` row with status `REQUESTED` using `refundRateUserOnTime`.
+- `CONFIRMED` can be cancelled by the owner.
+- If cancellation is before `cancelBeforeHours`, calculated from the earliest item start time, and the order has a successful payment, the backend creates a whole-order `refunds` row with status `REQUESTED` using `refundRateUserOnTime`.
+- If cancellation is after the configured window, the order is cancelled without refund. When `system_settings.late_cancellation_violation_enabled = true`, the backend records a `LATE_CANCEL` violation against the earliest confirmed booking item using `late_cancellation_penalty_points`.
 - `CHECKIN_EXPIRED` and `NO_SHOW` are not cancellable by user and do not create refunds.
 - Every cancellation writes `booking_order_status_histories` and item histories for changed items.
 
@@ -933,7 +934,6 @@ Common errors:
 
 - `BOOKING_NOT_FOUND`
 - `BOOKING_CANNOT_BE_CANCELLED`
-- `BOOKING_CANCEL_WINDOW_CLOSED`
 
 ## Payment APIs
 
@@ -1419,7 +1419,7 @@ Rules:
 - If points reach active `booking_rules.violationThreshold`, sets `bookingPermissionStatus = RESTRICTED` and `bookingLockedUntil` from `bookingBanDays`.
 - Does not create refunds.
 - Writes `booking_item_status_histories` and `audit_logs`.
-- No-show penalty points default to `1` until a dedicated config field is added.
+- No-show penalty points are read from `system_settings.no_show_penalty_points`, with service fallback `1` if the setting is missing.
 
 Response `200`:
 
@@ -1468,6 +1468,136 @@ Rules:
 Common errors:
 
 - `BOOKING_ITEM_COMPLETE_NOT_ALLOWED`
+
+## Violation APIs
+
+Violation APIs manage policy violations recorded against users. A violation can optionally link to a `bookingItemId`; no-show and late cancellation violations are item-level because check-in and slot usage happen per booking item.
+
+### `GET /api/admin/violations`
+
+Requires `Authorization: Bearer <accessToken>` and role `ADMIN` or `FIELD_MANAGER`.
+
+Supports optional filters: `userId`, `violationType`, `isWaived`, `fromDate`, `toDate`, `bookingItemId`.
+
+Response `200`:
+
+```json
+{
+  "violations": [
+    {
+      "id": "uuid",
+      "violationId": "uuid",
+      "userId": "uuid",
+      "bookingItemId": "uuid",
+      "violationType": "NO_SHOW",
+      "penaltyPoints": 1,
+      "description": "User did not arrive",
+      "recordedByUserId": "uuid",
+      "isWaived": false,
+      "recordedAt": "2026-05-20T00:00:00.000Z",
+      "user": {
+        "id": "uuid",
+        "fullName": "Nguyen Van A",
+        "email": "user@example.com",
+        "bookingPermissionStatus": "RESTRICTED",
+        "bookingLockedUntil": "2026-05-27T00:00:00.000Z",
+        "violationPoints": 3
+      },
+      "bookingItem": {
+        "id": "uuid",
+        "bookingOrderId": "uuid",
+        "startDatetime": "2026-05-20T08:00:00.000Z",
+        "endDatetime": "2026-05-20T09:00:00.000Z",
+        "bookingStatus": "NO_SHOW",
+        "court": {
+          "id": "uuid",
+          "courtName": "Main Field"
+        },
+        "bookingOrder": {
+          "id": "uuid",
+          "bookingCode": "BK-20260520-ABC123",
+          "bookingStatus": "CONFIRMED",
+          "paymentStatus": "SUCCESS"
+        }
+      },
+      "recordedByUser": {
+        "id": "uuid",
+        "fullName": "Field Manager",
+        "email": "manager@example.com"
+      }
+    }
+  ]
+}
+```
+
+### `POST /api/admin/violations/:id/waive`
+
+Requires `ADMIN`.
+
+Waives an unwaived violation, subtracts its penalty points from the user, and writes `audit_logs` with action `WAIVE_VIOLATION`.
+
+Request:
+
+```json
+{
+  "reason": "Valid documented reason"
+}
+```
+
+Response `200`:
+
+```json
+{
+  "violation": {
+    "id": "uuid",
+    "isWaived": true,
+    "penaltyPoints": 1
+  }
+}
+```
+
+Common errors:
+
+- `VIOLATION_NOT_FOUND`
+- `VIOLATION_ALREADY_WAIVED`
+
+### `POST /api/admin/violations/:id/adjust-points`
+
+Requires `ADMIN`.
+
+Adjusts `penaltyPoints`, applies the delta to `users.violationPoints`, re-checks the active threshold, and writes `audit_logs` with action `ADJUST_VIOLATION_POINTS`. If the updated total reaches the threshold, the user is restricted and receives `BOOKING_PERMISSION_RESTRICTED`.
+
+Request:
+
+```json
+{
+  "penaltyPoints": 2,
+  "reason": "Severity adjusted after review"
+}
+```
+
+Validation:
+
+- `penaltyPoints` must be an integer greater than or equal to `0`.
+- `reason` is required.
+
+Response `200`:
+
+```json
+{
+  "violation": {
+    "id": "uuid",
+    "penaltyPoints": 2,
+    "isWaived": false
+  }
+}
+```
+
+Internal violation creation rules:
+
+- Manager no-show confirmation creates `NO_SHOW`, records `bookingItemId`, increments user points, and sends `VIOLATION_RECORDED`.
+- Late user cancellation creates `LATE_CANCEL` only when `late_cancellation_violation_enabled` is enabled.
+- Duplicate prevention uses `bookingItemId + violationType` for item-linked violations.
 
 ## Waitlist APIs
 
@@ -1869,6 +1999,7 @@ Booking invariants:
 - `refunds.payment_id` is required.
 - `refunds.booking_order_id` is required and `refunds.booking_item_id` is optional for partial refunds.
 - `violations.booking_item_id` is optional but relational.
+- `violations_booking_item_type_unique_idx` prevents duplicate item-linked violations for the same `booking_item_id` and `violation_type`.
 - `notifications.booking_order_id` and `notifications.booking_item_id` are optional but relational.
 - Booking order cancellation actor FK and booking item check-in/completion/no-show actor FKs are present.
 - PostgreSQL migration includes `no_overlapping_active_booking_items` on `booking_items` for active statuses: `PENDING_PAYMENT`, `PAYMENT_PROCESSING`, `CONFIRMED`, `IN_USE`.
@@ -1881,3 +2012,6 @@ Config tables:
 - `priority_groups` stores unique `group_code`, rank, and advance-booking defaults.
 - `priority_policies` stores priority-level policy per priority group, including waitlist eligibility.
 - `system_settings.waitlist_response_minutes` stores how long a notified waitlist entry can be claimed.
+- `system_settings.no_show_penalty_points` stores no-show violation points.
+- `system_settings.late_cancellation_violation_enabled` controls whether late user cancellation records a violation.
+- `system_settings.late_cancellation_penalty_points` stores late-cancellation violation points.
