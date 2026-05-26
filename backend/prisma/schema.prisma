@@ -539,7 +539,6 @@ model WaitlistEntry {
   court         Court          @relation(fields: [courtId], references: [courtId])
   priorityGroup PriorityGroup? @relation(fields: [priorityGroupId], references: [priorityGroupId])
 
-  @@unique([userId, courtId, desiredStartDatetime, desiredEndDatetime])
   @@index([courtId, desiredStartDatetime, desiredEndDatetime])
   @@index([priorityGroupId])
   @@map("waitlist_entries")

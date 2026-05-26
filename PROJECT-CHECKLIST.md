@@ -693,7 +693,7 @@ Checklist:
 - [x] Job tự hoàn thành booking item khi hết giờ sử dụng.
 - [x] Job expire waitlist notified entries quá `expires_at`.
 - [!] Job gửi reminder trước giờ sử dụng nếu cần: hoãn đến module reminder/scheduler sau.
-- [!] Job notify waitlist khi slot được giải phóng: hoãn đến module Waitlist runtime.
+- [x] Job notify waitlist khi slot được giải phóng bởi payment hold expiry / waitlist response expiry.
 - [x] Job phải idempotent.
 - [x] Job ghi status history/audit log khi cập nhật trạng thái.
 - [x] Có runner `jobs:run-once` để scheduler gọi.
@@ -713,20 +713,20 @@ Mục tiêu: cho phép user vào danh sách chờ khi slot đã kín.
 
 Checklist:
 
-- [ ] API join waitlist.
-- [ ] API leave waitlist.
-- [ ] API list my waitlist entries.
-- [ ] Không cho join trùng cùng court/time.
-- [ ] Sắp xếp theo priority group.
-- [ ] Sắp xếp theo registered_at.
-- [ ] Có thể tính điểm uy tín nếu áp dụng.
-- [ ] Notify user ưu tiên cao nhất khi slot available.
+- [x] API join waitlist.
+- [x] API leave waitlist.
+- [x] API list my waitlist entries.
+- [x] Không cho join trùng cùng court/time.
+- [x] Sắp xếp theo priority group.
+- [x] Sắp xếp theo registered_at.
+- [!] Có thể tính điểm uy tín nếu áp dụng: chưa áp dụng reputation scoring trong policy hiện tại.
+- [x] Notify user ưu tiên cao nhất khi slot available.
 
 Acceptance criteria:
 
-- [ ] User vào waitlist được.
-- [ ] Slot giải phóng thì user phù hợp được thông báo.
-- [ ] Priority chỉ ảnh hưởng thứ tự waitlist, không cướp slot active.
+- [x] User vào waitlist được.
+- [x] Slot giải phóng thì user phù hợp được thông báo.
+- [x] Priority chỉ ảnh hưởng thứ tự waitlist, không cướp slot active.
 
 ---
 
@@ -1275,7 +1275,7 @@ Một module được coi là hoàn thành khi:
 | DB refactor sync | Codex | DONE | Backend synced to new booking_orders/booking_items database design and re-verified |
 | Manager operations | Codex | DONE | Booking item schedule, manager/admin check-in, late override, no-show violation, and in-use exception close implemented |
 | Jobs | Codex | DONE | Internal run-once jobs for payment hold expiry, check-in expiry, auto-complete, waitlist expiry, idempotent updates, and histories verified |
-| Waitlist |  | TODO |  |
+| Waitlist | Codex | DONE | Runtime waitlist APIs, active duplicate constraint, priority notification, book-from-waitlist flow, docs, and tests verified |
 | Violations |  | TODO |  |
 | Notifications | Codex | DONE | In-app notification APIs/service, lifecycle integrations, enum migration, and tests verified |
 | Reports |  | TODO |  |

@@ -354,7 +354,8 @@ async function seedSystemSettings(adminUserId: string) {
     ["violation_threshold", "3", "Ngưỡng điểm vi phạm để hạn chế đặt sân"],
     ["booking_ban_days", "7", "Số ngày khóa quyền đặt sân"],
     ["refund_rate_user_on_time", "100", "Tỷ lệ hoàn tiền khi user hủy đúng hạn"],
-    ["refund_rate_manager_fault", "100", "Tỷ lệ hoàn tiền khi phía sân hủy"]
+    ["refund_rate_manager_fault", "100", "Tỷ lệ hoàn tiền khi phía sân hủy"],
+    ["waitlist_response_minutes", "10", "Số phút user được phản hồi sau khi được notify waitlist"]
   ] as const;
 
   for (const [settingKey, settingValue, description] of settings) {

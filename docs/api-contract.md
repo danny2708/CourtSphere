@@ -1469,6 +1469,166 @@ Common errors:
 
 - `BOOKING_ITEM_COMPLETE_NOT_ALLOWED`
 
+## Waitlist APIs
+
+Waitlist APIs are in-app runtime behavior for users. Priority never steals a held or confirmed slot; it only orders who gets notified after a slot becomes free.
+
+Active waitlist statuses for duplicate detection are `WAITING` and `NOTIFIED`. `BOOKED`, `CANCELLED`, and `EXPIRED` are terminal/non-active for duplicate checks.
+
+### `POST /api/waitlist`
+
+Requires `Authorization: Bearer <accessToken>` and role `USER`.
+
+Request:
+
+```json
+{
+  "courtId": "uuid",
+  "startDatetime": "2026-05-21T08:00:00.000Z",
+  "endDatetime": "2026-05-21T09:00:00.000Z"
+}
+```
+
+Rules:
+
+- User must be active and not booking-restricted.
+- Court must exist and be `ACTIVE`.
+- Time must be in the future, inside active `operating_hours`, slot-aligned, and within priority advance booking days.
+- Priority policy must allow waitlist participation.
+- If the slot is available, returns `WAITLIST_SLOT_AVAILABLE`; users should book directly through `POST /api/bookings`.
+- Duplicate active waitlist entries for the same user/court/time range are rejected.
+- `priorityOrder` comes from active priority policy level, falling back to priority group level.
+
+Response `201`:
+
+```json
+{
+  "waitlistEntry": {
+    "waitlistEntryId": "uuid",
+    "court": {
+      "id": "uuid",
+      "courtName": "Main Field",
+      "status": "ACTIVE"
+    },
+    "desiredStartDatetime": "2026-05-21T08:00:00.000Z",
+    "desiredEndDatetime": "2026-05-21T09:00:00.000Z",
+    "priorityOrder": 2,
+    "status": "WAITING",
+    "registeredAt": "2026-05-20T00:00:00.000Z",
+    "notifiedAt": null,
+    "expiresAt": null
+  }
+}
+```
+
+Common errors:
+
+- `COURT_NOT_FOUND`
+- `COURT_NOT_AVAILABLE`
+- `BOOKING_PERMISSION_RESTRICTED`
+- `WAITLIST_NOT_ALLOWED`
+- `WAITLIST_SLOT_AVAILABLE`
+- `WAITLIST_ALREADY_EXISTS`
+
+### `GET /api/waitlist/my`
+
+Requires role `USER`.
+
+Returns waitlist entries owned by the authenticated user.
+
+Optional query params:
+
+- `status`: any `WaitlistStatus`.
+- `fromDate`: ISO datetime filter on `desiredStartDatetime`.
+- `toDate`: ISO datetime filter on `desiredStartDatetime`.
+
+### `DELETE /api/waitlist/:id`
+
+Requires role `USER`.
+
+Cancels the authenticated user's waitlist entry. The row is not deleted.
+
+Rules:
+
+- `WAITING` or `NOTIFIED` entries become `CANCELLED`.
+- Existing `CANCELLED` entries are returned idempotently.
+- `BOOKED` and `EXPIRED` entries cannot be cancelled.
+- Other users' entries are returned as not found.
+
+### `POST /api/waitlist/:id/book`
+
+Requires role `USER`.
+
+Creates a booking hold from a notified waitlist entry. This is the required waitlist confirmation flow; do not pass `waitlistEntryId` to `POST /api/bookings`.
+
+Rules:
+
+- Waitlist entry must belong to the authenticated user.
+- Waitlist entry status must be `NOTIFIED`.
+- `expiresAt` must still be in the future.
+- User and court must still be eligible.
+- The slot is checked again in the same transaction; priority does not bypass active `booking_items` overlap checks.
+- Waitlist entry becomes `BOOKED`.
+- Creates one `booking_orders` row and one `booking_items` row with status `PENDING_PAYMENT`.
+- `paymentStatus` is `INITIATED`; user must still pay 100% before booking becomes `CONFIRMED`.
+- Writes order and item status histories.
+- Emits `BOOKING_CREATED`.
+
+Response `201`:
+
+```json
+{
+  "booking": {
+    "bookingOrderId": "uuid",
+    "bookingCode": "BK-20260520-ABC123",
+    "orderStatus": "PENDING_PAYMENT",
+    "bookingStatus": "PENDING_PAYMENT",
+    "paymentStatus": "INITIATED",
+    "holdExpiresAt": "2026-05-20T00:10:00.000Z",
+    "totalAmount": 50000,
+    "items": [
+      {
+        "bookingItemId": "uuid",
+        "courtId": "uuid",
+        "startDatetime": "2026-05-21T08:00:00.000Z",
+        "endDatetime": "2026-05-21T09:00:00.000Z",
+        "itemStatus": "PENDING_PAYMENT",
+        "unitPrice": 50000,
+        "amount": 50000
+      }
+    ]
+  }
+}
+```
+
+Common errors:
+
+- `WAITLIST_ENTRY_NOT_FOUND`
+- `WAITLIST_ENTRY_NOT_NOTIFIED`
+- `WAITLIST_ENTRY_EXPIRED`
+- `WAITLIST_ENTRY_CANCELLED`
+- `WAITLIST_ENTRY_ALREADY_BOOKED`
+- `WAITLIST_SLOT_TAKEN`
+- `MAX_BOOKINGS_PER_DAY_REACHED`
+
+### Internal `notifyNextForSlot`
+
+Internal service function, not a public API.
+
+Behavior:
+
+- Confirms no active `booking_items` overlap exists.
+- Selects `WAITING` entries for the exact court/time range.
+- Sorts by `priorityOrder asc`, then `registeredAt asc`.
+- Updates one row from `WAITING` to `NOTIFIED` using a guarded update.
+- Sets `notifiedAt = now`.
+- Sets `expiresAt = now + waitlist_response_minutes`.
+- Emits `WAITLIST_NOTIFIED`.
+
+`waitlist_response_minutes` is read from `system_settings`; fallback is `10` minutes if absent or invalid.
+
+Current automatic integrations call this service after payment hold expiry and waitlist response expiry. User cancellation, manager/admin cancellation, and payment failure/expiry callbacks can call the same service after their item status transitions if realtime waitlist notification is required there.
+
 ## Notification APIs
 
 Notifications are in-app only in the MVP. Email, SMS, and push delivery are not integrated yet. Notification records can link to a `bookingOrderId` and optionally a `bookingItemId`.
@@ -1583,7 +1743,9 @@ Lifecycle integrations:
 - No-show confirmation emits `NO_SHOW`.
 - No-show violation emits `VIOLATION_RECORDED`.
 - Automatic booking permission restriction emits `BOOKING_PERMISSION_RESTRICTED`.
+- Waitlist slot notification emits `WAITLIST_NOTIFIED`.
 - Waitlist response expiry emits `WAITLIST_EXPIRED`.
+- Booking from waitlist emits `BOOKING_CREATED` and still requires payment.
 
 Duplicate handling:
 
@@ -1614,6 +1776,7 @@ Rules:
 - Changes `INITIATED` or `PROCESSING` payments to `EXPIRED`.
 - Writes `booking_order_status_histories` and `booking_item_status_histories`.
 - Creates an in-app `PAYMENT_EXPIRED` notification for the order owner.
+- Calls waitlist `notifyNextForSlot` for each expired booking item after the slot is released.
 
 Idempotency:
 
@@ -1657,7 +1820,7 @@ Rules:
 - Changes the entry to `EXPIRED`.
 - Creates a basic in-app `notifications` row with `notificationType = WAITLIST_EXPIRED`.
 - Writes an `audit_logs` record with `action = AUTO_EXPIRE_WAITLIST_ENTRY`.
-- Does not notify the next waitlist user yet; that belongs to the later Waitlist runtime module.
+- Calls waitlist `notifyNextForSlot` for the same court/time range after the entry expires.
 
 ## Database Contract Baseline
 
@@ -1710,10 +1873,11 @@ Booking invariants:
 - Booking order cancellation actor FK and booking item check-in/completion/no-show actor FKs are present.
 - PostgreSQL migration includes `no_overlapping_active_booking_items` on `booking_items` for active statuses: `PENDING_PAYMENT`, `PAYMENT_PROCESSING`, `CONFIRMED`, `IN_USE`.
 - `waitlist_entries.expires_at` exists for waitlist expiration.
+- `waitlist_entries_active_unique_idx` enforces duplicate prevention only for active waitlist statuses `WAITING` and `NOTIFIED`.
 
 Config tables:
 
 - `booking_rules` stores configurable hold/cancel/check-in/refund/violation defaults.
 - `priority_groups` stores unique `group_code`, rank, and advance-booking defaults.
 - `priority_policies` stores priority-level policy per priority group, including waitlist eligibility.
-- `system_settings` remains available for key-value settings needed by later modules.
+- `system_settings.waitlist_response_minutes` stores how long a notified waitlist entry can be claimed.

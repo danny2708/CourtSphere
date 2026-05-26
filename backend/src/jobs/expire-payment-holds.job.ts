@@ -12,6 +12,7 @@ import {
   notificationsService,
   type NotificationsService
 } from "../modules/notifications/notifications.service";
+import { waitlistService, type WaitlistService } from "../modules/waitlist/waitlist.service";
 import type { JobRunOptions, JobRunResult } from "./jobs.types";
 
 const jobName = "expire-payment-holds";
@@ -32,7 +33,10 @@ const expirableOrderInclude = {
   items: {
     select: {
       bookingItemId: true,
-      bookingStatus: true
+      bookingStatus: true,
+      courtId: true,
+      startDatetime: true,
+      endDatetime: true
     }
   },
   payments: {
@@ -52,7 +56,8 @@ export class ExpirePaymentHoldsJob {
     private readonly db: PrismaClient = prisma,
     private readonly state: BookingStateService = bookingStateService,
     private readonly nowProvider: () => Date = () => new Date(),
-    private readonly notifications: NotificationsService = notificationsService
+    private readonly notifications: NotificationsService = notificationsService,
+    private readonly waitlist: WaitlistService = waitlistService
   ) {}
 
   async run(options: JobRunOptions = {}): Promise<JobRunResult> {
@@ -186,6 +191,18 @@ export class ExpirePaymentHoldsJob {
       title: "Payment hold expired",
       content: `Booking ${currentOrder.bookingCode} expired because payment was not completed in time.`
     });
+
+    for (const item of itemsToExpire) {
+      await this.waitlist.notifyNextForSlotInTransaction(
+        tx,
+        {
+          courtId: item.courtId,
+          startDatetime: item.startDatetime,
+          endDatetime: item.endDatetime
+        },
+        now
+      );
+    }
 
     return true;
   }

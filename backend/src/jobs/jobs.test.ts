@@ -2,7 +2,6 @@ import {
   BookingStatus,
   NotificationType,
   PaymentStatus,
-  WaitlistStatus,
   type PrismaClient
 } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
@@ -12,12 +11,12 @@ import { ExpireCheckinJob } from "./expire-checkin.job";
 import { ExpirePaymentHoldsJob } from "./expire-payment-holds.job";
 import { ExpireWaitlistNotificationsJob } from "./expire-waitlist-notifications.job";
 import { JobsRunner } from "./jobs.runner";
+import type { WaitlistService } from "../modules/waitlist/waitlist.service";
 
 const bookingOrderId = "00000000-0000-4000-8000-000000001701";
 const bookingItemId = "00000000-0000-4000-8000-000000001702";
 const paymentId = "00000000-0000-4000-8000-000000001704";
 const userId = "00000000-0000-4000-8000-000000001705";
-const waitlistEntryId = "00000000-0000-4000-8000-000000001706";
 const now = new Date("2026-05-20T10:00:00.000Z");
 
 function createTransactionDb(tx: unknown, models: Record<string, unknown> = {}) {
@@ -38,7 +37,10 @@ function buildOrder(overrides: Record<string, unknown> = {}) {
     items: [
       {
         bookingItemId,
-        bookingStatus: BookingStatus.PENDING_PAYMENT
+        bookingStatus: BookingStatus.PENDING_PAYMENT,
+        courtId: "00000000-0000-4000-8000-000000001707",
+        startDatetime: new Date("2026-05-20T09:00:00.000Z"),
+        endDatetime: new Date("2026-05-20T10:00:00.000Z")
       }
     ],
     payments: [
@@ -69,16 +71,6 @@ function buildBookingItem(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function buildWaitlistEntry(overrides: Record<string, unknown> = {}) {
-  return {
-    waitlistEntryId,
-    userId,
-    status: WaitlistStatus.NOTIFIED,
-    expiresAt: new Date("2026-05-20T09:55:00.000Z"),
-    ...overrides
-  };
-}
-
 function bookingRule(lateCheckinMinutes = 15) {
   return {
     holdMinutes: 10,
@@ -91,6 +83,13 @@ function bookingRule(lateCheckinMinutes = 15) {
     refundRateUserOnTime: 100,
     refundRateManagerFault: 100
   };
+}
+
+function createWaitlistStub() {
+  return {
+    notifyNextForSlotInTransaction: vi.fn().mockResolvedValue(null),
+    expireNotifiedEntries: vi.fn().mockResolvedValue({ processed: 1 })
+  } as unknown as WaitlistService;
 }
 
 describe("system jobs", () => {
@@ -123,7 +122,8 @@ describe("system jobs", () => {
         findMany: vi.fn().mockResolvedValue([order])
       }
     });
-    const job = new ExpirePaymentHoldsJob(db, undefined, () => now);
+    const waitlist = createWaitlistStub();
+    const job = new ExpirePaymentHoldsJob(db, undefined, () => now, undefined, waitlist);
 
     const result = await job.run();
 
@@ -179,6 +179,15 @@ describe("system jobs", () => {
           notificationType: NotificationType.PAYMENT_EXPIRED
         })
       })
+    );
+    expect(waitlist.notifyNextForSlotInTransaction).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        courtId: order.items[0].courtId,
+        startDatetime: order.items[0].startDatetime,
+        endDatetime: order.items[0].endDatetime
+      }),
+      now
     );
   });
 
@@ -444,26 +453,10 @@ describe("system jobs", () => {
   });
 
   it("expires notified waitlist entries and creates one basic notification", async () => {
-    const entry = buildWaitlistEntry();
-    const tx = {
-      waitlistEntry: {
-        findFirst: vi.fn().mockResolvedValue(entry),
-        updateMany: vi.fn().mockResolvedValue({ count: 1 })
-      },
-      notification: {
-        findFirst: vi.fn().mockResolvedValue(null),
-        create: vi.fn().mockResolvedValue({})
-      },
-      auditLog: {
-        create: vi.fn().mockResolvedValue({})
-      }
-    };
-    const db = createTransactionDb(tx, {
-      waitlistEntry: {
-        findMany: vi.fn().mockResolvedValue([entry])
-      }
-    });
-    const job = new ExpireWaitlistNotificationsJob(db, () => now);
+    const waitlist = {
+      expireNotifiedEntries: vi.fn().mockResolvedValue({ processed: 1 })
+    } as unknown as WaitlistService;
+    const job = new ExpireWaitlistNotificationsJob(() => now, waitlist);
 
     const result = await job.run();
 
@@ -471,50 +464,22 @@ describe("system jobs", () => {
       jobName: "expire-waitlist-notifications",
       processed: 1
     });
-    expect(tx.waitlistEntry.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: {
-          status: WaitlistStatus.EXPIRED
-        }
-      })
-    );
-    expect(tx.notification.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          userId,
-          notificationType: NotificationType.WAITLIST_EXPIRED
-        })
-      })
-    );
+    expect(waitlist.expireNotifiedEntries).toHaveBeenCalledWith({
+      now,
+      batchSize: 100
+    });
   });
 
   it("does not expire WAITING waitlist entries or duplicate waitlist notifications", async () => {
-    const staleEntry = buildWaitlistEntry();
-    const tx = {
-      waitlistEntry: {
-        findFirst: vi.fn().mockResolvedValue(null),
-        updateMany: vi.fn()
-      },
-      notification: {
-        findFirst: vi.fn(),
-        create: vi.fn()
-      },
-      auditLog: {
-        create: vi.fn()
-      }
-    };
-    const db = createTransactionDb(tx, {
-      waitlistEntry: {
-        findMany: vi.fn().mockResolvedValue([staleEntry])
-      }
-    });
-    const job = new ExpireWaitlistNotificationsJob(db, () => now);
+    const waitlist = {
+      expireNotifiedEntries: vi.fn().mockResolvedValue({ processed: 0 })
+    } as unknown as WaitlistService;
+    const job = new ExpireWaitlistNotificationsJob(() => now, waitlist);
 
     const result = await job.run();
 
     expect(result.processed).toBe(0);
-    expect(tx.notification.create).not.toHaveBeenCalled();
-    expect(tx.auditLog.create).not.toHaveBeenCalled();
+    expect(waitlist.expireNotifiedEntries).toHaveBeenCalledOnce();
   });
 
   it("runs all system jobs once", async () => {

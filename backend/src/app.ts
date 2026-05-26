@@ -14,6 +14,7 @@ import paymentsRouter from "./modules/payments/payments.routes";
 import refundsRouter from "./modules/refunds/refunds.routes";
 import rulesRouter from "./modules/rules/rules.routes";
 import usersRouter from "./modules/users/users.routes";
+import waitlistRouter from "./modules/waitlist/waitlist.routes";
 import healthRouter from "./routes/health.routes";
 
 export const app = express();
@@ -43,6 +44,7 @@ app.use("/api", courtsRouter);
 app.use("/api", availabilityRouter);
 app.use("/api/bookings", bookingsRouter);
 app.use("/api/notifications", notificationsRouter);
+app.use("/api/waitlist", waitlistRouter);
 app.use("/api", paymentsRouter);
 app.use("/api", refundsRouter);
 app.use("/api", managerRouter);

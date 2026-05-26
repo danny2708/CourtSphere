@@ -3,7 +3,9 @@ import { EntityStatus, Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import type { EffectiveBookingPolicy } from "./rules.types";
 
-type RulesDbClient = Pick<PrismaClient, "bookingRule" | "priorityPolicy"> | Prisma.TransactionClient;
+type RulesDbClient =
+  | Pick<PrismaClient, "bookingRule" | "priorityPolicy" | "systemSetting">
+  | Prisma.TransactionClient;
 
 export const FALLBACK_BOOKING_RULES = {
   ruleName: "DEFAULT",
@@ -17,6 +19,7 @@ export const FALLBACK_BOOKING_RULES = {
   refundRateUserOnTime: 100,
   refundRateManagerFault: 100
 } as const;
+export const FALLBACK_WAITLIST_RESPONSE_MINUTES = 10;
 
 const bookingRuleSelect = {
   bookingRuleId: true,
@@ -61,6 +64,18 @@ export class RulesRepository {
   async getBookingRuleForPolicy() {
     const bookingRule = await this.getActiveBookingRule();
     return bookingRule ?? FALLBACK_BOOKING_RULES;
+  }
+
+  async getWaitlistResponseMinutes(): Promise<number> {
+    const setting = await this.db.systemSetting.findUnique({
+      where: { settingKey: "waitlist_response_minutes" },
+      select: { settingValue: true }
+    });
+    const parsedValue = Number.parseInt(setting?.settingValue ?? "", 10);
+
+    return Number.isInteger(parsedValue) && parsedValue > 0
+      ? parsedValue
+      : FALLBACK_WAITLIST_RESPONSE_MINUTES;
   }
 
   async getPriorityPolicyByGroupId(priorityGroupId: string | null): Promise<PriorityPolicyRecord | null> {
