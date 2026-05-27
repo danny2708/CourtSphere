@@ -1,13 +1,17 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, Clock, CreditCard, ShieldCheck } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { Button } from "../../components/common/Button";
 import { CourtGrid } from "../../components/courts/CourtGrid";
 import { CourtFilterDrawer } from "../../components/filters/CourtFilterDrawer";
 import { SearchFilterBar } from "../../components/layout/SearchFilterBar";
+import { mockCourts } from "../../features/courts/data/mockCourts";
+import { defaultCourtFilters, filterCourts } from "../../features/courts/utils/courtFilters";
+import { buildCourtDetailPath, ROUTE_PATHS } from "../../routes/route-paths";
 import { useAuthStore } from "../../stores/auth.store";
 import { useToastStore } from "../../stores/toast.store";
-import type { CourtCardViewModel, CourtFilterState } from "../../types/court.types";
+import type { CourtFilterState } from "../../types/court.types";
 
 const summaryItems = [
   {
@@ -32,88 +36,16 @@ const summaryItems = [
   }
 ] as const;
 
-const defaultFilters: CourtFilterState = {
-  courtTypes: [],
-  statuses: [],
-  priceRange: [0, 500000],
-  timeSlot: "",
-  favoritesOnly: false
-};
-
-const mockCourts: CourtCardViewModel[] = [
-  {
-    id: "court-football-01",
-    name: "Sân bóng đá trung tâm",
-    rating: 4.8,
-    distanceText: "350m",
-    address: "Khu thể thao A, cổng chính",
-    openTime: "06:00",
-    closeTime: "22:00",
-    status: "ACTIVE",
-    tags: ["Bóng đá", "Ngoài trời", "Sân 7"],
-    hasPromotion: true,
-    isFavorite: true
-  },
-  {
-    id: "court-badminton-02",
-    name: "Nhà thi đấu cầu lông",
-    rating: 4.6,
-    distanceText: "500m",
-    address: "Nhà thi đấu B, tầng 1",
-    openTime: "07:00",
-    closeTime: "21:00",
-    status: "MAINTENANCE",
-    tags: ["Cầu lông", "Trong nhà", "Sàn gỗ"],
-    isFavorite: false
-  },
-  {
-    id: "court-tennis-03",
-    name: "Sân tennis khu giảng viên",
-    rating: 4.7,
-    distanceText: "1.2km",
-    address: "Khu thể thao C, cạnh thư viện",
-    openTime: "05:30",
-    closeTime: "20:30",
-    status: "TEMP_CLOSED",
-    tags: ["Tennis", "Ngoài trời", "Ưu tiên"],
-    isFavorite: false
-  },
-  {
-    id: "court-basketball-04",
-    name: "Sân bóng rổ cũ",
-    rating: 4.1,
-    distanceText: "900m",
-    address: "Khu ký túc xá cũ",
-    openTime: "06:00",
-    closeTime: "18:00",
-    status: "RETIRED",
-    tags: ["Bóng rổ", "Ngoài trời"],
-    isFavorite: false
-  }
-];
-
 export function HomePage() {
   const { addToast } = useToastStore();
   const user = useAuthStore((state) => state.user);
-  const [courts, setCourts] = useState(mockCourts);
-  const [filters, setFilters] = useState<CourtFilterState>(defaultFilters);
+  const [courts, setCourts] = useState(mockCourts.slice(0, 4));
+  const [filters, setFilters] = useState<CourtFilterState>(defaultCourtFilters);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
 
   const filteredCourts = useMemo(() => {
-    const normalizedKeyword = searchKeyword.trim().toLowerCase();
-
-    return courts.filter((court) => {
-      const matchesKeyword =
-        !normalizedKeyword ||
-        court.name.toLowerCase().includes(normalizedKeyword) ||
-        court.tags.some((tag) => tag.toLowerCase().includes(normalizedKeyword));
-      const matchesStatus = filters.statuses.length === 0 || filters.statuses.includes(court.status);
-      const matchesType = filters.courtTypes.length === 0 || court.tags.some((tag) => filters.courtTypes.includes(tag));
-      const matchesFavorite = !filters.favoritesOnly || court.isFavorite;
-
-      return matchesKeyword && matchesStatus && matchesType && matchesFavorite;
-    });
+    return filterCourts(courts, searchKeyword, filters);
   }, [courts, filters, searchKeyword]);
 
   const handleToggleFavorite = (courtId: string) => {
@@ -186,7 +118,19 @@ export function HomePage() {
         </Button>
       </div>
 
-      <CourtGrid courts={filteredCourts} onBook={handleBook} onShare={handleShare} onToggleFavorite={handleToggleFavorite} />
+      <CourtGrid
+        courts={filteredCourts}
+        getCourtDetailPath={buildCourtDetailPath}
+        onBook={handleBook}
+        onShare={handleShare}
+        onToggleFavorite={handleToggleFavorite}
+      />
+
+      <div className="home-court-link">
+        <Link className="ui-button ui-button--primary ui-button--lg" to={ROUTE_PATHS.courts}>
+          Xem tất cả sân
+        </Link>
+      </div>
 
       <CourtFilterDrawer
         filters={filters}
@@ -196,7 +140,7 @@ export function HomePage() {
           setIsFilterOpen(false);
         }}
         onChange={setFilters}
-        onClear={() => setFilters(defaultFilters)}
+        onClear={() => setFilters(defaultCourtFilters)}
         onClose={() => setIsFilterOpen(false)}
       />
     </section>

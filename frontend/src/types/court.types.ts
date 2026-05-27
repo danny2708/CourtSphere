@@ -8,8 +8,12 @@ export type CourtCardViewModel = {
   rating?: number;
   distanceText?: string;
   address?: string;
+  area?: string;
+  courtType?: string;
+  capacity?: number;
   openTime?: string;
   closeTime?: string;
+  startingPrice?: number;
   status: CourtStatus;
   tags: string[];
   hasPromotion?: boolean;
@@ -19,6 +23,7 @@ export type CourtCardViewModel = {
 export type CourtFilterState = {
   courtTypes: string[];
   statuses: CourtStatus[];
+  areas: string[];
   priceRange: [number, number];
   timeSlot: string;
   favoritesOnly: boolean;

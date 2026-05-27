@@ -35,11 +35,13 @@ const codeMessages: Record<string, string> = {
   INVALID_ACCESS_TOKEN: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
   ACCOUNT_LOCKED: "Tài khoản đang bị khóa.",
   ACCOUNT_DISABLED: "Tài khoản đã bị vô hiệu hóa.",
+  INVALID_CREDENTIALS: "Email hoặc mật khẩu không đúng.",
   FORBIDDEN: "Bạn không có quyền truy cập chức năng này.",
   NOT_FOUND: "Không tìm thấy dữ liệu cần hiển thị.",
   EMAIL_ALREADY_EXISTS: "Email này đã được đăng ký.",
   PHONE_ALREADY_EXISTS: "Số điện thoại này đã được đăng ký.",
   IDENTITY_CODE_ALREADY_EXISTS: "Mã định danh này đã được đăng ký.",
+  PRIORITY_GROUP_NOT_CONFIGURED: "Nhóm người dùng chưa được cấu hình. Vui lòng liên hệ quản trị viên.",
   VALIDATION_ERROR: "Vui lòng kiểm tra lại thông tin đã nhập."
 };
 

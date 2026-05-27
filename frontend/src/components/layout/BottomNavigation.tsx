@@ -7,7 +7,7 @@ import { cn } from "../../utils/cn";
 const bottomNavItems = [
   { label: "Trang chủ", to: ROUTE_PATHS.home, icon: Home, end: true },
   { label: "Bản đồ", to: ROUTE_PATHS.map, icon: Map, end: false },
-  { label: "Khám phá", to: ROUTE_PATHS.userHome, icon: Search, end: false },
+  { label: "Khám phá", to: ROUTE_PATHS.courts, icon: Search, end: false },
   { label: "Nổi bật", to: ROUTE_PATHS.featured, icon: Sparkles, end: false },
   { label: "Tài khoản", to: ROUTE_PATHS.account, icon: UserRound, end: false }
 ] as const;

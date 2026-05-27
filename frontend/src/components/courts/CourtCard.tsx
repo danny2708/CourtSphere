@@ -1,4 +1,5 @@
 import { Clock, MapPin, Star } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { Button } from "../common/Button";
 import { Badge } from "../common/Badge";
@@ -11,6 +12,7 @@ import type { CourtCardViewModel, CourtStatus } from "../../types/court.types";
 
 type CourtCardProps = {
   court: CourtCardViewModel;
+  detailPath?: string;
   onBook?: (courtId: string) => void;
   onShare?: (courtId: string) => void;
   onToggleFavorite?: (courtId: string) => void;
@@ -31,7 +33,7 @@ function getOpenHours(court: CourtCardViewModel): string | null {
   return `${court.openTime} - ${court.closeTime}`;
 }
 
-export function CourtCard({ court, onBook, onShare, onToggleFavorite }: CourtCardProps) {
+export function CourtCard({ court, detailPath, onBook, onShare, onToggleFavorite }: CourtCardProps) {
   const openHours = getOpenHours(court);
   const canBook = court.status === "ACTIVE";
 
@@ -69,7 +71,15 @@ export function CourtCard({ court, onBook, onShare, onToggleFavorite }: CourtCar
         </div>
 
         <div>
-          <h2>{court.name}</h2>
+          <h2>
+            {detailPath ? (
+              <Link className="court-card__title-link" to={detailPath}>
+                {court.name}
+              </Link>
+            ) : (
+              court.name
+            )}
+          </h2>
           {court.address ? (
             <p className="court-meta">
               <MapPin aria-hidden="true" size={16} />
@@ -89,6 +99,12 @@ export function CourtCard({ court, onBook, onShare, onToggleFavorite }: CourtCar
             <CourtTagBadge key={tag} tag={tag} />
           ))}
         </div>
+
+        {detailPath ? (
+          <Link className="court-card__details-link" to={detailPath}>
+            Xem chi tiết
+          </Link>
+        ) : null}
 
         <Button className="court-card__cta" disabled={!canBook} onClick={() => onBook?.(court.id)}>
           {bookingButtonText[court.status]}

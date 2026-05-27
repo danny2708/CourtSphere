@@ -4,13 +4,14 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { ROUTE_PATHS } from "../../routes/route-paths";
 import { useAuthStore } from "../../stores/auth.store";
 import { useToastStore } from "../../stores/toast.store";
+import type { RoleName } from "../../types/auth.types";
 import { cn } from "../../utils/cn";
 import { getErrorMessage } from "../../utils/format-error";
 import { Button } from "../common/Button";
 
 const navItems = [
   { label: "Trang chủ", to: ROUTE_PATHS.home },
-  { label: "Khám phá", to: ROUTE_PATHS.userHome },
+  { label: "Khám phá", to: ROUTE_PATHS.courts },
   { label: "Quản lý", to: ROUTE_PATHS.managerHome },
   { label: "Admin", to: ROUTE_PATHS.adminHome }
 ] as const;
@@ -21,6 +22,18 @@ const todayFormatter = new Intl.DateTimeFormat("vi-VN", {
   month: "2-digit",
   year: "numeric"
 });
+
+function getPrimaryRoleLabel(roles: RoleName[]): string {
+  if (roles.includes("ADMIN")) {
+    return "Admin";
+  }
+
+  if (roles.includes("FIELD_MANAGER") || roles.includes("MANAGER")) {
+    return "Quản lý";
+  }
+
+  return "User";
+}
 
 export function AppHeader() {
   const navigate = useNavigate();
@@ -73,7 +86,8 @@ export function AppHeader() {
             <>
               <div className="user-chip" title={user.email}>
                 {user.roles.includes("ADMIN") ? <ShieldCheck aria-hidden="true" size={16} /> : <UserRound aria-hidden="true" size={16} />}
-                <span>{user.fullName}</span>
+                <span className="user-chip__name">{user.fullName}</span>
+                <span className="user-chip__role">{getPrimaryRoleLabel(user.roles)}</span>
               </div>
               <Button className="header-icon-button" size="sm" variant="icon" onClick={handleLogout} aria-label="Đăng xuất">
                 <LogOut aria-hidden="true" size={18} />

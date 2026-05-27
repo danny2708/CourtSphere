@@ -72,6 +72,8 @@ export type AuthState = {
   accessToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  login: (payload: LoginRequest) => Promise<AuthUser>;
+  register: (payload: RegisterRequest) => Promise<AuthUser>;
   setToken: (token: string | null) => void;
   setUser: (user: AuthUser | null) => void;
   loadCurrentUser: () => Promise<void>;

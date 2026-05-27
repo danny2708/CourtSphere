@@ -1,10 +1,10 @@
 import { create } from "zustand";
 
 import { configureApiClient } from "../api/client";
-import { getCurrentUser, logoutRequest } from "../api/auth.api";
+import { authService } from "../features/auth/services/authService";
 import { ROUTE_PATHS, PUBLIC_ROUTE_PATHS } from "../routes/route-paths";
 import { ApiClientError } from "../types/api.types";
-import type { AuthState, AuthUser, RoleName } from "../types/auth.types";
+import type { AuthState, AuthUser, LoginRequest, RegisterRequest, RoleName } from "../types/auth.types";
 import { getErrorMessage } from "../utils/format-error";
 
 const ACCESS_TOKEN_STORAGE_KEY = "courtsphere.accessToken";
@@ -50,6 +50,56 @@ export const useAuthStore = create<InternalAuthState>((set, get) => ({
   isLoading: false,
   error: null,
 
+  login: async (payload: LoginRequest) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await authService.login(payload);
+
+      writeStoredToken(response.accessToken);
+      set({
+        accessToken: response.accessToken,
+        user: response.user,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null
+      });
+
+      return response.user;
+    } catch (error) {
+      set({
+        isLoading: false,
+        error: getErrorMessage(error)
+      });
+      throw error;
+    }
+  },
+
+  register: async (payload: RegisterRequest) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await authService.register(payload);
+
+      writeStoredToken(response.accessToken);
+      set({
+        accessToken: response.accessToken,
+        user: response.user,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null
+      });
+
+      return response.user;
+    } catch (error) {
+      set({
+        isLoading: false,
+        error: getErrorMessage(error)
+      });
+      throw error;
+    }
+  },
+
   setToken: (token: string | null) => {
     writeStoredToken(token);
     set({
@@ -86,10 +136,14 @@ export const useAuthStore = create<InternalAuthState>((set, get) => ({
       return;
     }
 
+    if (get().isLoading) {
+      return;
+    }
+
     set({ isLoading: true, error: null });
 
     try {
-      const user = await getCurrentUser();
+      const user = await authService.getCurrentUser();
       set({
         user,
         isAuthenticated: true,
@@ -112,8 +166,10 @@ export const useAuthStore = create<InternalAuthState>((set, get) => ({
   logout: async () => {
     try {
       if (get().accessToken) {
-        await logoutRequest();
+        await authService.logout();
       }
+    } catch {
+      // Local auth state must be cleared even when the stateless backend logout request fails.
     } finally {
       get().clearAuth();
     }

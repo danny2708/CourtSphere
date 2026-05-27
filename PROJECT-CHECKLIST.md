@@ -923,18 +923,28 @@ Acceptance criteria:
 
 Checklist:
 
-- [ ] Register page.
-- [ ] Login page.
-- [ ] Logout action.
-- [ ] Current user display.
-- [ ] Validate form register/login.
-- [ ] Redirect theo role sau login.
+- [x] Register page.
+- [x] Login page.
+- [x] Logout action.
+- [x] Current user display.
+- [x] Validate form register/login.
+- [x] Redirect theo role sau login.
 
 Acceptance criteria:
 
-- [ ] User đăng ký/login/logout được.
-- [ ] Sai thông tin hiển thị lỗi rõ ràng.
-- [ ] Role redirect đúng.
+- [x] User đăng ký/login/logout được.
+- [x] Sai thông tin hiển thị lỗi rõ ràng.
+- [x] Role redirect đúng.
+
+Verification notes:
+
+- [x] `npm run typecheck` pass.
+- [x] `npm run lint` pass.
+- [x] `npm test` pass.
+- [x] `npm run build` pass.
+- [x] Manual route `/login`, `/register`, `/user`, `/manager`, `/admin` trả 200 từ dev server.
+- [x] Backend auth API verify: register USER, `/me`, logout, login, duplicate email `409`, wrong password `401`.
+- [ ] Manual E2E login bằng tài khoản ADMIN/FIELD_MANAGER cần credential seed hợp lệ.
 
 ---
 
@@ -942,24 +952,46 @@ Acceptance criteria:
 
 Checklist:
 
-- [ ] Home page với court cards.
-- [ ] Court list page.
-- [ ] Search by name.
-- [ ] Filter by court type.
-- [ ] Filter by location.
-- [ ] Filter by status.
-- [ ] Filter by price/time nếu backend hỗ trợ.
-- [ ] Court detail page.
-- [ ] Hiển thị ảnh, tên, địa chỉ, giờ mở cửa, trạng thái.
+- [x] Home page với court cards.
+- [x] Court list page.
+- [x] Search by name.
+- [x] Filter by court type.
+- [x] Filter by location.
+- [x] Filter by status.
+- [x] Filter by price/time nếu backend hỗ trợ.
+- [x] Court detail page.
+- [x] Hiển thị ảnh, tên, địa chỉ, giờ mở cửa, trạng thái.
 - [ ] Hiển thị availability slots.
-- [ ] Hiển thị pricing.
+- [x] Hiển thị pricing.
 - [ ] Hiển thị rules: cancel/check-in/refund.
 
 Acceptance criteria:
 
-- [ ] User tìm sân được.
+- [x] User tìm sân được.
 - [ ] User xem chi tiết và lịch trống được.
-- [ ] Court không khả dụng thì disable nút đặt lịch.
+- [x] Court không khả dụng thì disable nút đặt lịch.
+
+#### 7.4.1 Court Listing & Court Detail Pages
+
+Checklist:
+
+- [x] Route `/courts` hoạt động với mock data.
+- [x] Route `/courts/:courtId` hoạt động với mock data.
+- [x] Mock data được tách khỏi page.
+- [x] Có service mock-first cho list/detail.
+- [x] Có search/filter/sort cơ bản.
+- [x] Detail id không tồn tại hiển thị state hợp lý.
+- [x] Header/bottom navigation trỏ đúng route court browsing.
+
+Acceptance criteria:
+
+- [x] `npm run typecheck` pass.
+- [x] `npm run lint` pass.
+- [x] `npm test` pass.
+- [x] `npm run build` pass.
+- [x] Manual route `/courts` trả 200.
+- [x] Manual route `/courts/court-football-01` trả 200.
+- [x] Manual route `/courts/not-found-id` trả 200 và xử lý not found trong UI.
 
 ---
 
@@ -1182,8 +1214,8 @@ Acceptance criteria:
 - [ ] Operating hours.
 - [ ] Pricing rules.
 - [ ] Availability API.
-- [ ] Court list UI.
-- [ ] Court detail UI.
+- [x] Court list UI.
+- [x] Court detail UI.
 
 ### Sprint 2 — Booking & payment MVP
 
@@ -1289,7 +1321,9 @@ Một module được coi là hoàn thành khi:
 | Reports | Codex | DONE | Admin reports APIs, aggregate service, contract, tests, and verification completed |
 | Frontend foundation | Codex | DONE | React + TypeScript/Vite foundation with router, API client, auth store, protected/role routes, layout, states, theme, and verification completed |
 | UI design system | Codex | DONE | Theme tokens, header, search/filter bar, court cards/grid, badges, drawer, common states, mobile bottom nav, and mock HomePage preview verified |
-| User pages |  | TODO |  |
+| Court listing/detail | Codex | DONE | Mock-first `/courts` and `/courts/:courtId`, search/filter/sort, detail view, navigation links, and verification completed |
+| Frontend auth pages | Codex | DONE | Login/register forms, Zod validation, auth service/store actions, logout, current user display, role redirect helper, and backend USER auth flow verified |
+| User pages | Codex | IN_PROGRESS | Court browsing shell done; availability, booking flow, my bookings, policy/rules pages remain |
 | Manager pages |  | TODO |  |
 | Admin pages |  | TODO |  |
 | Tests |  | TODO |  |

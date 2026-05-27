@@ -14,6 +14,7 @@ type CourtFilterDrawerProps = {
 };
 
 const courtTypes = ["Bóng đá", "Cầu lông", "Tennis", "Bóng rổ", "Đa năng", "Trong nhà", "Ngoài trời"];
+const courtAreas = ["Khu thể thao A", "Nhà thi đấu B", "Khu thể thao C", "Ký túc xá", "Khu sinh viên"];
 const courtStatuses: CourtStatus[] = ["ACTIVE", "MAINTENANCE", "TEMP_CLOSED", "RETIRED"];
 const timeSlots = ["Sáng", "Chiều", "Tối"];
 
@@ -72,6 +73,22 @@ export function CourtFilterDrawer({ filters, isOpen, onApply, onChange, onClear,
                   onChange={() => onChange({ ...filters, statuses: toggleStatus(filters.statuses, status) })}
                 />
                 <span>{courtStatusLabel[status]}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="filter-section">
+          <h3>Khu vực</h3>
+          <div className="filter-chip-grid">
+            {courtAreas.map((area) => (
+              <label key={area} className="filter-chip">
+                <input
+                  checked={filters.areas.includes(area)}
+                  type="checkbox"
+                  onChange={() => onChange({ ...filters, areas: toggleString(filters.areas, area) })}
+                />
+                <span>{area}</span>
               </label>
             ))}
           </div>
