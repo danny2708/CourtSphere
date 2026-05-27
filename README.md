@@ -84,3 +84,23 @@ Health check:
 ```bash
 curl http://localhost:3000/health
 ```
+
+### Swagger / OpenAPI
+
+After starting the backend, open the interactive Swagger UI:
+
+```text
+http://localhost:3000/api-docs
+```
+
+The raw OpenAPI JSON contract is available at:
+
+```text
+http://localhost:3000/openapi.json
+```
+
+Swagger supports Bearer JWT authentication. Use the `Authorize` button and enter:
+
+```text
+Bearer <accessToken>
+```
