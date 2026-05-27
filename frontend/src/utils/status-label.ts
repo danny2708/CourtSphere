@@ -1,0 +1,54 @@
+export const bookingOrderStatusLabel = {
+  PENDING_PAYMENT: "Chờ thanh toán",
+  PAYMENT_PROCESSING: "Đang xử lý thanh toán",
+  PAYMENT_EXPIRED: "Hết hạn thanh toán",
+  CONFIRMED: "Đã xác nhận",
+  PARTIALLY_CANCELLED: "Đã hủy một phần",
+  CANCELLED_BY_USER: "Người dùng đã hủy",
+  CANCELLED_BY_MANAGER: "Quản lý đã hủy",
+  CANCELLED_BY_ADMIN: "Quản trị viên đã hủy",
+  COMPLETED: "Hoàn thành"
+} as const;
+
+export const bookingItemStatusLabel = {
+  PENDING_PAYMENT: "Chờ thanh toán",
+  PAYMENT_PROCESSING: "Đang xử lý thanh toán",
+  PAYMENT_EXPIRED: "Hết hạn thanh toán",
+  CONFIRMED: "Đã xác nhận",
+  IN_USE: "Đang sử dụng",
+  COMPLETED: "Hoàn thành",
+  CANCELLED_BY_USER: "Người dùng đã hủy",
+  CANCELLED_BY_MANAGER: "Quản lý đã hủy",
+  CANCELLED_BY_ADMIN: "Quản trị viên đã hủy",
+  CHECKIN_EXPIRED: "Quá giờ check-in",
+  NO_SHOW: "Vắng mặt"
+} as const;
+
+export const courtStatusLabel = {
+  ACTIVE: "Đang hoạt động",
+  MAINTENANCE: "Bảo trì",
+  TEMP_CLOSED: "Tạm đóng",
+  RETIRED: "Ngừng sử dụng"
+} as const;
+
+export const paymentStatusLabel = {
+  INITIATED: "Đã khởi tạo",
+  PROCESSING: "Đang xử lý",
+  SUCCESS: "Thành công",
+  FAILED: "Thất bại",
+  CANCELLED: "Đã hủy",
+  EXPIRED: "Hết hạn"
+} as const;
+
+export const refundStatusLabel = {
+  REQUESTED: "Đã yêu cầu",
+  PROCESSING: "Đang xử lý",
+  SUCCESS: "Hoàn tiền thành công",
+  FAILED: "Hoàn tiền thất bại",
+  MANUAL_REVIEW: "Cần xử lý thủ công",
+  REJECTED: "Đã từ chối"
+} as const;
+
+export function getStatusLabel<TStatusMap extends Record<string, string>>(statusMap: TStatusMap, status: string): string {
+  return statusMap[status] ?? status;
+}

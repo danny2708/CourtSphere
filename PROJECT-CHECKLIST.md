@@ -840,22 +840,22 @@ Mục tiêu: tạo nền React + TypeScript ổn định.
 
 Checklist:
 
-- [ ] Khởi tạo React + TypeScript.
-- [ ] Cấu hình router.
-- [ ] Cấu hình API client.
-- [ ] Cấu hình auth store.
-- [ ] Cấu hình protected routes.
-- [ ] Cấu hình role-based routes.
-- [ ] Cấu hình global layout.
-- [ ] Cấu hình toast/error handling.
-- [ ] Cấu hình form validation.
-- [ ] Cấu hình theme xanh nước biển.
+- [x] Khởi tạo React + TypeScript.
+- [x] Cấu hình router.
+- [x] Cấu hình API client.
+- [x] Cấu hình auth store.
+- [x] Cấu hình protected routes.
+- [x] Cấu hình role-based routes.
+- [x] Cấu hình global layout.
+- [x] Cấu hình toast/error handling.
+- [x] Cấu hình form validation.
+- [x] Cấu hình theme xanh nước biển.
 
 Acceptance criteria:
 
-- [ ] Frontend chạy được local.
-- [ ] Có layout cơ bản.
-- [ ] Có route auth/user/manager/admin.
+- [x] Frontend chạy được local.
+- [x] Có layout cơ bản.
+- [x] Có route auth/user/manager/admin.
 
 ---
 
@@ -894,28 +894,28 @@ const theme = {
 
 Checklist:
 
-- [ ] Tạo `AppHeader`.
-- [ ] Tạo `SearchFilterBar`.
-- [ ] Tạo `BottomNavigation`.
-- [ ] Tạo `CourtCard`.
-- [ ] Tạo `CourtGrid`.
-- [ ] Tạo `CourtStatusBadge`.
-- [ ] Tạo `CourtTagBadge`.
-- [ ] Tạo `FavoriteButton`.
-- [ ] Tạo `ShareButton`.
-- [ ] Tạo `FilterDrawer`.
-- [ ] Tạo `LoadingState`.
-- [ ] Tạo `EmptyState`.
-- [ ] Tạo `ErrorState`.
+- [x] Tạo `AppHeader`.
+- [x] Tạo `SearchFilterBar`.
+- [x] Tạo `BottomNavigation`.
+- [x] Tạo `CourtCard`.
+- [x] Tạo `CourtGrid`.
+- [x] Tạo `CourtStatusBadge`.
+- [x] Tạo `CourtTagBadge`.
+- [x] Tạo `FavoriteButton`.
+- [x] Tạo `ShareButton`.
+- [x] Tạo `FilterDrawer`.
+- [x] Tạo `LoadingState`.
+- [x] Tạo `EmptyState`.
+- [x] Tạo `ErrorState`.
 
 Acceptance criteria:
 
-- [ ] UI mobile-first.
-- [ ] Desktop hiển thị grid 3 cột.
-- [ ] Tablet hiển thị grid 2 cột.
-- [ ] Mobile hiển thị 1 cột.
-- [ ] Bottom navigation fixed trên mobile.
-- [ ] Không copy logo/hình ảnh/thương hiệu của website tham khảo.
+- [x] UI mobile-first.
+- [x] Desktop hiển thị grid 3 cột.
+- [x] Tablet hiển thị grid 2 cột.
+- [x] Mobile hiển thị 1 cột.
+- [x] Bottom navigation fixed trên mobile.
+- [x] Không copy logo/hình ảnh/thương hiệu của website tham khảo.
 
 ---
 
@@ -1169,7 +1169,7 @@ Acceptance criteria:
 ### Sprint 0 — Foundation
 
 - [x] Backend foundation.
-- [ ] Frontend foundation.
+- [x] Frontend foundation.
 - [x] Prisma schema baseline.
 - [x] Seed data.
 - [x] Auth basic.
@@ -1287,8 +1287,8 @@ Một module được coi là hoàn thành khi:
 | Violations | Codex | DONE | Admin/manager violation APIs, waive/adjust audit, shared violation service, late cancellation handling, and verification completed |
 | Notifications | Codex | DONE | In-app notification APIs/service, lifecycle integrations, enum migration, and tests verified |
 | Reports | Codex | DONE | Admin reports APIs, aggregate service, contract, tests, and verification completed |
-| Frontend foundation |  | TODO |  |
-| UI design system |  | TODO |  |
+| Frontend foundation | Codex | DONE | React + TypeScript/Vite foundation with router, API client, auth store, protected/role routes, layout, states, theme, and verification completed |
+| UI design system | Codex | DONE | Theme tokens, header, search/filter bar, court cards/grid, badges, drawer, common states, mobile bottom nav, and mock HomePage preview verified |
 | User pages |  | TODO |  |
 | Manager pages |  | TODO |  |
 | Admin pages |  | TODO |  |
