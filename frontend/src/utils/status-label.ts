@@ -52,6 +52,28 @@ export const refundStatusLabel = {
   REJECTED: "Đã từ chối"
 } as const;
 
+export const accountStatusLabel = {
+  ACTIVE: "Đang hoạt động",
+  LOCKED: "Đã khóa",
+  DISABLED: "Vô hiệu hóa"
+} as const;
+
+export const bookingPermissionStatusLabel = {
+  ALLOWED: "Được đặt sân",
+  RESTRICTED: "Bị hạn chế đặt sân"
+} as const;
+
+export const entityStatusLabel = {
+  ACTIVE: "Đang hoạt động",
+  INACTIVE: "Ngừng hoạt động"
+} as const;
+
+export const violationTypeLabel = {
+  NO_SHOW: "Vắng mặt",
+  LATE_CANCELLATION: "Hủy sát giờ",
+  MANUAL: "Thủ công"
+} as const;
+
 export const availabilitySlotStatusLabel = {
   AVAILABLE: "Còn trống",
   PENDING_PAYMENT: "Đang giữ chỗ",

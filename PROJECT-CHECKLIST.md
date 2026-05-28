@@ -1091,26 +1091,36 @@ Verification notes:
 
 Checklist:
 
-- [ ] Admin dashboard.
-- [ ] User management page.
-- [ ] Role assignment UI.
-- [ ] Priority group management UI.
-- [ ] Court type management UI.
-- [ ] Court management UI.
-- [ ] Operating hours UI.
-- [ ] Pricing rules UI.
-- [ ] Booking rules UI.
-- [ ] Priority policies UI.
-- [ ] Payment management UI.
-- [ ] Refund management UI.
-- [ ] Violation management UI.
-- [ ] Reports page.
+- [x] Admin dashboard.
+- [x] User management page.
+- [x] Role assignment UI.
+- [x] Priority group management UI.
+- [x] Court type management UI.
+- [x] Court management UI.
+- [x] Operating hours UI.
+- [x] Pricing rules UI.
+- [x] Booking rules UI.
+- [x] Priority policies UI.
+- [x] Payment management UI.
+- [x] Refund management UI.
+- [x] Violation management UI.
+- [x] Reports page.
 
 Acceptance criteria:
 
-- [ ] Admin quản trị được dữ liệu cốt lõi.
-- [ ] Admin cấu hình được nghiệp vụ động.
-- [ ] Admin xem được báo cáo cơ bản.
+- [ ] Admin quản trị được dữ liệu cốt lõi: frontend-ready, manual ADMIN credential verification pending.
+- [ ] Admin cấu hình được nghiệp vụ động: frontend-ready, manual ADMIN credential verification pending.
+- [ ] Admin xem được báo cáo cơ bản: frontend-ready, manual ADMIN credential verification pending.
+
+Verification notes:
+
+- [x] `npm run typecheck` pass.
+- [x] `npm run lint` pass.
+- [x] `npm test` pass.
+- [x] `npm run build` pass.
+- [x] Dev route check `/admin`, `/admin/dashboard`, `/admin/users`, `/admin/roles`, `/admin/priority-groups`, `/admin/court-types`, `/admin/courts`, `/admin/operating-hours`, `/admin/pricing-rules`, `/admin/booking-rules`, `/admin/priority-policies`, `/admin/payments`, `/admin/refunds`, `/admin/violations`, `/admin/reports` trả 200.
+- [x] Backend RBAC verify: tài khoản `FIELD_MANAGER` gọi `GET /api/admin/users` trả `403 FORBIDDEN`.
+- [ ] Manual admin E2E với credential `ADMIN` thật pending vì chưa có tài khoản admin login hợp lệ trong phiên này.
 
 ---
 

@@ -2006,6 +2006,204 @@ a {
   padding: 18px;
 }
 
+.admin-page {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-nav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 6px 0 2px;
+}
+
+.admin-nav__link {
+  min-height: 40px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-secondary);
+  background: var(--color-card);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.admin-nav__link--active {
+  border-color: rgba(14, 165, 233, 0.28);
+  color: var(--color-primary-dark);
+  background: var(--color-primary-light);
+}
+
+.admin-header {
+  align-items: center;
+}
+
+.admin-stat-grid,
+.admin-card-grid,
+.admin-dashboard-links,
+.admin-report-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-stat-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-card-grid,
+.admin-dashboard-links {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-report-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-stat-card,
+.admin-info-card,
+.admin-dashboard-link,
+.admin-report-card,
+.admin-form-card {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-stat-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.admin-stat-card span {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.admin-stat-card strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.admin-stat-card p,
+.admin-info-card p,
+.admin-dashboard-link p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.admin-stat-card__icon,
+.admin-dashboard-link svg,
+.admin-info-card svg {
+  color: var(--color-primary-dark);
+}
+
+.admin-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
+}
+
+.admin-filter-bar input,
+.admin-filter-bar select,
+.admin-form-card input,
+.dialog-panel input,
+.dialog-panel select {
+  min-height: 42px;
+  min-width: 220px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  color: var(--color-text-primary);
+  background: #ffffff;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 14px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-table th {
+  color: var(--color-text-secondary);
+  background: var(--color-background);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.admin-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-muted {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+}
+
+.admin-badge-row,
+.admin-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-form-card .form-field,
+.dialog-panel .form-field {
+  display: grid;
+  gap: 7px;
+}
+
+.admin-form-card .form-field span,
+.dialog-panel .form-field span {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.admin-report-card pre {
+  max-height: 320px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--radius-button);
+  color: var(--color-text-primary);
+  background: var(--color-background);
+  white-space: pre-wrap;
+}
+
 .toast-viewport {
   position: fixed;
   right: 16px;
@@ -2103,12 +2301,23 @@ a {
 
   .manager-dashboard-grid,
   .manager-booking-grid,
-  .manager-court-grid {
+  .manager-court-grid,
+  .admin-stat-grid,
+  .admin-card-grid,
+  .admin-dashboard-links,
+  .admin-report-grid,
+  .admin-form-grid {
     grid-template-columns: 1fr;
   }
 
   .manager-filters {
     grid-template-columns: 1fr;
+  }
+
+  .admin-filter-bar,
+  .admin-filter-bar input,
+  .admin-filter-bar select {
+    width: 100%;
   }
 
   .search-filter-bar {

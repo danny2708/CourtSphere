@@ -12,8 +12,21 @@ import { NotFoundPage } from "./pages/misc/NotFoundPage";
 import { PlaceholderPage } from "./pages/misc/PlaceholderPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { RegisterPage } from "./pages/auth/RegisterPage";
-import { AdminHomePage } from "./pages/admin/AdminHomePage";
 import { HomePage } from "./pages/user/HomePage";
+import { AdminDashboardPage } from "./features/admin/pages/AdminDashboardPage";
+import { BookingRulesPage } from "./features/admin/pages/BookingRulesPage";
+import { CourtManagementPage } from "./features/admin/pages/CourtManagementPage";
+import { CourtTypeManagementPage } from "./features/admin/pages/CourtTypeManagementPage";
+import { OperatingHoursPage } from "./features/admin/pages/OperatingHoursPage";
+import { PaymentManagementPage } from "./features/admin/pages/PaymentManagementPage";
+import { PricingRulesPage } from "./features/admin/pages/PricingRulesPage";
+import { PriorityGroupManagementPage } from "./features/admin/pages/PriorityGroupManagementPage";
+import { PriorityPoliciesPage } from "./features/admin/pages/PriorityPoliciesPage";
+import { RefundManagementPage } from "./features/admin/pages/RefundManagementPage";
+import { ReportsPage } from "./features/admin/pages/ReportsPage";
+import { RoleManagementPage } from "./features/admin/pages/RoleManagementPage";
+import { UserManagementPage } from "./features/admin/pages/UserManagementPage";
+import { ViolationManagementPage } from "./features/admin/pages/ViolationManagementPage";
 import { ManagerCheckinPage } from "./features/manager/pages/ManagerCheckinPage";
 import { ManagerCourtStatusPage } from "./features/manager/pages/ManagerCourtStatusPage";
 import { ManagerDashboardPage } from "./features/manager/pages/ManagerDashboardPage";
@@ -58,7 +71,21 @@ export default function App() {
             </Route>
 
             <Route element={<RoleRoute roles="ADMIN" />}>
-              <Route path={ROUTE_PATHS.adminHome} element={<AdminHomePage />} />
+              <Route path={ROUTE_PATHS.adminHome} element={<AdminDashboardPage />} />
+              <Route path={ROUTE_PATHS.adminDashboard} element={<AdminDashboardPage />} />
+              <Route path={ROUTE_PATHS.adminUsers} element={<UserManagementPage />} />
+              <Route path={ROUTE_PATHS.adminRoles} element={<RoleManagementPage />} />
+              <Route path={ROUTE_PATHS.adminPriorityGroups} element={<PriorityGroupManagementPage />} />
+              <Route path={ROUTE_PATHS.adminCourtTypes} element={<CourtTypeManagementPage />} />
+              <Route path={ROUTE_PATHS.adminCourts} element={<CourtManagementPage />} />
+              <Route path={ROUTE_PATHS.adminOperatingHours} element={<OperatingHoursPage />} />
+              <Route path={ROUTE_PATHS.adminPricingRules} element={<PricingRulesPage />} />
+              <Route path={ROUTE_PATHS.adminBookingRules} element={<BookingRulesPage />} />
+              <Route path={ROUTE_PATHS.adminPriorityPolicies} element={<PriorityPoliciesPage />} />
+              <Route path={ROUTE_PATHS.adminPayments} element={<PaymentManagementPage />} />
+              <Route path={ROUTE_PATHS.adminRefunds} element={<RefundManagementPage />} />
+              <Route path={ROUTE_PATHS.adminViolations} element={<ViolationManagementPage />} />
+              <Route path={ROUTE_PATHS.adminReports} element={<ReportsPage />} />
             </Route>
           </Route>
 
