@@ -961,14 +961,14 @@ Checklist:
 - [x] Filter by price/time nếu backend hỗ trợ.
 - [x] Court detail page.
 - [x] Hiển thị ảnh, tên, địa chỉ, giờ mở cửa, trạng thái.
-- [ ] Hiển thị availability slots.
+- [x] Hiển thị availability slots.
 - [x] Hiển thị pricing.
-- [ ] Hiển thị rules: cancel/check-in/refund.
+- [x] Hiển thị rules: cancel/check-in/refund.
 
 Acceptance criteria:
 
 - [x] User tìm sân được.
-- [ ] User xem chi tiết và lịch trống được.
+- [x] User xem chi tiết và lịch trống được.
 - [x] Court không khả dụng thì disable nút đặt lịch.
 
 #### 7.4.1 Court Listing & Court Detail Pages
@@ -992,6 +992,30 @@ Acceptance criteria:
 - [x] Manual route `/courts` trả 200.
 - [x] Manual route `/courts/court-football-01` trả 200.
 - [x] Manual route `/courts/not-found-id` trả 200 và xử lý not found trong UI.
+
+#### 7.4.2 Court Availability & Policy Integration
+
+Checklist:
+
+- [x] Court detail có date picker chọn ngày xem lịch trống.
+- [x] Tạo availability service real-first/mock fallback cho dev preview.
+- [x] Tạo availability slot picker/card.
+- [x] Slot available/hold/booked/unavailable hiển thị rõ và disabled đúng.
+- [x] Court không `ACTIVE` không cho đặt lịch.
+- [x] Hiển thị giá theo slot nếu có dữ liệu.
+- [x] Hiển thị policy giữ chỗ, hủy, check-in, hoàn tiền.
+- [x] Có loading/error/empty state cho availability.
+- [x] Không tạo booking hold trong module này.
+- [x] Không có nút user tự check-in.
+
+Verification notes:
+
+- [x] `npm run typecheck` pass.
+- [x] `npm run lint` pass.
+- [x] `npm test` pass.
+- [x] `npm run build` pass.
+- [x] Programmatic Vite route check `/courts`, `/courts/court-football-01`, `/courts/court-badminton-02`, `/courts/not-found-id` trả 200.
+- [ ] Backend availability API manual verification pending vì backend `localhost:3000` chưa chạy trong phiên kiểm tra này.
 
 ---
 

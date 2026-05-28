@@ -49,6 +49,15 @@ export const refundStatusLabel = {
   REJECTED: "Đã từ chối"
 } as const;
 
+export const availabilitySlotStatusLabel = {
+  AVAILABLE: "Còn trống",
+  PENDING_PAYMENT: "Đang giữ chỗ",
+  PAYMENT_PROCESSING: "Đang xử lý thanh toán",
+  CONFIRMED: "Đã đặt",
+  IN_USE: "Đang sử dụng",
+  UNAVAILABLE: "Không khả dụng"
+} as const;
+
 export function getStatusLabel<TStatusMap extends Record<string, string>>(statusMap: TStatusMap, status: string): string {
   return statusMap[status] ?? status;
 }

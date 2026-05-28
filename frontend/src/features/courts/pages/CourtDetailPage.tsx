@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Clock, MapPin, UsersRound } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -13,7 +13,14 @@ import { FavoriteButton } from "../../../components/courts/FavoriteButton";
 import { ShareButton } from "../../../components/courts/ShareButton";
 import { ROUTE_PATHS } from "../../../routes/route-paths";
 import { useToastStore } from "../../../stores/toast.store";
+import { getErrorMessage } from "../../../utils/format-error";
+import { AvailabilityDatePicker } from "../components/AvailabilityDatePicker";
+import { AvailabilitySlotPicker } from "../components/AvailabilitySlotPicker";
+import { CourtPolicyPanel } from "../components/CourtPolicyPanel";
+import { CourtPriceSummary } from "../components/CourtPriceSummary";
+import { getCourtAvailability } from "../services/availabilityService";
 import { getCourtById } from "../services/courtService";
+import type { AvailabilitySlotViewModel, CourtAvailabilityViewModel } from "../types/availability.types";
 import type { CourtDetailViewModel } from "../types/court-detail.types";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
@@ -24,7 +31,7 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
 
 function getAvailabilityText(court: CourtDetailViewModel): string {
   if (court.status === "ACTIVE") {
-    return "Đặt sân";
+    return "Xem lịch trống";
   }
 
   if (court.status === "MAINTENANCE") {
@@ -38,14 +45,32 @@ function getAvailabilityText(court: CourtDetailViewModel): string {
   return "Ngừng sử dụng";
 }
 
+function toDateInputValue(date: Date): string {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+
+  return localDate.toISOString().slice(0, 10);
+}
+
+function isPastDate(date: string, minDate: string): boolean {
+  return date < minDate;
+}
+
 export function CourtDetailPage() {
   const navigate = useNavigate();
   const { courtId } = useParams<{ courtId: string }>();
   const { addToast } = useToastStore();
+  const todayDate = useMemo(() => toDateInputValue(new Date()), []);
+  const [availability, setAvailability] = useState<CourtAvailabilityViewModel | null>(null);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [availabilityReloadKey, setAvailabilityReloadKey] = useState(0);
   const [court, setCourt] = useState<CourtDetailViewModel | null>(null);
+  const [dateError, setDateError] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(todayDate);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -77,6 +102,57 @@ export function CourtDetailPage() {
     };
   }, [courtId]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAvailability() {
+      if (!court) {
+        return;
+      }
+
+      if (isPastDate(selectedDate, todayDate)) {
+        setDateError("Vui lòng chọn một ngày hợp lệ.");
+        setAvailability(null);
+        setAvailabilityError(null);
+        setIsLoadingAvailability(false);
+        setSelectedSlotId(null);
+        return;
+      }
+
+      setDateError(null);
+      setAvailabilityError(null);
+      setIsLoadingAvailability(true);
+      setSelectedSlotId(null);
+
+      try {
+        const loadedAvailability = await getCourtAvailability({ court, date: selectedDate });
+
+        if (!isMounted) {
+          return;
+        }
+
+        setAvailability(loadedAvailability);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setAvailability(null);
+        setAvailabilityError(getErrorMessage(error));
+      } finally {
+        if (isMounted) {
+          setIsLoadingAvailability(false);
+        }
+      }
+    }
+
+    void loadAvailability();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [availabilityReloadKey, court, selectedDate, todayDate]);
+
   if (isLoading) {
     return <LoadingState message="Đang tải chi tiết sân..." title="Chi tiết sân" />;
   }
@@ -93,6 +169,51 @@ export function CourtDetailPage() {
   }
 
   const canBook = court.status === "ACTIVE";
+  const selectedSlot = useMemo(
+    () => availability?.slots.find((slot) => slot.id === selectedSlotId) ?? null,
+    [availability?.slots, selectedSlotId]
+  );
+  const availableSlotCount = availability?.slots.filter((slot) => slot.isAvailable).length ?? 0;
+  const canContinueBooking = canBook && Boolean(selectedSlot?.isAvailable);
+
+  const handleSelectSlot = (slot: AvailabilitySlotViewModel) => {
+    if (!slot.isAvailable) {
+      addToast({
+        type: "warning",
+        title: "Khung giờ không khả dụng",
+        message: slot.reasonText ?? "Khung giờ này hiện không khả dụng."
+      });
+      return;
+    }
+
+    setSelectedSlotId(slot.id);
+  };
+
+  const handleBookingIntent = () => {
+    if (!canBook) {
+      addToast({
+        type: "warning",
+        title: "Sân không khả dụng",
+        message: "Chỉ sân đang hoạt động mới có thể đặt lịch."
+      });
+      return;
+    }
+
+    if (!selectedSlot) {
+      addToast({
+        type: "info",
+        title: "Chọn khung giờ",
+        message: "Vui lòng chọn một khung giờ còn trống trước khi đặt lịch."
+      });
+      return;
+    }
+
+    addToast({
+      type: "info",
+      title: "Chuẩn bị đặt lịch",
+      message: "Tạo booking hold sẽ được triển khai ở module 7.5 Booking pages."
+    });
+  };
 
   return (
     <section className="page-stack">
@@ -155,11 +276,66 @@ export function CourtDetailPage() {
             </div>
           </div>
 
-          <Button disabled={!canBook} onClick={() => addToast({ type: "info", title: "Đặt sân", message: "Luồng đặt sân sẽ được triển khai ở module booking." })}>
+          <Button
+            disabled={!canBook}
+            onClick={() => {
+              document.getElementById("court-availability")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          >
             {getAvailabilityText(court)}
           </Button>
         </div>
       </div>
+
+      <Card as="section" className="detail-card detail-card--wide availability-panel" id="court-availability">
+        <div className="availability-header">
+          <div>
+            <p className="eyebrow">Lịch trống</p>
+            <h2>Chọn ngày và khung giờ</h2>
+            <p>Slot còn trống có thể chọn để chuẩn bị đặt lịch. Booking hold và thanh toán sẽ được xử lý ở module sau.</p>
+          </div>
+          <AvailabilityDatePicker
+            error={dateError}
+            minDate={todayDate}
+            value={selectedDate}
+            onChange={setSelectedDate}
+          />
+        </div>
+
+        {!canBook ? (
+          <p className="availability-warning" role="status">
+            Sân không ở trạng thái hoạt động nên tất cả khung giờ đặt lịch đều bị khóa.
+          </p>
+        ) : null}
+
+        {isLoadingAvailability ? (
+          <LoadingState compact message="Đang tải lịch trống..." />
+        ) : availabilityError ? (
+          <ErrorState
+            compact
+            actionLabel="Thử lại"
+            message={availabilityError}
+            title="Không tải được lịch trống"
+            onAction={() => setAvailabilityReloadKey((key) => key + 1)}
+          />
+        ) : availability ? (
+          <AvailabilitySlotPicker
+            selectedSlotId={selectedSlotId}
+            slots={availability.slots}
+            onSelectSlot={handleSelectSlot}
+          />
+        ) : null}
+
+        <div className="booking-intent">
+          <div>
+            <span>Khung giờ đã chọn</span>
+            <strong>{selectedSlot ? `${selectedSlot.startTimeText} - ${selectedSlot.endTimeText}` : "Chưa chọn khung giờ"}</strong>
+          </div>
+          <Button disabled={!canContinueBooking} onClick={handleBookingIntent}>
+            Đặt lịch
+          </Button>
+        </div>
+      </Card>
 
       <div className="court-detail-grid">
         <Card as="section" className="detail-card">
@@ -215,6 +391,17 @@ export function CourtDetailPage() {
             ))}
           </div>
         </Card>
+
+        {availability ? (
+          <>
+            <CourtPriceSummary
+              availableSlotCount={availableSlotCount}
+              selectedSlot={selectedSlot}
+              source={availability.source}
+            />
+            <CourtPolicyPanel policy={availability.policy} />
+          </>
+        ) : null}
       </div>
     </section>
   );

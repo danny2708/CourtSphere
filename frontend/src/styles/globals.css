@@ -1171,6 +1171,253 @@ a {
   gap: 8px;
 }
 
+.availability-panel {
+  scroll-margin-top: 112px;
+}
+
+.availability-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.availability-header p {
+  margin: 8px 0 0;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.availability-date-picker {
+  min-width: 240px;
+  display: grid;
+  gap: 8px;
+}
+
+.availability-date-picker span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-primary);
+  font-weight: 850;
+}
+
+.availability-date-picker svg {
+  color: var(--color-primary-dark);
+}
+
+.availability-date-picker input {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  color: var(--color-text-primary);
+  background: var(--color-background);
+  font-weight: 750;
+}
+
+.availability-date-picker input:focus {
+  outline: none;
+  border-color: rgba(14, 165, 233, 0.52);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
+}
+
+.availability-date-picker small,
+.availability-slot p {
+  color: var(--color-text-secondary);
+}
+
+.availability-date-picker small {
+  color: var(--color-danger);
+  font-weight: 800;
+}
+
+.availability-warning {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(250, 204, 21, 0.42);
+  border-radius: var(--radius-button);
+  color: #854d0e;
+  background: #fef9c3;
+  font-weight: 800;
+}
+
+.availability-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.availability-slot {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-background);
+}
+
+.availability-slot--available {
+  border-color: rgba(34, 197, 94, 0.32);
+  background: #f0fdf4;
+}
+
+.availability-slot--selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.16);
+}
+
+.availability-slot--pending-payment,
+.availability-slot--payment-processing {
+  border-color: rgba(250, 204, 21, 0.42);
+  background: #fefce8;
+}
+
+.availability-slot--confirmed,
+.availability-slot--in-use {
+  background: #f8fafc;
+}
+
+.availability-slot--unavailable {
+  opacity: 0.82;
+  background: #fff1f2;
+}
+
+.availability-slot__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.availability-slot__header > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.availability-slot__time {
+  color: var(--color-text-primary);
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.availability-slot__price {
+  color: var(--color-primary-dark);
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.availability-slot p {
+  min-height: 42px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.availability-slot__button {
+  width: 100%;
+  min-height: 38px;
+}
+
+.booking-intent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+}
+
+.booking-intent div {
+  display: grid;
+  gap: 4px;
+}
+
+.booking-intent span {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.booking-intent strong {
+  color: var(--color-text-primary);
+  font-size: 18px;
+}
+
+.price-summary dl {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.price-summary dl div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.price-summary dt,
+.policy-list span {
+  color: var(--color-text-secondary);
+  font-weight: 750;
+}
+
+.price-summary dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 900;
+}
+
+.policy-panel {
+  align-content: start;
+}
+
+.policy-panel .eyebrow,
+.price-summary .eyebrow {
+  margin: 0 0 6px;
+}
+
+.policy-list {
+  display: grid;
+  gap: 10px;
+}
+
+.policy-list div {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  background: var(--color-background);
+}
+
+.policy-list svg {
+  color: var(--color-primary-dark);
+}
+
+.policy-list strong {
+  text-align: right;
+}
+
+.policy-note {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-button);
+  color: #075985;
+  background: var(--color-primary-light);
+  font-weight: 750;
+  line-height: 1.55;
+}
+
 .filter-drawer {
   position: fixed;
   inset: 0;
@@ -1401,6 +1648,19 @@ a {
   .court-detail-grid {
     grid-template-columns: 1fr;
   }
+
+  .availability-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .availability-date-picker {
+    min-width: 0;
+  }
+
+  .availability-slot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -1499,6 +1759,33 @@ a {
 
   .detail-list dd,
   .operating-hours-list strong {
+    text-align: left;
+  }
+
+  .availability-slot-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-intent,
+  .price-summary dl div {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .booking-intent .ui-button {
+    width: 100%;
+  }
+
+  .price-summary dd {
+    text-align: left;
+  }
+
+  .policy-list div {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .policy-list strong {
+    grid-column: 2;
     text-align: left;
   }
 
