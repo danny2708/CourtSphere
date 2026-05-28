@@ -150,6 +150,8 @@ function buildMockSlot(input: {
 }): AvailabilitySlotViewModel {
   const startDatetime = buildDateTime(input.date, input.startTime);
   const endDatetime = buildDateTime(input.date, input.endTime);
+  const isPastSlot = new Date(endDatetime).getTime() <= Date.now();
+  const status = input.status === "AVAILABLE" && isPastSlot ? "UNAVAILABLE" : input.status;
 
   return {
     id: `${input.court.id}-${startDatetime}`,
@@ -158,11 +160,11 @@ function buildMockSlot(input: {
     endDatetime,
     startTimeText: input.startTime,
     endTimeText: input.endTime,
-    status: input.status,
-    isAvailable: input.status === "AVAILABLE",
+    status,
+    isAvailable: status === "AVAILABLE",
     priceAmount: input.priceAmount,
     priceText: formatPrice(input.priceAmount),
-    reasonText: input.reasonText
+    reasonText: status === "UNAVAILABLE" && isPastSlot ? "Khung giờ đã qua." : input.reasonText
   };
 }
 

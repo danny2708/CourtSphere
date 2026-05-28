@@ -12,6 +12,7 @@ import { Button } from "../common/Button";
 const navItems = [
   { label: "Trang chủ", to: ROUTE_PATHS.home },
   { label: "Khám phá", to: ROUTE_PATHS.courts },
+  { label: "Đơn của tôi", to: ROUTE_PATHS.myBookings },
   { label: "Quản lý", to: ROUTE_PATHS.managerHome },
   { label: "Admin", to: ROUTE_PATHS.adminHome }
 ] as const;

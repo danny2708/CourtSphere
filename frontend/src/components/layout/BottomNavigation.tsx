@@ -1,4 +1,4 @@
-import { Home, Map, Search, Sparkles, UserRound } from "lucide-react";
+import { CalendarCheck, Home, Map, Search, UserRound } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { ROUTE_PATHS } from "../../routes/route-paths";
@@ -8,7 +8,7 @@ const bottomNavItems = [
   { label: "Trang chủ", to: ROUTE_PATHS.home, icon: Home, end: true },
   { label: "Bản đồ", to: ROUTE_PATHS.map, icon: Map, end: false },
   { label: "Khám phá", to: ROUTE_PATHS.courts, icon: Search, end: false },
-  { label: "Nổi bật", to: ROUTE_PATHS.featured, icon: Sparkles, end: false },
+  { label: "Đơn", to: ROUTE_PATHS.myBookings, icon: CalendarCheck, end: false },
   { label: "Tài khoản", to: ROUTE_PATHS.account, icon: UserRound, end: false }
 ] as const;
 

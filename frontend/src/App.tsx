@@ -4,6 +4,10 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { ForbiddenState } from "./components/common/ForbiddenState";
 import { CourtDetailPage } from "./features/courts/pages/CourtDetailPage";
 import { CourtListPage } from "./features/courts/pages/CourtListPage";
+import { BookingCreatePage } from "./features/bookings/pages/BookingCreatePage";
+import { BookingDetailPage } from "./features/bookings/pages/BookingDetailPage";
+import { MyBookingsPage } from "./features/bookings/pages/MyBookingsPage";
+import { PaymentPage } from "./features/bookings/pages/PaymentPage";
 import { NotFoundPage } from "./pages/misc/NotFoundPage";
 import { PlaceholderPage } from "./pages/misc/PlaceholderPage";
 import { LoginPage } from "./pages/auth/LoginPage";
@@ -32,6 +36,10 @@ export default function App() {
 
           <Route element={<ProtectedRoute />}>
             <Route path={ROUTE_PATHS.userHome} element={<HomePage />} />
+            <Route path={ROUTE_PATHS.bookingCreate} element={<BookingCreatePage />} />
+            <Route path={ROUTE_PATHS.myBookings} element={<MyBookingsPage />} />
+            <Route path={ROUTE_PATHS.bookingDetail} element={<BookingDetailPage />} />
+            <Route path={ROUTE_PATHS.bookingPayment} element={<PaymentPage />} />
 
             <Route element={<RoleRoute roles={["FIELD_MANAGER", "ADMIN"]} />}>
               <Route path={ROUTE_PATHS.managerHome} element={<ManagerHomePage />} />

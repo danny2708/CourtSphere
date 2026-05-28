@@ -1015,7 +1015,8 @@ Verification notes:
 - [x] `npm test` pass.
 - [x] `npm run build` pass.
 - [x] Programmatic Vite route check `/courts`, `/courts/court-football-01`, `/courts/court-badminton-02`, `/courts/not-found-id` trả 200.
-- [ ] Backend availability API manual verification pending vì backend `localhost:3000` chưa chạy trong phiên kiểm tra này.
+- [x] Backend `localhost:3000` reachable; register USER và `GET /api/courts` trả seed courts.
+- [ ] Real availability success pending: `GET /api/courts/00000000-0000-0000-0000-000000000101/availability?date=2026-05-29&includePricing=true` trả `400 VALIDATION_ERROR` vì seed court id không qua `z.string().uuid()` validator backend.
 
 ---
 
@@ -1023,25 +1024,34 @@ Verification notes:
 
 Checklist:
 
-- [ ] Booking create page.
-- [ ] Date picker.
-- [ ] Slot picker.
-- [ ] Participant count input.
-- [ ] Usage purpose input.
-- [ ] Booking summary card.
-- [ ] Submit create booking hold.
-- [ ] Payment page hoặc fake payment UI.
-- [ ] My bookings page.
-- [ ] Booking detail page.
-- [ ] Cancel booking action.
-- [ ] Booking history timeline.
+- [x] Booking create page.
+- [x] Date picker.
+- [x] Slot picker.
+- [ ] Participant count input: không triển khai vì API contract `POST /api/bookings` không nhận field này.
+- [x] Usage purpose input: map vào `note` theo API contract.
+- [x] Booking summary card.
+- [x] Submit create booking hold.
+- [x] Payment page hoặc fake payment UI.
+- [x] My bookings page.
+- [x] Booking detail page.
+- [x] Cancel booking action.
+- [x] Booking history timeline.
 
 Acceptance criteria:
 
-- [ ] User tạo booking hold được.
-- [ ] User thanh toán/fake payment được.
-- [ ] User xem trạng thái booking/payment/refund được.
-- [ ] User hủy booking hợp lệ được.
+- [x] User tạo booking hold được qua mock-first frontend flow.
+- [x] User thanh toán/fake payment được qua mock-first frontend flow.
+- [x] User xem trạng thái booking/payment/refund được.
+- [x] User hủy booking hợp lệ được qua mock-first frontend flow.
+
+Verification notes:
+
+- [x] `npm run typecheck` pass.
+- [x] `npm run lint` pass.
+- [x] `npm test` pass.
+- [x] `npm run build` pass.
+- [x] Dev route check `/bookings/create`, `/bookings/my`, `/bookings/mock-booking-route`, `/bookings/mock-booking-route/payment`, `/courts/court-football-01` trả 200.
+- [ ] Real booking API E2E pending vì backend seed court ids hiện tại không qua UUID validator ở route params, nên availability/booking với seed court chưa verify success được.
 
 ---
 

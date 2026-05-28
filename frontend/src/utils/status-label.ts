@@ -4,10 +4,13 @@ export const bookingOrderStatusLabel = {
   PAYMENT_EXPIRED: "Hết hạn thanh toán",
   CONFIRMED: "Đã xác nhận",
   PARTIALLY_CANCELLED: "Đã hủy một phần",
+  IN_USE: "Đang sử dụng",
   CANCELLED_BY_USER: "Người dùng đã hủy",
   CANCELLED_BY_MANAGER: "Quản lý đã hủy",
   CANCELLED_BY_ADMIN: "Quản trị viên đã hủy",
-  COMPLETED: "Hoàn thành"
+  COMPLETED: "Hoàn thành",
+  CHECKIN_EXPIRED: "Quá giờ check-in",
+  NO_SHOW: "Vắng mặt"
 } as const;
 
 export const bookingItemStatusLabel = {

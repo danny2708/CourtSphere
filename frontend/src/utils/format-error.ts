@@ -42,6 +42,23 @@ const codeMessages: Record<string, string> = {
   PHONE_ALREADY_EXISTS: "Số điện thoại này đã được đăng ký.",
   IDENTITY_CODE_ALREADY_EXISTS: "Mã định danh này đã được đăng ký.",
   PRIORITY_GROUP_NOT_CONFIGURED: "Nhóm người dùng chưa được cấu hình. Vui lòng liên hệ quản trị viên.",
+  BOOKING_SLOT_UNAVAILABLE: "Khung giờ này vừa được người khác giữ chỗ. Vui lòng chọn khung giờ khác.",
+  BOOKING_RETRY_REQUIRED: "Có xung đột khi tạo đơn. Vui lòng thử lại.",
+  BOOKING_NOT_FOUND: "Không tìm thấy đơn đặt sân.",
+  BOOKING_CANNOT_BE_CANCELLED: "Bạn không thể hủy đơn này ở trạng thái hiện tại.",
+  BOOKING_NOT_PAYABLE: "Đơn đặt sân không còn ở trạng thái có thể thanh toán.",
+  BOOKING_HOLD_EXPIRED: "Đơn đặt sân đã hết hạn thanh toán.",
+  PAYMENT_AMOUNT_MISMATCH: "Số tiền thanh toán không khớp với đơn đặt sân.",
+  INVALID_PAYMENT_SIGNATURE: "Chữ ký thanh toán mock không hợp lệ.",
+  PAYMENT_NOT_FOUND: "Không tìm thấy giao dịch thanh toán.",
+  PAYMENT_ALREADY_TERMINAL: "Giao dịch thanh toán đã ở trạng thái cuối.",
+  COURT_NOT_AVAILABLE: "Sân hiện không khả dụng.",
+  OUTSIDE_OPERATING_HOURS: "Khung giờ nằm ngoài giờ hoạt động của sân.",
+  COURT_CLOSED: "Sân không mở cửa trong ngày đã chọn.",
+  BOOKING_DURATION_EXCEEDS_LIMIT: "Thời lượng đặt sân vượt giới hạn cho phép.",
+  ADVANCE_BOOKING_LIMIT_EXCEEDED: "Ngày đặt vượt quá số ngày được phép đặt trước.",
+  MAX_BOOKINGS_PER_DAY_REACHED: "Bạn đã đạt giới hạn số lượt đặt sân trong ngày.",
+  PRICING_RULE_NOT_FOUND: "Chưa có bảng giá cho khung giờ này.",
   VALIDATION_ERROR: "Vui lòng kiểm tra lại thông tin đã nhập."
 };
 

@@ -11,7 +11,7 @@ import { CourtStatusBadge } from "../../../components/courts/CourtStatusBadge";
 import { CourtTagBadge } from "../../../components/courts/CourtTagBadge";
 import { FavoriteButton } from "../../../components/courts/FavoriteButton";
 import { ShareButton } from "../../../components/courts/ShareButton";
-import { ROUTE_PATHS } from "../../../routes/route-paths";
+import { buildBookingCreatePath, ROUTE_PATHS } from "../../../routes/route-paths";
 import { useToastStore } from "../../../stores/toast.store";
 import { getErrorMessage } from "../../../utils/format-error";
 import { AvailabilityDatePicker } from "../components/AvailabilityDatePicker";
@@ -22,6 +22,7 @@ import { getCourtAvailability } from "../services/availabilityService";
 import { getCourtById } from "../services/courtService";
 import type { AvailabilitySlotViewModel, CourtAvailabilityViewModel } from "../types/availability.types";
 import type { CourtDetailViewModel } from "../types/court-detail.types";
+import { getDefaultAvailabilityDate, toDateInputValue } from "../utils/dateUtils";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   currency: "VND",
@@ -45,12 +46,6 @@ function getAvailabilityText(court: CourtDetailViewModel): string {
   return "Ngừng sử dụng";
 }
 
-function toDateInputValue(date: Date): string {
-  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-
-  return localDate.toISOString().slice(0, 10);
-}
-
 function isPastDate(date: string, minDate: string): boolean {
   return date < minDate;
 }
@@ -60,6 +55,7 @@ export function CourtDetailPage() {
   const { courtId } = useParams<{ courtId: string }>();
   const { addToast } = useToastStore();
   const todayDate = useMemo(() => toDateInputValue(new Date()), []);
+  const defaultAvailabilityDate = useMemo(() => getDefaultAvailabilityDate(), []);
   const [availability, setAvailability] = useState<CourtAvailabilityViewModel | null>(null);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [availabilityReloadKey, setAvailabilityReloadKey] = useState(0);
@@ -69,7 +65,7 @@ export function CourtDetailPage() {
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(todayDate);
+  const [selectedDate, setSelectedDate] = useState(defaultAvailabilityDate);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -153,6 +149,12 @@ export function CourtDetailPage() {
     };
   }, [availabilityReloadKey, court, selectedDate, todayDate]);
 
+  const selectedSlot = useMemo(
+    () => availability?.slots.find((slot) => slot.id === selectedSlotId) ?? null,
+    [availability?.slots, selectedSlotId]
+  );
+  const availableSlotCount = availability?.slots.filter((slot) => slot.isAvailable).length ?? 0;
+
   if (isLoading) {
     return <LoadingState message="Đang tải chi tiết sân..." title="Chi tiết sân" />;
   }
@@ -169,11 +171,6 @@ export function CourtDetailPage() {
   }
 
   const canBook = court.status === "ACTIVE";
-  const selectedSlot = useMemo(
-    () => availability?.slots.find((slot) => slot.id === selectedSlotId) ?? null,
-    [availability?.slots, selectedSlotId]
-  );
-  const availableSlotCount = availability?.slots.filter((slot) => slot.isAvailable).length ?? 0;
   const canContinueBooking = canBook && Boolean(selectedSlot?.isAvailable);
 
   const handleSelectSlot = (slot: AvailabilitySlotViewModel) => {
@@ -211,8 +208,14 @@ export function CourtDetailPage() {
     addToast({
       type: "info",
       title: "Chuẩn bị đặt lịch",
-      message: "Tạo booking hold sẽ được triển khai ở module 7.5 Booking pages."
+      message: "Chuyển sang bước tạo giữ chỗ."
     });
+    navigate(buildBookingCreatePath({
+      courtId: court.id,
+      date: selectedDate,
+      startDatetime: selectedSlot.startDatetime,
+      endDatetime: selectedSlot.endDatetime
+    }));
   };
 
   return (
