@@ -13,8 +13,14 @@ import { PlaceholderPage } from "./pages/misc/PlaceholderPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { RegisterPage } from "./pages/auth/RegisterPage";
 import { AdminHomePage } from "./pages/admin/AdminHomePage";
-import { ManagerHomePage } from "./pages/manager/ManagerHomePage";
 import { HomePage } from "./pages/user/HomePage";
+import { ManagerCheckinPage } from "./features/manager/pages/ManagerCheckinPage";
+import { ManagerCourtStatusPage } from "./features/manager/pages/ManagerCourtStatusPage";
+import { ManagerDashboardPage } from "./features/manager/pages/ManagerDashboardPage";
+import { ManagerInUsePage } from "./features/manager/pages/ManagerInUsePage";
+import { ManagerNoShowPage } from "./features/manager/pages/ManagerNoShowPage";
+import { ManagerTodaySchedulePage } from "./features/manager/pages/ManagerTodaySchedulePage";
+import { ManagerUsageHistoryPage } from "./features/manager/pages/ManagerUsageHistoryPage";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { RoleRoute } from "./routes/RoleRoute";
 import { ROUTE_PATHS } from "./routes/route-paths";
@@ -42,7 +48,13 @@ export default function App() {
             <Route path={ROUTE_PATHS.bookingPayment} element={<PaymentPage />} />
 
             <Route element={<RoleRoute roles={["FIELD_MANAGER", "ADMIN"]} />}>
-              <Route path={ROUTE_PATHS.managerHome} element={<ManagerHomePage />} />
+              <Route path={ROUTE_PATHS.managerHome} element={<ManagerDashboardPage />} />
+              <Route path={ROUTE_PATHS.managerToday} element={<ManagerTodaySchedulePage />} />
+              <Route path={ROUTE_PATHS.managerCheckIn} element={<ManagerCheckinPage />} />
+              <Route path={ROUTE_PATHS.managerInUse} element={<ManagerInUsePage />} />
+              <Route path={ROUTE_PATHS.managerNoShow} element={<ManagerNoShowPage />} />
+              <Route path={ROUTE_PATHS.managerCourts} element={<ManagerCourtStatusPage />} />
+              <Route path={ROUTE_PATHS.managerHistory} element={<ManagerUsageHistoryPage />} />
             </Route>
 
             <Route element={<RoleRoute roles="ADMIN" />}>

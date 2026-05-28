@@ -1059,21 +1059,31 @@ Verification notes:
 
 Checklist:
 
-- [ ] Manager today schedule page.
-- [ ] Search booking by code/user/court/time.
-- [ ] Check-in action.
-- [ ] Complete booking action.
-- [ ] No-show management page.
-- [ ] Manager cancel booking page/action.
-- [ ] Court status management page.
-- [ ] Usage history page.
+- [x] Manager today schedule page.
+- [x] Search booking by code/user/court/time.
+- [x] Check-in action.
+- [x] Complete booking action / override complete.
+- [x] No-show management page.
+- [x] Manager cancel booking page/action.
+- [x] Court status management page.
+- [x] Usage history page: UI dùng dữ liệu `GET /api/manager/bookings/today` vì chưa có endpoint history riêng.
 
 Acceptance criteria:
 
-- [ ] Manager check-in được booking.
-- [ ] Manager complete được booking.
-- [ ] Manager xác nhận no-show được.
-- [ ] Manager cập nhật tình trạng sân được.
+- [x] Manager check-in được booking qua frontend action/service, mock-first fallback cho dev preview.
+- [x] Manager complete được booking qua override-complete action/service.
+- [x] Manager xác nhận no-show được qua frontend action/service.
+- [x] Manager cập nhật tình trạng sân được qua route backend hiện có `PATCH /api/admin/courts/:id/status`.
+
+Verification notes:
+
+- [x] `npm run typecheck` pass.
+- [x] `npm run lint` pass.
+- [x] `npm test` pass.
+- [x] `npm run build` pass.
+- [x] Dev route check `/manager`, `/manager/today`, `/manager/check-in`, `/manager/in-use`, `/manager/no-show`, `/manager/courts`, `/manager/history` trả 200.
+- [x] Backend RBAC verify: USER thường gọi `GET /api/manager/bookings/today` trả `403 FORBIDDEN`.
+- [ ] Manual manager E2E với FIELD_MANAGER/ADMIN pending vì seed credential manager/admin hiện chưa login được bằng password thật.
 
 ---
 

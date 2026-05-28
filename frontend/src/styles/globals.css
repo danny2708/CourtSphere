@@ -1790,6 +1790,222 @@ a {
   gap: 10px;
 }
 
+.dialog-warning {
+  padding: 12px;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: var(--radius-button);
+  color: #92400e !important;
+  background: #fffbeb;
+  font-weight: 700;
+}
+
+.manager-page {
+  display: grid;
+  gap: 18px;
+}
+
+.manager-nav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 6px 0 2px;
+}
+
+.manager-nav__link {
+  min-height: 42px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-secondary);
+  background: var(--color-card);
+  font-weight: 800;
+}
+
+.manager-nav__link--active {
+  border-color: rgba(14, 165, 233, 0.28);
+  color: var(--color-primary-dark);
+  background: var(--color-primary-light);
+}
+
+.manager-header {
+  align-items: center;
+}
+
+.manager-dashboard-grid,
+.manager-booking-grid,
+.manager-court-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.manager-dashboard-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.manager-booking-grid,
+.manager-court-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.manager-dashboard-card,
+.manager-booking-card,
+.manager-court-card {
+  height: 100%;
+  display: grid;
+  gap: 14px;
+}
+
+.manager-dashboard-card {
+  padding: 22px;
+}
+
+.manager-dashboard-card svg {
+  color: var(--color-primary-dark);
+}
+
+.manager-dashboard-card h2,
+.manager-dashboard-card p,
+.manager-court-card h3,
+.manager-court-card p {
+  margin: 0;
+}
+
+.manager-dashboard-card p,
+.manager-court-card p {
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.manager-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.manager-tabs .ui-button {
+  flex: 0 0 auto;
+}
+
+.manager-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px) minmax(160px, 200px);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
+}
+
+.manager-filters label,
+.dialog-panel .form-field {
+  display: grid;
+  gap: 7px;
+}
+
+.manager-filters span,
+.dialog-panel .form-field span {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.manager-filters input,
+.manager-filters select,
+.dialog-panel select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  color: var(--color-text-primary);
+  background: #ffffff;
+}
+
+.manager-booking-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.manager-booking-card__header h3 {
+  margin: 2px 0 0;
+  font-size: 20px;
+}
+
+.manager-booking-card__header p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+}
+
+.manager-booking-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.manager-booking-meta span {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  color: var(--color-text-secondary);
+  background: var(--color-background);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.manager-card-alert {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.manager-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.manager-court-card {
+  grid-template-columns: 160px minmax(0, 1fr);
+  overflow: hidden;
+  padding: 0;
+}
+
+.manager-court-card__media {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  background:
+    linear-gradient(90deg, transparent 49%, rgba(255, 255, 255, 0.42) 49% 51%, transparent 51%),
+    linear-gradient(0deg, transparent 48%, rgba(255, 255, 255, 0.34) 48% 52%, transparent 52%),
+    linear-gradient(135deg, var(--color-primary), #22c55e);
+}
+
+.manager-court-card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.manager-court-card__body {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 18px;
+}
+
 .toast-viewport {
   position: fixed;
   right: 16px;
@@ -1882,6 +2098,16 @@ a {
   }
 
   .my-booking-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .manager-dashboard-grid,
+  .manager-booking-grid,
+  .manager-court-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .manager-filters {
     grid-template-columns: 1fr;
   }
 
@@ -2058,8 +2284,22 @@ a {
 
   .my-booking-card__actions .ui-button,
   .detail-actions-stack .ui-button,
+  .manager-card-actions .ui-button,
   .dialog-actions .ui-button {
     width: 100%;
+  }
+
+  .manager-booking-card__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .manager-court-card {
+    grid-template-columns: 1fr;
+  }
+
+  .manager-court-card__media {
+    min-height: 160px;
   }
 
   .policy-list div {
