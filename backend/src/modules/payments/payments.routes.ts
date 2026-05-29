@@ -27,6 +27,13 @@ export function createPaymentsRouter(
     asyncHandler(controller.createPaymentForBooking)
   );
   router.post(
+    "/bookings/:id/payments/cancel",
+    requireAuth,
+    requireRole(["USER"]),
+    validateRequest({ params: bookingPaymentParamsSchema }),
+    asyncHandler(controller.cancelPaymentForBooking)
+  );
+  router.post(
     "/payments/callback/mock",
     validateRequest({ body: mockPaymentCallbackSchema }),
     asyncHandler(controller.handleMockCallback)

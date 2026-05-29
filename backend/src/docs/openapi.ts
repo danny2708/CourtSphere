@@ -594,7 +594,37 @@ export const openApiDocument = {
                       bookingStatus: "PAYMENT_PROCESSING",
                       paymentStatus: "PROCESSING",
                       totalAmount: 50000,
+                      holdExpiresAt: "2026-05-20T00:10:00.000Z",
                       items: []
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bookings/{id}/payments/cancel": {
+      post: {
+        tags: ["Payments"],
+        summary: "Cancel active payment session for a booking order",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }
+        ],
+        responses: {
+          "200": {
+            description: "Payment session cancelled",
+            content: {
+              "application/json": {
+                example: {
+                  payment: {
+                    id: "uuid",
+                    paymentStatus: "CANCELLED",
+                    bookingOrder: {
+                      bookingOrderId: "uuid",
+                      bookingStatus: "PENDING_PAYMENT",
+                      paymentStatus: "CANCELLED"
                     }
                   }
                 }

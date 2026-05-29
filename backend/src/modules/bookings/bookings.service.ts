@@ -524,8 +524,22 @@ export class BookingsService {
           let paymentStatus = currentOrder.paymentStatus;
           let refundable = false;
 
-          if (currentOrder.bookingStatus === BookingStatus.PENDING_PAYMENT) {
+          if (
+            currentOrder.bookingStatus === BookingStatus.PENDING_PAYMENT ||
+            currentOrder.bookingStatus === BookingStatus.PAYMENT_PROCESSING
+          ) {
             paymentStatus = PaymentStatus.CANCELLED;
+            await tx.payment.updateMany({
+              where: {
+                bookingOrderId: currentOrder.bookingOrderId,
+                paymentStatus: {
+                  in: [PaymentStatus.INITIATED, PaymentStatus.PROCESSING]
+                }
+              },
+              data: {
+                paymentStatus: PaymentStatus.CANCELLED
+              }
+            });
           } else if (currentOrder.bookingStatus === BookingStatus.CONFIRMED) {
             const isOnTimeCancellation = this.isCancellationWindowOpen(
               earliestItemStart(currentOrder),

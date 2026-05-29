@@ -1,34 +1,49 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { ErrorState } from "../../../components/common/ErrorState";
 import { LoadingState } from "../../../components/common/LoadingState";
 import { buildBookingDetailPath, ROUTE_PATHS } from "../../../routes/route-paths";
+import { useToastStore } from "../../../stores/toast.store";
 import { getErrorMessage } from "../../../utils/format-error";
 import { BookingItemCard } from "../components/BookingItemCard";
 import { BookingStatusBadge } from "../components/BookingStatusBadge";
+import { CancelBookingDialog } from "../components/CancelBookingDialog";
 import { MomoPaymentPanel } from "../components/MomoPaymentPanel";
 import { PaymentStatusBadge } from "../components/PaymentStatusBadge";
-import { getBookingDetail } from "../services/bookingService";
-import { createPayment } from "../services/paymentService";
+import { cancelBooking, getBookingDetail } from "../services/bookingService";
+import { cancelPaymentForBooking, createPayment } from "../services/paymentService";
 import type { BookingOrder } from "../types/booking.types";
 
 function isPayable(booking: BookingOrder): boolean {
   return booking.bookingStatus === "PENDING_PAYMENT" || booking.bookingStatus === "PAYMENT_PROCESSING";
 }
 
-function isHoldExpired(booking: BookingOrder): boolean {
-  return Boolean(booking.holdExpiresAt && new Date(booking.holdExpiresAt) <= new Date());
+function canCancelBookingRequest(booking: BookingOrder): boolean {
+  return booking.bookingStatus === "PENDING_PAYMENT" || booking.bookingStatus === "PAYMENT_PROCESSING";
+}
+
+function activePaymentDeadline(booking: BookingOrder): string | null {
+  if (booking.bookingStatus !== "PAYMENT_PROCESSING" || booking.paymentStatus !== "PROCESSING" || !booking.holdExpiresAt) {
+    return null;
+  }
+
+  return new Date(booking.holdExpiresAt) > new Date() ? booking.holdExpiresAt : null;
 }
 
 export function PaymentPage() {
   const navigate = useNavigate();
   const { bookingOrderId } = useParams<{ bookingOrderId: string }>();
+  const { addToast } = useToastStore();
   const [booking, setBooking] = useState<BookingOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isCancelBookingOpen, setIsCancelBookingOpen] = useState(false);
+  const [isCancellingBooking, setIsCancellingBooking] = useState(false);
+  const [isCancellingPayment, setIsCancellingPayment] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentDeadline, setPaymentDeadline] = useState<string | null>(null);
 
   const loadBooking = async () => {
     if (!bookingOrderId) {
@@ -41,7 +56,9 @@ export function PaymentPage() {
     setError(null);
 
     try {
-      setBooking(await getBookingDetail(bookingOrderId));
+      const loadedBooking = await getBookingDetail(bookingOrderId);
+      setBooking(loadedBooking);
+      setPaymentDeadline(activePaymentDeadline(loadedBooking));
     } catch (loadError) {
       setError(getErrorMessage(loadError));
     } finally {
@@ -63,11 +80,6 @@ export function PaymentPage() {
       return;
     }
 
-    if (isHoldExpired(booking)) {
-      setError("Đơn đặt sân đã hết hạn thanh toán.");
-      return;
-    }
-
     setIsProcessing(true);
     setError(null);
 
@@ -76,6 +88,7 @@ export function PaymentPage() {
         amount: booking.totalAmount,
         paymentMethod: "MOMO"
       });
+      setPaymentDeadline(payment.bookingOrder?.holdExpiresAt ?? null);
 
       if (!payment.paymentUrl) {
         throw new Error("MoMo không trả về đường dẫn thanh toán.");
@@ -89,6 +102,59 @@ export function PaymentPage() {
       if (document.visibilityState === "visible") {
         setIsProcessing(false);
       }
+    }
+  };
+
+  const handlePaymentDeadlineExpired = useCallback(() => {
+    if (!booking) {
+      return;
+    }
+
+    setIsProcessing(false);
+    navigate(buildBookingDetailPath(booking.bookingOrderId), { replace: true });
+  }, [booking, navigate]);
+
+  const handleCancelPayment = async () => {
+    if (!booking) {
+      return;
+    }
+
+    setIsCancellingPayment(true);
+    setError(null);
+
+    try {
+      await cancelPaymentForBooking(booking.bookingOrderId);
+      const updatedBooking = await getBookingDetail(booking.bookingOrderId);
+      setBooking(updatedBooking);
+      setPaymentDeadline(activePaymentDeadline(updatedBooking));
+      addToast({ type: "success", title: "Đã hủy phiên thanh toán" });
+      navigate(buildBookingDetailPath(booking.bookingOrderId), { replace: true });
+    } catch (cancelError) {
+      setError(getErrorMessage(cancelError));
+    } finally {
+      setIsCancellingPayment(false);
+    }
+  };
+
+  const handleCancelBookingRequest = async (reason?: string) => {
+    if (!booking) {
+      return;
+    }
+
+    setIsCancellingBooking(true);
+    setError(null);
+
+    try {
+      const updatedBooking = await cancelBooking(booking.bookingOrderId, { reason });
+      setBooking(updatedBooking);
+      setPaymentDeadline(null);
+      setIsCancelBookingOpen(false);
+      addToast({ type: "success", title: "Đã hủy yêu cầu đặt sân" });
+      navigate(buildBookingDetailPath(booking.bookingOrderId), { replace: true });
+    } catch (cancelError) {
+      setError(getErrorMessage(cancelError));
+    } finally {
+      setIsCancellingBooking(false);
     }
   };
 
@@ -134,8 +200,16 @@ export function PaymentPage() {
       <div className="booking-create-layout">
         <MomoPaymentPanel
           booking={booking}
+          canCancelBookingRequest={canCancelBookingRequest(booking)}
+          canCancelPayment={booking.paymentStatus === "PROCESSING"}
           isMockBooking={booking.bookingOrderId.startsWith("mock-booking-")}
+          isCancellingBooking={isCancellingBooking}
+          isCancellingPayment={isCancellingPayment}
           isProcessing={isProcessing}
+          paymentDeadline={paymentDeadline}
+          onCancelBookingRequest={() => setIsCancelBookingOpen(true)}
+          onCancelPayment={handleCancelPayment}
+          onPaymentDeadlineExpired={handlePaymentDeadlineExpired}
           onPay={handlePay}
         />
         <div className="booking-side-panel">
@@ -144,6 +218,13 @@ export function PaymentPage() {
           ))}
         </div>
       </div>
+
+      <CancelBookingDialog
+        isOpen={isCancelBookingOpen}
+        isSubmitting={isCancellingBooking}
+        onCancel={() => setIsCancelBookingOpen(false)}
+        onConfirm={handleCancelBookingRequest}
+      />
     </section>
   );
 }

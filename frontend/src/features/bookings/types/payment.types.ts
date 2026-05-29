@@ -14,7 +14,10 @@ export type PaymentDetail = {
   paymentUrl?: string;
   paidAt?: string | null;
   createdAt?: string;
-  bookingOrder?: Pick<BookingOrder, "id" | "bookingOrderId" | "bookingCode" | "bookingStatus" | "paymentStatus" | "totalAmount" | "items">;
+  bookingOrder?: Pick<
+    BookingOrder,
+    "id" | "bookingOrderId" | "bookingCode" | "bookingStatus" | "paymentStatus" | "totalAmount" | "holdExpiresAt" | "items"
+  >;
 };
 
 export type MockPaymentCallbackPayload = {

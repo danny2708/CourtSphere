@@ -903,6 +903,7 @@ Request:
 Rules:
 
 - `PENDING_PAYMENT` can be cancelled without refund.
+- `PAYMENT_PROCESSING` can be cancelled before payment success; active initiated/processing payments are marked `CANCELLED`.
 - `CONFIRMED` can be cancelled by the owner.
 - If cancellation is before `cancelBeforeHours`, calculated from the earliest item start time, and the order has a successful payment, the backend creates a whole-order `refunds` row with status `REQUESTED` using `refundRateUserOnTime`.
 - If cancellation is after the configured window, the order is cancelled without refund. When `system_settings.late_cancellation_violation_enabled = true`, the backend records a `LATE_CANCEL` violation against the earliest confirmed booking item using `late_cancellation_penalty_points`.
@@ -943,7 +944,7 @@ These APIs implement a mock/sandbox payment flow for MVP. They do not integrate 
 
 Requires `Authorization: Bearer <accessToken>` and role `USER`. `:id` is the `bookingOrderId`; only the booking order owner can create a payment.
 
-Creates or returns a mock payment for a booking order that is still payable. Creating payment moves the order and pending items from `PENDING_PAYMENT` to `PAYMENT_PROCESSING`; the order/items are confirmed only after a successful callback.
+Creates or returns a sandbox payment for a booking order that is still payable. Pressing pay starts a payment session and refreshes `holdExpiresAt` to `now + holdMinutes` from active booking rules. Creating payment moves the order and pending items from `PENDING_PAYMENT` to `PAYMENT_PROCESSING`; the order/items are confirmed only after a successful callback.
 
 Request:
 
@@ -957,7 +958,7 @@ Rules:
 
 - Booking order must belong to the authenticated user.
 - Booking order status must be `PENDING_PAYMENT` or `PAYMENT_PROCESSING`.
-- Booking order hold must not be expired.
+- If a previous payment session has expired, the old `INITIATED`/`PROCESSING` payment is marked `EXPIRED` and a new payment session can be created while the order is still payable.
 - `amount` must equal `bookingOrder.totalAmount`.
 - No deposit flow exists; payment is always for 100% of the order total.
 
@@ -979,6 +980,7 @@ Response `201`:
       "bookingStatus": "PAYMENT_PROCESSING",
       "paymentStatus": "PROCESSING",
       "totalAmount": 50000,
+      "holdExpiresAt": "2026-05-20T00:10:00.000Z",
       "items": []
     }
   }
@@ -989,8 +991,36 @@ Common errors:
 
 - `BOOKING_NOT_FOUND`
 - `BOOKING_NOT_PAYABLE`
-- `BOOKING_HOLD_EXPIRED`
+- `BOOKING_SLOT_UNAVAILABLE`
 - `PAYMENT_AMOUNT_MISMATCH`
+
+### `POST /api/bookings/:id/payments/cancel`
+
+Requires `Authorization: Bearer <accessToken>` and role `USER`. `:id` is the `bookingOrderId`; only the booking order owner can cancel the active payment session.
+
+Cancels the current payment session without cancelling the booking request. The active `INITIATED`/`PROCESSING` payment changes to `CANCELLED`. If the order/items were `PAYMENT_PROCESSING`, they are moved back to `PENDING_PAYMENT` and status histories are written with `actionType = USER_CANCEL_PAYMENT_SESSION`. The user can start a new payment session later while the booking request remains payable.
+
+Response `200`:
+
+```json
+{
+  "payment": {
+    "id": "uuid",
+    "paymentStatus": "CANCELLED",
+    "bookingOrder": {
+      "bookingOrderId": "uuid",
+      "bookingStatus": "PENDING_PAYMENT",
+      "paymentStatus": "CANCELLED"
+    }
+  }
+}
+```
+
+Common errors:
+
+- `BOOKING_NOT_FOUND`
+- `PAYMENT_CANCEL_NOT_ALLOWED`
+- `NO_ACTIVE_PAYMENT_SESSION`
 
 ### `POST /api/payments/callback/mock`
 
@@ -1029,14 +1059,14 @@ Idempotency:
 
 - Repeating a `SUCCESS` callback for an already successful payment returns the current payment and does not create duplicate order/item history rows.
 - Terminal payments `FAILED`, `CANCELLED`, or `EXPIRED` cannot be switched to a different terminal status by a later callback.
-- If a success callback arrives after `holdExpiresAt`, the backend does not confirm the order; it marks the payment/order/items as expired.
+- If a success callback arrives after the current payment session `holdExpiresAt`, the backend does not confirm the order. It marks that payment as `EXPIRED`, leaves the order payable, and the user can start a new payment session.
 
 Failed/cancelled behavior:
 
 - Payment status changes to the callback status.
 - Booking order is not confirmed.
-- If callback status is `EXPIRED` or the hold is already expired, order/items change to `PAYMENT_EXPIRED` and history is written.
-- The Notifications module emits `PAYMENT_SUCCESS`, `PAYMENT_EXPIRED`, or a `SYSTEM` notification for failed/cancelled mock payments.
+- If callback status is `EXPIRED`, only the payment session expires; order/items stay payable and no booking status history is written.
+- The Notifications module emits `PAYMENT_SUCCESS`, `PAYMENT_EXPIRED`, or a `SYSTEM` notification for failed/cancelled sandbox payments.
 
 Common errors:
 
@@ -1898,15 +1928,17 @@ Job name: `expire-payment-holds`.
 
 Rules:
 
-- Finds `booking_orders` with status `PENDING_PAYMENT` or `PAYMENT_PROCESSING`.
+- Finds `booking_orders` with status `PENDING_PAYMENT`.
 - `holdExpiresAt < now`.
 - No related `payments` row has `paymentStatus = SUCCESS`.
 - Changes the order to `PAYMENT_EXPIRED`.
-- Changes pending/payment-processing `booking_items` on the order to `PAYMENT_EXPIRED`.
+- Changes pending `booking_items` on the order to `PAYMENT_EXPIRED`.
 - Changes `INITIATED` or `PROCESSING` payments to `EXPIRED`.
 - Writes `booking_order_status_histories` and `booking_item_status_histories`.
 - Creates an in-app `PAYMENT_EXPIRED` notification for the order owner.
 - Calls waitlist `notifyNextForSlot` for each expired booking item after the slot is released.
+
+Payment sessions that have already moved an order to `PAYMENT_PROCESSING` are not permanently expired by this job; the frontend may close the payment screen when its countdown ends, and the user can reopen payment to start a new session.
 
 Idempotency:
 

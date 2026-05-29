@@ -37,7 +37,7 @@ function canPay(booking: BookingOrder): boolean {
 }
 
 function canCancel(booking: BookingOrder): boolean {
-  return booking.bookingStatus === "PENDING_PAYMENT" || booking.bookingStatus === "CONFIRMED";
+  return booking.bookingStatus === "PENDING_PAYMENT" || booking.bookingStatus === "PAYMENT_PROCESSING" || booking.bookingStatus === "CONFIRMED";
 }
 
 export function BookingDetailPage() {

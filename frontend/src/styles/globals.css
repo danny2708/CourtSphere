@@ -1775,6 +1775,34 @@ a {
   background: var(--color-primary-light);
 }
 
+.payment-countdown {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(245, 158, 11, 0.34);
+  border-radius: var(--radius-button);
+  background: #fff7df;
+  color: #7c3f00;
+}
+
+.payment-countdown span,
+.payment-countdown strong {
+  display: block;
+}
+
+.payment-countdown span {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.payment-countdown strong {
+  margin-top: 2px;
+  color: var(--color-text-primary);
+  font-size: 28px;
+  line-height: 1;
+}
+
 .payment-return-panel {
   max-width: 620px;
   display: grid;

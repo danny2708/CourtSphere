@@ -439,6 +439,107 @@ describe("BookingsService", () => {
     expect(tx.bookingOrder.create).not.toHaveBeenCalled();
   });
 
+  it("cancels a payment-processing booking request before payment is completed", async () => {
+    const activePayment = {
+      paymentId,
+      bookingOrderId,
+      userId,
+      amount: new Prisma.Decimal(50000),
+      paymentMethod: "MOCK",
+      gatewayTransactionId: "gw_1",
+      paymentStatus: PaymentStatus.PROCESSING,
+      rawCallback: null,
+      paidAt: null,
+      createdAt: now,
+      updatedAt: now
+    };
+    const currentOrder = buildOrder({
+      bookingStatus: BookingStatus.PAYMENT_PROCESSING,
+      paymentStatus: PaymentStatus.PROCESSING,
+      user: buildUser(),
+      payments: [activePayment],
+      items: [
+        {
+          ...buildOrder().items[0],
+          bookingStatus: BookingStatus.PAYMENT_PROCESSING
+        }
+      ]
+    });
+    const cancelledOrder = buildOrder({
+      bookingStatus: BookingStatus.CANCELLED_BY_USER,
+      paymentStatus: PaymentStatus.CANCELLED,
+      refundable: false,
+      cancelledByUserId: userId,
+      cancelledAt: now,
+      items: [
+        {
+          ...buildOrder().items[0],
+          bookingStatus: BookingStatus.CANCELLED_BY_USER
+        }
+      ]
+    });
+    const tx = {
+      bookingOrder: {
+        findFirst: vi.fn().mockResolvedValue(currentOrder),
+        update: vi.fn().mockResolvedValue({ bookingOrderId }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue(cancelledOrder)
+      },
+      payment: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 })
+      },
+      bookingItem: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 })
+      },
+      bookingOrderStatusHistory: {
+        create: vi.fn().mockResolvedValue({})
+      },
+      bookingItemStatusHistory: {
+        create: vi.fn().mockResolvedValue({})
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
+      }
+    };
+    const rules = {
+      getEffectivePolicy: vi.fn().mockResolvedValue(effectivePolicy())
+    } as unknown as RulesRepository;
+    const service = createService(tx, { rules });
+
+    const order = await service.cancelMyBooking(userId, bookingOrderId, {
+      reason: "Changed plan"
+    });
+
+    expect(order).toMatchObject({
+      id: bookingOrderId,
+      bookingStatus: BookingStatus.CANCELLED_BY_USER,
+      paymentStatus: PaymentStatus.CANCELLED
+    });
+    expect(tx.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          paymentStatus: PaymentStatus.CANCELLED
+        }
+      })
+    );
+    expect(tx.bookingItem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          bookingStatus: BookingStatus.CANCELLED_BY_USER
+        }
+      })
+    );
+    expect(tx.bookingOrderStatusHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          oldStatus: BookingStatus.PAYMENT_PROCESSING,
+          newStatus: BookingStatus.CANCELLED_BY_USER,
+          actionType: "USER_CANCEL_BOOKING_ORDER"
+        })
+      })
+    );
+  });
+
   it("cancels a confirmed booking order and requests refund by bookingOrderId", async () => {
     const payment = {
       paymentId,

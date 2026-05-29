@@ -14,6 +14,7 @@ import {
   notificationsService,
   type NotificationsService
 } from "../notifications/notifications.service";
+import { RulesRepository } from "../rules/rules.repository";
 import {
   mockPaymentGateway,
   type MockPaymentGateway
@@ -96,6 +97,10 @@ function decimalToNumber(value: Prisma.Decimal): number {
   return Number(value.toString());
 }
 
+function addMinutes(value: Date, minutes: number): Date {
+  return new Date(value.getTime() + minutes * 60_000);
+}
+
 function toPaymentDto(payment: PaymentWithRelations, paymentUrl?: string) {
   return {
     id: payment.paymentId,
@@ -176,6 +181,12 @@ function paymentUrlForPayment(payment: { paymentMethod: string; gatewayTransacti
 }
 
 function handleKnownPrismaError(error: unknown): never {
+  const message = error instanceof Error ? error.message : "";
+
+  if (message.includes("no_overlapping_active_booking_items")) {
+    throw new AppError(409, "Selected slot is no longer available", "BOOKING_SLOT_UNAVAILABLE");
+  }
+
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
       throw new AppError(409, "Payment already exists", "PAYMENT_ALREADY_EXISTS");
@@ -246,17 +257,39 @@ export class PaymentsService {
             throw new AppError(404, "Booking order not found", "BOOKING_NOT_FOUND");
           }
 
-          this.assertOrderCanCreatePayment(order, input.amount, now);
+          this.assertOrderCanCreatePayment(order, input.amount);
 
           const existingPayment = order.payments[0];
-          if (existingPayment) {
+          if (existingPayment && order.holdExpiresAt && order.holdExpiresAt > now) {
             return {
               paymentId: existingPayment.paymentId,
               paymentUrl: paymentUrlForPayment(existingPayment)
             };
           }
 
-          const gatewayTransaction = await this.createGatewayTransaction(paymentMethod, order, now);
+          if (existingPayment) {
+            await tx.payment.updateMany({
+              where: {
+                bookingOrderId: order.bookingOrderId,
+                paymentStatus: {
+                  in: [PaymentStatus.INITIATED, PaymentStatus.PROCESSING]
+                }
+              },
+              data: {
+                paymentStatus: PaymentStatus.EXPIRED
+              }
+            });
+          }
+
+          const paymentExpiresAt = await this.createPaymentExpiresAt(tx, now);
+          const gatewayTransaction = await this.createGatewayTransaction(
+            paymentMethod,
+            {
+              ...order,
+              holdExpiresAt: paymentExpiresAt
+            },
+            now
+          );
           const payment = await tx.payment.create({
             data: {
               bookingOrderId: order.bookingOrderId,
@@ -277,7 +310,8 @@ export class PaymentsService {
               where: { bookingOrderId: order.bookingOrderId },
               data: {
                 bookingStatus: BookingStatus.PAYMENT_PROCESSING,
-                paymentStatus: PaymentStatus.PROCESSING
+                paymentStatus: PaymentStatus.PROCESSING,
+                holdExpiresAt: paymentExpiresAt
               }
             });
             await tx.bookingItem.updateMany({
@@ -315,7 +349,8 @@ export class PaymentsService {
             await tx.bookingOrder.update({
               where: { bookingOrderId: order.bookingOrderId },
               data: {
-                paymentStatus: PaymentStatus.PROCESSING
+                paymentStatus: PaymentStatus.PROCESSING,
+                holdExpiresAt: paymentExpiresAt
               }
             });
           }
@@ -332,6 +367,126 @@ export class PaymentsService {
       const payment = await this.getPaymentOrThrow(result.paymentId);
 
       return toPaymentDto(payment, result.paymentUrl);
+    } catch (error) {
+      return handleKnownPrismaError(error);
+    }
+  }
+
+  async cancelPaymentForBooking(userId: string, bookingOrderId: string) {
+    const now = this.nowProvider();
+
+    try {
+      const result = await this.db.$transaction(
+        async (tx) => {
+          const order = await tx.bookingOrder.findFirst({
+            where: {
+              bookingOrderId,
+              userId
+            },
+            include: {
+              payments: {
+                where: {
+                  paymentStatus: {
+                    in: [PaymentStatus.INITIATED, PaymentStatus.PROCESSING]
+                  }
+                },
+                orderBy: {
+                  createdAt: "desc"
+                }
+              },
+              items: {
+                select: {
+                  bookingItemId: true,
+                  bookingStatus: true
+                }
+              }
+            }
+          });
+
+          if (!order) {
+            throw new AppError(404, "Booking order not found", "BOOKING_NOT_FOUND");
+          }
+
+          if (
+            order.bookingStatus !== BookingStatus.PENDING_PAYMENT &&
+            order.bookingStatus !== BookingStatus.PAYMENT_PROCESSING
+          ) {
+            throw new AppError(
+              409,
+              "Payment can only be cancelled for a payable booking order",
+              "PAYMENT_CANCEL_NOT_ALLOWED"
+            );
+          }
+
+          const payment = order.payments[0];
+          if (!payment) {
+            throw new AppError(409, "No active payment session found", "NO_ACTIVE_PAYMENT_SESSION");
+          }
+
+          await tx.payment.update({
+            where: { paymentId: payment.paymentId },
+            data: {
+              paymentStatus: PaymentStatus.CANCELLED,
+              rawCallback: {
+                source: "USER_CANCEL_PAYMENT_SESSION",
+                cancelledAt: now.toISOString()
+              }
+            }
+          });
+
+          await tx.bookingOrder.update({
+            where: { bookingOrderId: order.bookingOrderId },
+            data: {
+              bookingStatus: BookingStatus.PENDING_PAYMENT,
+              paymentStatus: PaymentStatus.CANCELLED
+            }
+          });
+
+          const processingItems = order.items.filter(
+            (item) => item.bookingStatus === BookingStatus.PAYMENT_PROCESSING
+          );
+          await tx.bookingItem.updateMany({
+            where: {
+              bookingOrderId: order.bookingOrderId,
+              bookingStatus: BookingStatus.PAYMENT_PROCESSING
+            },
+            data: {
+              bookingStatus: BookingStatus.PENDING_PAYMENT
+            }
+          });
+
+          if (order.bookingStatus === BookingStatus.PAYMENT_PROCESSING) {
+            await this.state.recordOrderStatusHistory(tx, {
+              bookingOrderId: order.bookingOrderId,
+              oldStatus: BookingStatus.PAYMENT_PROCESSING,
+              newStatus: BookingStatus.PENDING_PAYMENT,
+              actionType: "USER_CANCEL_PAYMENT_SESSION",
+              actionByUserId: userId,
+              note: "User cancelled current payment session"
+            });
+          }
+
+          for (const item of processingItems) {
+            await this.state.recordItemStatusHistory(tx, {
+              bookingItemId: item.bookingItemId,
+              oldStatus: BookingStatus.PAYMENT_PROCESSING,
+              newStatus: BookingStatus.PENDING_PAYMENT,
+              actionType: "USER_CANCEL_PAYMENT_SESSION",
+              actionByUserId: userId,
+              note: "User cancelled current payment session"
+            });
+          }
+
+          return {
+            paymentId: payment.paymentId
+          };
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable
+        }
+      );
+
+      return toPaymentDto(await this.getPaymentOrThrow(result.paymentId));
     } catch (error) {
       return handleKnownPrismaError(error);
     }
@@ -424,7 +579,7 @@ export class PaymentsService {
                   paidAt: null
                 }
               });
-              await this.expireOrderIfStillWaiting(tx, payment.bookingOrder, now);
+              await this.markPaymentSessionExpired(tx, payment.bookingOrder);
 
               return payment.paymentId;
             }
@@ -508,11 +663,8 @@ export class PaymentsService {
             }
           });
 
-          if (
-            input.status === PaymentStatus.EXPIRED ||
-            (payment.bookingOrder.holdExpiresAt && payment.bookingOrder.holdExpiresAt <= now)
-          ) {
-            await this.expireOrderIfStillWaiting(tx, payment.bookingOrder, now);
+          if (input.status === PaymentStatus.EXPIRED) {
+            await this.markPaymentSessionExpired(tx, payment.bookingOrder);
           } else if (input.status === PaymentStatus.FAILED || input.status === PaymentStatus.CANCELLED) {
             await this.notifications.createPaymentNotification(tx, {
               userId: payment.userId,
@@ -640,7 +792,7 @@ export class PaymentsService {
     return payment;
   }
 
-  private assertOrderCanCreatePayment(order: PaymentOrder, amount: number, now: Date): void {
+  private assertOrderCanCreatePayment(order: PaymentOrder, amount: number): void {
     if (
       order.bookingStatus !== BookingStatus.PENDING_PAYMENT &&
       order.bookingStatus !== BookingStatus.PAYMENT_PROCESSING
@@ -652,85 +804,37 @@ export class PaymentsService {
       );
     }
 
-    if (!order.holdExpiresAt || order.holdExpiresAt <= now) {
-      throw new AppError(409, "Booking payment hold has expired", "BOOKING_HOLD_EXPIRED");
-    }
-
     if (!new Prisma.Decimal(amount).equals(order.totalAmount)) {
       throw new AppError(400, "Payment amount must equal booking total amount", "PAYMENT_AMOUNT_MISMATCH");
     }
   }
 
-  private async expireOrderIfStillWaiting(
+  private async createPaymentExpiresAt(tx: Prisma.TransactionClient, now: Date): Promise<Date> {
+    const rules = await new RulesRepository(tx).getBookingRuleForPolicy();
+
+    return addMinutes(now, rules.holdMinutes);
+  }
+
+  private async markPaymentSessionExpired(
     tx: Prisma.TransactionClient,
-    order: PaymentOrder,
-    now: Date
+    order: PaymentOrder
   ): Promise<void> {
-    if (
-      order.bookingStatus !== BookingStatus.PENDING_PAYMENT &&
-      order.bookingStatus !== BookingStatus.PAYMENT_PROCESSING
-    ) {
-      return;
-    }
-
-    const updatedOrder = await tx.bookingOrder.updateMany({
-      where: {
-        bookingOrderId: order.bookingOrderId,
-        bookingStatus: {
-          in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAYMENT_PROCESSING]
-        }
-      },
+    await tx.bookingOrder.update({
+      where: { bookingOrderId: order.bookingOrderId },
       data: {
-        bookingStatus: BookingStatus.PAYMENT_EXPIRED,
-        paymentStatus: PaymentStatus.EXPIRED,
-        refundable: false
+        paymentStatus: PaymentStatus.EXPIRED
       }
     });
-
-    if (updatedOrder.count === 0) {
-      return;
-    }
-
-    await tx.bookingItem.updateMany({
-      where: {
-        bookingOrderId: order.bookingOrderId,
-        bookingStatus: {
-          in: [BookingStatus.PENDING_PAYMENT, BookingStatus.PAYMENT_PROCESSING]
-        }
-      },
-      data: {
-        bookingStatus: BookingStatus.PAYMENT_EXPIRED
-      }
-    });
-
-    await this.state.recordOrderStatusHistory(tx, {
-      bookingOrderId: order.bookingOrderId,
-      oldStatus: order.bookingStatus,
-      newStatus: BookingStatus.PAYMENT_EXPIRED,
-      actionType: "PAYMENT_CALLBACK_EXPIRED_HOLD",
-      note: `Payment callback processed after hold expired at ${now.toISOString()}`
-    });
-
-    for (const item of order.items.filter((bookingItem) =>
-      waitingPaymentItemStatuses.includes(bookingItem.bookingStatus)
-    )) {
-      await this.state.recordItemStatusHistory(tx, {
-        bookingItemId: item.bookingItemId,
-        oldStatus: item.bookingStatus,
-        newStatus: BookingStatus.PAYMENT_EXPIRED,
-        actionType: "PAYMENT_CALLBACK_EXPIRED_HOLD",
-        note: `Payment callback processed after hold expired at ${now.toISOString()}`
-      });
-    }
 
     await this.notifications.createPaymentNotification(tx, {
       userId: order.userId,
       bookingOrderId: order.bookingOrderId,
       notificationType: NotificationType.PAYMENT_EXPIRED,
-      title: "Payment hold expired",
-      content: `Booking ${order.bookingCode} expired because payment was not completed in time.`
+      title: "Payment session expired",
+      content: `Payment session for booking ${order.bookingCode} expired. You can start a new payment session while the order is still payable.`
     });
   }
+
 }
 
 export const paymentsService = new PaymentsService();
