@@ -1,20 +1,76 @@
 ﻿import { PrismaClient } from "@prisma/client";
 
+import bcrypt from "bcryptjs";
+
 const prisma = new PrismaClient();
 
-const passwordHash = "seed-password-hash-placeholder";
+const seedPassword = "Password123!";
 
 const courtIds = {
+  footballA: "00000000-0000-4000-8000-000000000101",
+  badmintonA: "00000000-0000-4000-8000-000000000102",
+  basketballA: "00000000-0000-4000-8000-000000000103"
+};
+
+const pricingRuleIds = {
+  footballDefault: "00000000-0000-4000-8000-000000000201",
+  badmintonDefault: "00000000-0000-4000-8000-000000000202",
+  basketballDefault: "00000000-0000-4000-8000-000000000203"
+};
+
+const legacyCourtIds = {
   footballA: "00000000-0000-0000-0000-000000000101",
   badmintonA: "00000000-0000-0000-0000-000000000102",
   basketballA: "00000000-0000-0000-0000-000000000103"
 };
 
-const pricingRuleIds = {
+const legacyPricingRuleIds = {
   footballDefault: "00000000-0000-0000-0000-000000000201",
   badmintonDefault: "00000000-0000-0000-0000-000000000202",
   basketballDefault: "00000000-0000-0000-0000-000000000203"
 };
+
+async function migrateLegacySeedIds() {
+  const courtIdPairs = [
+    [legacyCourtIds.footballA, courtIds.footballA],
+    [legacyCourtIds.badmintonA, courtIds.badmintonA],
+    [legacyCourtIds.basketballA, courtIds.basketballA]
+  ] as const;
+
+  const pricingRuleIdPairs = [
+    [legacyPricingRuleIds.footballDefault, pricingRuleIds.footballDefault],
+    [legacyPricingRuleIds.badmintonDefault, pricingRuleIds.badmintonDefault],
+    [legacyPricingRuleIds.basketballDefault, pricingRuleIds.basketballDefault]
+  ] as const;
+
+  for (const [legacyId, nextId] of courtIdPairs) {
+    const [legacyCourt, nextCourt] = await Promise.all([
+      prisma.court.findUnique({ where: { courtId: legacyId }, select: { courtId: true } }),
+      prisma.court.findUnique({ where: { courtId: nextId }, select: { courtId: true } })
+    ]);
+
+    if (legacyCourt && !nextCourt) {
+      await prisma.court.update({
+        where: { courtId: legacyId },
+        data: { courtId: nextId }
+      });
+    }
+  }
+
+  for (const [legacyId, nextId] of pricingRuleIdPairs) {
+    const [legacyPricingRule, nextPricingRule] = await Promise.all([
+      prisma.pricingRule.findUnique({ where: { pricingRuleId: legacyId }, select: { pricingRuleId: true } }),
+      prisma.pricingRule.findUnique({ where: { pricingRuleId: nextId }, select: { pricingRuleId: true } })
+    ]);
+
+    if (legacyPricingRule && !nextPricingRule) {
+      await prisma.pricingRule.update({
+        where: { pricingRuleId: legacyId },
+        data: { pricingRuleId: nextId }
+      });
+    }
+  }
+}
 
 async function seedPriorityGroups() {
   const [staff, student, external] = await Promise.all([
@@ -109,12 +165,15 @@ async function assignRole(userId: string, roleId: string) {
   });
 }
 
-async function seedUsers(studentPriorityGroupId: string, staffPriorityGroupId: string) {
+async function seedUsers(studentPriorityGroupId: string, staffPriorityGroupId: string, passwordHash: string) {
   const [adminUser, managerUser, sampleUser] = await Promise.all([
     prisma.user.upsert({
       where: { email: "admin@courtsphere.local" },
       update: {
         fullName: "CourtSphere Admin",
+        passwordHash,
+        accountStatus: "ACTIVE",
+        bookingPermissionStatus: "ALLOWED",
         priorityGroupId: staffPriorityGroupId
       },
       create: {
@@ -130,6 +189,9 @@ async function seedUsers(studentPriorityGroupId: string, staffPriorityGroupId: s
       where: { email: "manager@courtsphere.local" },
       update: {
         fullName: "Field Manager",
+        passwordHash,
+        accountStatus: "ACTIVE",
+        bookingPermissionStatus: "ALLOWED",
         priorityGroupId: staffPriorityGroupId
       },
       create: {
@@ -145,6 +207,9 @@ async function seedUsers(studentPriorityGroupId: string, staffPriorityGroupId: s
       where: { email: "user@courtsphere.local" },
       update: {
         fullName: "Sample Student",
+        passwordHash,
+        accountStatus: "ACTIVE",
+        bookingPermissionStatus: "ALLOWED",
         priorityGroupId: studentPriorityGroupId
       },
       create: {
@@ -380,9 +445,12 @@ async function seedSystemSettings(adminUserId: string) {
 }
 
 async function main() {
+  await migrateLegacySeedIds();
+
+  const passwordHash = await bcrypt.hash(seedPassword, 12);
   const priorityGroups = await seedPriorityGroups();
   const roles = await seedRoles();
-  const users = await seedUsers(priorityGroups.student.priorityGroupId, priorityGroups.staff.priorityGroupId);
+  const users = await seedUsers(priorityGroups.student.priorityGroupId, priorityGroups.staff.priorityGroupId, passwordHash);
 
   await Promise.all([
     assignRole(users.adminUser.userId, roles.user.roleId),

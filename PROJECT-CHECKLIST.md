@@ -1016,7 +1016,7 @@ Verification notes:
 - [x] `npm run build` pass.
 - [x] Programmatic Vite route check `/courts`, `/courts/court-football-01`, `/courts/court-badminton-02`, `/courts/not-found-id` trả 200.
 - [x] Backend `localhost:3000` reachable; register USER và `GET /api/courts` trả seed courts.
-- [ ] Real availability success pending: `GET /api/courts/00000000-0000-0000-0000-000000000101/availability?date=2026-05-29&includePricing=true` trả `400 VALIDATION_ERROR` vì seed court id không qua `z.string().uuid()` validator backend.
+- [x] Real availability success: seed court ids changed to validator-safe UUIDs; `GET /api/courts/00000000-0000-4000-8000-000000000101/availability?date=2026-05-29&includePricing=true` returns real slots.
 
 ---
 
@@ -1027,7 +1027,7 @@ Checklist:
 - [x] Booking create page.
 - [x] Date picker.
 - [x] Slot picker.
-- [ ] Participant count input: không triển khai vì API contract `POST /api/bookings` không nhận field này.
+- [x] Participant count input: Khong trien khai theo API contract moi vi `POST /api/bookings` khong nhan field nay.
 - [x] Usage purpose input: map vào `note` theo API contract.
 - [x] Booking summary card.
 - [x] Submit create booking hold.
@@ -1051,7 +1051,7 @@ Verification notes:
 - [x] `npm test` pass.
 - [x] `npm run build` pass.
 - [x] Dev route check `/bookings/create`, `/bookings/my`, `/bookings/mock-booking-route`, `/bookings/mock-booking-route/payment`, `/courts/court-football-01` trả 200.
-- [ ] Real booking API E2E pending vì backend seed court ids hiện tại không qua UUID validator ở route params, nên availability/booking với seed court chưa verify success được.
+- [x] Real booking API/frontend E2E pass: browser flow creates real hold, mock payment callback confirms `CONFIRMED/SUCCESS`, `/bookings/my` and detail render backend data.
 
 ---
 
@@ -1083,7 +1083,7 @@ Verification notes:
 - [x] `npm run build` pass.
 - [x] Dev route check `/manager`, `/manager/today`, `/manager/check-in`, `/manager/in-use`, `/manager/no-show`, `/manager/courts`, `/manager/history` trả 200.
 - [x] Backend RBAC verify: USER thường gọi `GET /api/manager/bookings/today` trả `403 FORBIDDEN`.
-- [ ] Manual manager E2E với FIELD_MANAGER/ADMIN pending vì seed credential manager/admin hiện chưa login được bằng password thật.
+- [x] Manual manager E2E pass with `FIELD_MANAGER`: seed credential login, today schedule, check-in `CONFIRMED -> IN_USE`, override complete `IN_USE -> COMPLETED`, and safe no-show test verified.
 
 ---
 
@@ -1108,9 +1108,9 @@ Checklist:
 
 Acceptance criteria:
 
-- [ ] Admin quản trị được dữ liệu cốt lõi: frontend-ready, manual ADMIN credential verification pending.
-- [ ] Admin cấu hình được nghiệp vụ động: frontend-ready, manual ADMIN credential verification pending.
-- [ ] Admin xem được báo cáo cơ bản: frontend-ready, manual ADMIN credential verification pending.
+- [x] Admin quan tri duoc du lieu cot loi: ADMIN credential verified; users/courts/payments/refunds/violations load real data.
+- [x] Admin cau hinh duoc nghiep vu dong: booking rules get/update verified.
+- [x] Admin xem duoc bao cao co ban: overview and reports pages/API load real data.
 
 Verification notes:
 
@@ -1120,7 +1120,7 @@ Verification notes:
 - [x] `npm run build` pass.
 - [x] Dev route check `/admin`, `/admin/dashboard`, `/admin/users`, `/admin/roles`, `/admin/priority-groups`, `/admin/court-types`, `/admin/courts`, `/admin/operating-hours`, `/admin/pricing-rules`, `/admin/booking-rules`, `/admin/priority-policies`, `/admin/payments`, `/admin/refunds`, `/admin/violations`, `/admin/reports` trả 200.
 - [x] Backend RBAC verify: tài khoản `FIELD_MANAGER` gọi `GET /api/admin/users` trả `403 FORBIDDEN`.
-- [ ] Manual admin E2E với credential `ADMIN` thật pending vì chưa có tài khoản admin login hợp lệ trong phiên này.
+- [x] Manual admin E2E pass with real `ADMIN` credential: dashboard, users, courts, booking rules, payments, refunds, violations, reports, lock/unlock and restrict/unrestrict test user verified.
 
 ---
 
@@ -1243,9 +1243,9 @@ Verification notes:
 
 ### 9.3 E2E tests
 
-- [ ] User browses courts -> creates booking -> pays -> sees confirmed booking.
-- [ ] Manager checks in booking -> completes booking.
-- [ ] User does not arrive -> system expires check-in -> manager confirms no-show.
+- [x] User browses courts -> creates booking -> pays -> sees confirmed booking.
+- [x] Manager checks in booking -> completes booking.
+- [x] User does not arrive -> system expires check-in -> manager confirms no-show.
 - [ ] Admin configures booking rule -> new rule affects booking validation.
 
 ---
@@ -1263,31 +1263,31 @@ Verification notes:
 
 ### Sprint 1 — Courts & availability
 
-- [ ] Court types.
-- [ ] Courts.
-- [ ] Operating hours.
-- [ ] Pricing rules.
-- [ ] Availability API.
+- [x] Court types.
+- [x] Courts.
+- [x] Operating hours.
+- [x] Pricing rules.
+- [x] Availability API.
 - [x] Court list UI.
 - [x] Court detail UI.
 
 ### Sprint 2 — Booking & payment MVP
 
-- [ ] Booking hold.
-- [ ] Overlap prevention.
+- [x] Booking hold.
+- [x] Overlap prevention.
 - [x] Payment sandbox.
 - [x] Confirm booking after payment.
-- [ ] My bookings UI.
-- [ ] Booking detail UI.
+- [x] My bookings UI.
+- [x] Booking detail UI.
 
 ### Sprint 3 — Manager operations
 
-- [ ] Today schedule.
-- [ ] Check-in.
-- [ ] Complete booking.
-- [ ] No-show.
-- [ ] Manager cancel.
-- [ ] Court status update.
+- [x] Today schedule.
+- [x] Check-in.
+- [x] Complete booking.
+- [x] No-show.
+- [x] Manager cancel.
+- [x] Court status update.
 
 ### Sprint 4 — Refund, violation, jobs
 
@@ -1295,21 +1295,21 @@ Verification notes:
 - [x] Refund module.
 - [x] Expire payment job.
 - [x] Check-in expiration job.
-- [ ] Violation module.
-- [ ] Notifications.
+- [x] Violation module.
+- [x] Notifications.
 
 ### Sprint 5 — Admin & reports
 
-- [ ] User management.
-- [ ] Role management.
-- [ ] Booking rules.
-- [ ] Priority groups.
-- [ ] Payment/refund management.
+- [x] User management.
+- [x] Role management.
+- [x] Booking rules.
+- [x] Priority groups.
+- [x] Payment/refund management.
 - [x] Reports dashboard.
 
 ### Sprint 6 — Polish & hardening
 
-- [ ] Full E2E flow.
+- [x] Full E2E flow.
 - [ ] Error handling polish.
 - [ ] Loading/empty states.
 - [ ] Security review.
@@ -1377,9 +1377,9 @@ Một module được coi là hoàn thành khi:
 | UI design system | Codex | DONE | Theme tokens, header, search/filter bar, court cards/grid, badges, drawer, common states, mobile bottom nav, and mock HomePage preview verified |
 | Court listing/detail | Codex | DONE | Mock-first `/courts` and `/courts/:courtId`, search/filter/sort, detail view, navigation links, and verification completed |
 | Frontend auth pages | Codex | DONE | Login/register forms, Zod validation, auth service/store actions, logout, current user display, role redirect helper, and backend USER auth flow verified |
-| User pages | Codex | IN_PROGRESS | Court browsing shell done; availability, booking flow, my bookings, policy/rules pages remain |
-| Manager pages |  | TODO |  |
-| Admin pages |  | TODO |  |
+| User pages | Codex | DONE | Real court detail/availability and browser booking/payment/my-bookings/detail E2E verified against backend |
+| Manager pages | Codex | DONE | Real FIELD_MANAGER login, today schedule, check-in, complete, no-show, court status pages and RBAC verified |
+| Admin pages | Codex | DONE | Real ADMIN login, dashboard/users/courts/rules/payments/refunds/violations/reports and RBAC verified |
 | Tests |  | TODO |  |
 | Documentation |  | TODO |  |
 

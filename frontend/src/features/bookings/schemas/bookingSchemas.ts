@@ -11,7 +11,12 @@ export const createBookingFormSchema = z
     courtId: z.string().trim().min(1, "Thiếu thông tin sân"),
     startDatetime: isoDateTimeSchema,
     endDatetime: isoDateTimeSchema,
-    note: z.string().trim().max(500, "Ghi chú tối đa 500 ký tự").optional()
+    note: z
+      .string()
+      .trim()
+      .max(500, "Ghi chú tối đa 500 ký tự")
+      .optional()
+      .transform((value) => (value ? value : undefined))
   })
   .refine((value) => new Date(value.startDatetime) < new Date(value.endDatetime), {
     message: "Giờ kết thúc phải sau giờ bắt đầu",
