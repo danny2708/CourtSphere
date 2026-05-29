@@ -103,7 +103,7 @@ export function RefundManagementPage() {
   return (
     <div className="admin-page">
       <AdminNavigation />
-      <AdminPageHeader title="Refund management" description="Theo dõi và retry các refund sandbox/mock." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
+      <AdminPageHeader title="Refund management" description="Theo dõi và retry các refund sandbox." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
       <div className="admin-filter-bar">
         <input placeholder="Tìm refund, booking code..." value={keyword} onChange={(event) => setKeyword(event.target.value)} />
       </div>

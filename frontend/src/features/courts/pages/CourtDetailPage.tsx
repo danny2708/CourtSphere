@@ -260,23 +260,29 @@ export function CourtDetailPage() {
           <p>{court.description}</p>
 
           <div className="detail-meta-grid">
-            <div>
-              <MapPin aria-hidden="true" size={20} />
-              <span>Vị trí</span>
-              <strong>{court.address}</strong>
-            </div>
-            <div>
-              <UsersRound aria-hidden="true" size={20} />
-              <span>Sức chứa</span>
-              <strong>{court.capacity} người</strong>
-            </div>
-            <div>
-              <Clock aria-hidden="true" size={20} />
-              <span>Giờ mở cửa</span>
-              <strong>
-                {court.openTime} - {court.closeTime}
-              </strong>
-            </div>
+            {court.address ? (
+              <div>
+                <MapPin aria-hidden="true" size={20} />
+                <span>Vị trí</span>
+                <strong>{court.address}</strong>
+              </div>
+            ) : null}
+            {typeof court.capacity === "number" ? (
+              <div>
+                <UsersRound aria-hidden="true" size={20} />
+                <span>Sức chứa</span>
+                <strong>{court.capacity} người</strong>
+              </div>
+            ) : null}
+            {court.openTime && court.closeTime ? (
+              <div>
+                <Clock aria-hidden="true" size={20} />
+                <span>Giờ mở cửa</span>
+                <strong>
+                  {court.openTime} - {court.closeTime}
+                </strong>
+              </div>
+            ) : null}
           </div>
 
           <Button
@@ -295,7 +301,7 @@ export function CourtDetailPage() {
           <div>
             <p className="eyebrow">Lịch trống</p>
             <h2>Chọn ngày và khung giờ</h2>
-            <p>Slot còn trống có thể chọn để chuẩn bị đặt lịch. Booking hold và thanh toán sẽ được xử lý ở module sau.</p>
+            <p>Slot còn trống có thể chọn để tạo giữ chỗ và chuyển sang bước thanh toán.</p>
           </div>
           <AvailabilityDatePicker
             error={dateError}
@@ -348,10 +354,12 @@ export function CourtDetailPage() {
               <dt>Loại sân</dt>
               <dd>{court.courtType}</dd>
             </div>
-            <div>
-              <dt>Khu vực</dt>
-              <dd>{court.area}</dd>
-            </div>
+            {court.area ? (
+              <div>
+                <dt>Khu vực</dt>
+                <dd>{court.area}</dd>
+              </div>
+            ) : null}
             <div>
               <dt>Giá tham khảo</dt>
               <dd>{court.startingPrice ? `Từ ${currencyFormatter.format(court.startingPrice)}` : "Chưa có dữ liệu"}</dd>
@@ -381,13 +389,15 @@ export function CourtDetailPage() {
 
         <Card as="section" className="detail-card detail-card--wide">
           <h2>Tiện ích và tag</h2>
-          <div className="amenity-list">
-            {court.amenities.map((amenity) => (
-              <Badge key={amenity} tone="neutral">
-                {amenity}
-              </Badge>
-            ))}
-          </div>
+          {court.amenities.length ? (
+            <div className="amenity-list">
+              {court.amenities.map((amenity) => (
+                <Badge key={amenity} tone="neutral">
+                  {amenity}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
           <div className="court-card__tags">
             {court.tags.map((tag) => (
               <CourtTagBadge key={tag} tag={tag} />
@@ -400,7 +410,6 @@ export function CourtDetailPage() {
             <CourtPriceSummary
               availableSlotCount={availableSlotCount}
               selectedSlot={selectedSlot}
-              source={availability.source}
             />
             <CourtPolicyPanel policy={availability.policy} />
           </>

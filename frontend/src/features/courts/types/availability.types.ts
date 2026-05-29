@@ -50,7 +50,6 @@ export type CourtAvailabilityViewModel = {
   durationMinutes?: number;
   policy: AvailabilityPolicyViewModel;
   slots: AvailabilitySlotViewModel[];
-  source: "api" | "mock";
 };
 
 export type AvailabilityApiPolicy = {

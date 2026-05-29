@@ -27,7 +27,7 @@ export function FakePaymentPanel({ booking, isProcessing, onPay }: FakePaymentPa
 
       <div className="payment-assurance">
         <ShieldCheck aria-hidden="true" size={20} />
-        Không xác nhận booking ở frontend. Trạng thái cuối cùng luôn lấy lại từ backend hoặc mock service sau khi thanh toán.
+        Không xác nhận booking ở frontend. Trạng thái cuối cùng luôn lấy lại từ backend sau khi thanh toán.
       </div>
 
       <Button disabled={isProcessing} size="lg" onClick={onPay}>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDownAZ, SlidersHorizontal } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import { Button } from "../../../components/common/Button";
 import { ErrorState } from "../../../components/common/ErrorState";
@@ -16,13 +17,12 @@ import { defaultCourtFilters, filterCourts, sortCourts } from "../utils/courtFil
 
 const sortOptions: Array<{ value: CourtSortOption; label: string }> = [
   { value: "available_first", label: "Khả dụng trước" },
-  { value: "name_asc", label: "Tên A-Z" },
-  { value: "capacity_asc", label: "Sức chứa tăng" },
-  { value: "capacity_desc", label: "Sức chứa giảm" }
+  { value: "name_asc", label: "Tên A-Z" }
 ];
 
 export function CourtListPage() {
   const { addToast } = useToastStore();
+  const navigate = useNavigate();
   const [courts, setCourts] = useState<CourtDetailViewModel[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<CourtFilterState>(defaultCourtFilters);
@@ -36,8 +36,7 @@ export function CourtListPage() {
     setIsLoading(true);
 
     try {
-      const searchParams = new URLSearchParams(window.location.search);
-      const loadedCourts = await listCourts({ simulateError: searchParams.get("error") === "true" });
+      const loadedCourts = await listCourts();
       setCourts(loadedCourts);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Không tải được dữ liệu. Vui lòng thử lại.");
@@ -53,6 +52,9 @@ export function CourtListPage() {
   const visibleCourts = useMemo(() => {
     return sortCourts(filterCourts(courts, searchKeyword, filters), sortBy);
   }, [courts, filters, searchKeyword, sortBy]);
+  const courtTypeOptions = useMemo(() => {
+    return Array.from(new Set(courts.map((court) => court.courtType))).sort((first, second) => first.localeCompare(second, "vi"));
+  }, [courts]);
 
   const handleToggleFavorite = (courtId: string) => {
     setCourts((currentCourts) =>
@@ -61,13 +63,7 @@ export function CourtListPage() {
   };
 
   const handleBook = (courtId: string) => {
-    const court = courts.find((item) => item.id === courtId);
-
-    addToast({
-      type: "info",
-      title: "Đặt sân",
-      message: `Luồng đặt sân cho ${court?.name ?? "sân này"} sẽ được triển khai ở module booking.`
-    });
+    navigate(buildCourtDetailPath(courtId));
   };
 
   const handleShare = (courtId: string) => {
@@ -94,7 +90,7 @@ export function CourtListPage() {
         <div>
           <p className="eyebrow">Khám phá sân</p>
           <h1>Danh sách sân thể thao</h1>
-          <p>Tìm sân theo loại hình, khu vực, trạng thái và sức chứa bằng dữ liệu preview mock-first.</p>
+          <p>Tìm sân theo loại hình, trạng thái, khung giờ và giá bằng dữ liệu vận hành từ database.</p>
         </div>
         <Button variant="secondary" onClick={() => setIsFilterOpen(true)}>
           <SlidersHorizontal aria-hidden="true" size={18} />
@@ -108,7 +104,7 @@ export function CourtListPage() {
         onOpenFilter={() => setIsFilterOpen(true)}
         onOpenMap={() => addToast({ type: "info", title: "Bản đồ", message: "Map view sẽ được triển khai ở module sau." })}
         onSearchChange={setSearchKeyword}
-        onShowBooked={() => addToast({ type: "info", title: "Sân đã đặt", message: "Danh sách sân đã đặt sẽ dùng dữ liệu booking sau." })}
+        onShowBooked={() => addToast({ type: "info", title: "Sân đã đặt", message: "Danh sách sân đã đặt sẽ dùng dữ liệu booking." })}
         onShowFavorites={() => setFilters((currentFilters) => ({ ...currentFilters, favoritesOnly: !currentFilters.favoritesOnly }))}
       />
 
@@ -138,6 +134,7 @@ export function CourtListPage() {
       />
 
       <CourtFilterDrawer
+        courtTypes={courtTypeOptions}
         filters={filters}
         isOpen={isFilterOpen}
         onApply={(nextFilters) => {

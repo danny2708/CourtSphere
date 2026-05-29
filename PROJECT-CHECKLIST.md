@@ -396,7 +396,7 @@ Checklist:
 - [x] Đồng bộ enum booking/payment/refund/court/account status.
 - [x] Thêm index cho các query quan trọng.
 - [x] Thêm migration SQL chống overlap booking bằng PostgreSQL exclusion constraint.
-- [x] Viết seed data: admin, manager, user, roles, priority groups, court types, courts, rules.
+- [x] Viết seed data vận hành: users/roles/priority, courts, rules, bookings/items, payments, refunds, waitlist, notifications, violations, histories, audit logs.
 
 Acceptance criteria:
 
@@ -816,7 +816,7 @@ Checklist:
 - [x] Chuyển notifications sang optional `booking_order_id` và `booking_item_id`.
 - [x] Giữ `waitlist_entries.expires_at`.
 - [x] Thêm migration SQL `no_overlapping_active_booking_items`.
-- [x] Cập nhật seed data tương thích schema mới.
+- [x] Cập nhật seed data tương thích schema mới và đủ dữ liệu vận hành cho frontend real API.
 - [x] Cập nhật API contract.
 - [x] Re-verify auth/RBAC/courts/rules/availability/bookings/payments/refunds tests.
 
@@ -975,10 +975,10 @@ Acceptance criteria:
 
 Checklist:
 
-- [x] Route `/courts` hoạt động với mock data.
-- [x] Route `/courts/:courtId` hoạt động với mock data.
-- [x] Mock data được tách khỏi page.
-- [x] Có service mock-first cho list/detail.
+- [x] Route `/courts` hoạt động với dữ liệu thật từ API/DB seed.
+- [x] Route `/courts/:courtId` hoạt động với dữ liệu thật từ API/DB seed.
+- [x] Mock court data và fallback dev preview đã được gỡ khỏi page/service.
+- [x] Service list/detail dùng API thật, không fallback mock.
 - [x] Có search/filter/sort cơ bản.
 - [x] Detail id không tồn tại hiển thị state hợp lý.
 - [x] Header/bottom navigation trỏ đúng route court browsing.
@@ -990,7 +990,7 @@ Acceptance criteria:
 - [x] `npm test` pass.
 - [x] `npm run build` pass.
 - [x] Manual route `/courts` trả 200.
-- [x] Manual route `/courts/court-football-01` trả 200.
+- [x] Manual route `/courts/<uuid-seed-court-id>` trả 200.
 - [x] Manual route `/courts/not-found-id` trả 200 và xử lý not found trong UI.
 
 #### 7.4.2 Court Availability & Policy Integration
@@ -998,7 +998,7 @@ Acceptance criteria:
 Checklist:
 
 - [x] Court detail có date picker chọn ngày xem lịch trống.
-- [x] Tạo availability service real-first/mock fallback cho dev preview.
+- [x] Tạo availability service dùng API thật, không fallback mock.
 - [x] Tạo availability slot picker/card.
 - [x] Slot available/hold/booked/unavailable hiển thị rõ và disabled đúng.
 - [x] Court không `ACTIVE` không cho đặt lịch.
@@ -1014,7 +1014,7 @@ Verification notes:
 - [x] `npm run lint` pass.
 - [x] `npm test` pass.
 - [x] `npm run build` pass.
-- [x] Programmatic Vite route check `/courts`, `/courts/court-football-01`, `/courts/court-badminton-02`, `/courts/not-found-id` trả 200.
+- [x] Programmatic Vite route check `/courts`, `/courts/<uuid-seed-court-id>`, `/courts/not-found-id` trả 200.
 - [x] Backend `localhost:3000` reachable; register USER và `GET /api/courts` trả seed courts.
 - [x] Real availability success: seed court ids changed to validator-safe UUIDs; `GET /api/courts/00000000-0000-4000-8000-000000000101/availability?date=2026-05-29&includePricing=true` returns real slots.
 
@@ -1039,10 +1039,10 @@ Checklist:
 
 Acceptance criteria:
 
-- [x] User tạo booking hold được qua mock-first frontend flow.
-- [x] User thanh toán/fake payment được qua mock-first frontend flow.
+- [x] User tạo booking hold được qua frontend flow gọi API thật.
+- [x] User thanh toán qua payment sandbox backend.
 - [x] User xem trạng thái booking/payment/refund được.
-- [x] User hủy booking hợp lệ được qua mock-first frontend flow.
+- [x] User hủy booking hợp lệ được qua frontend flow gọi API thật.
 
 Verification notes:
 
@@ -1050,7 +1050,7 @@ Verification notes:
 - [x] `npm run lint` pass.
 - [x] `npm test` pass.
 - [x] `npm run build` pass.
-- [x] Dev route check `/bookings/create`, `/bookings/my`, `/bookings/mock-booking-route`, `/bookings/mock-booking-route/payment`, `/courts/court-football-01` trả 200.
+- [x] Dev route check `/bookings/create`, `/bookings/my`, `/courts/<uuid-seed-court-id>` trả 200.
 - [x] Real booking API/frontend E2E pass: browser flow creates real hold, mock payment callback confirms `CONFIRMED/SUCCESS`, `/bookings/my` and detail render backend data.
 
 ---
@@ -1070,7 +1070,7 @@ Checklist:
 
 Acceptance criteria:
 
-- [x] Manager check-in được booking qua frontend action/service, mock-first fallback cho dev preview.
+- [x] Manager check-in được booking qua frontend action/service gọi API thật.
 - [x] Manager complete được booking qua override-complete action/service.
 - [x] Manager xác nhận no-show được qua frontend action/service.
 - [x] Manager cập nhật tình trạng sân được qua route backend hiện có `PATCH /api/admin/courts/:id/status`.
@@ -1365,7 +1365,7 @@ Một module được coi là hoàn thành khi:
 | Availability | Codex | DONE | Hold-aware slot generation now reads booking_items, conflict detection, pricing, and policy response implemented |
 | Booking | Codex | DONE | BookingOrder/BookingItem hold creation, combo all-or-nothing validation, user APIs, cancellation/refund request, and histories implemented |
 | Payment | Codex | DONE | Mock payment tied to booking_orders, callback idempotency, status query, admin list, and order/item confirmation implemented |
-| Refund | Codex | DONE | Mock refund processor tied to booking_orders with optional booking_items, admin APIs, retry audit logs, and manager/admin cancellation implemented |
+| Refund | Codex | DONE | Sandbox refund processor tied to booking_orders with optional booking_items, admin APIs, retry audit logs, and manager/admin cancellation implemented |
 | DB refactor sync | Codex | DONE | Backend synced to new booking_orders/booking_items database design and re-verified |
 | Manager operations | Codex | DONE | Booking item schedule, manager/admin check-in, late override, no-show violation, and in-use exception close implemented |
 | Jobs | Codex | DONE | Internal run-once jobs for payment hold expiry, check-in expiry, auto-complete, waitlist expiry, idempotent updates, and histories verified |
@@ -1374,8 +1374,8 @@ Một module được coi là hoàn thành khi:
 | Notifications | Codex | DONE | In-app notification APIs/service, lifecycle integrations, enum migration, and tests verified |
 | Reports | Codex | DONE | Admin reports APIs, aggregate service, contract, tests, and verification completed |
 | Frontend foundation | Codex | DONE | React + TypeScript/Vite foundation with router, API client, auth store, protected/role routes, layout, states, theme, and verification completed |
-| UI design system | Codex | DONE | Theme tokens, header, search/filter bar, court cards/grid, badges, drawer, common states, mobile bottom nav, and mock HomePage preview verified |
-| Court listing/detail | Codex | DONE | Mock-first `/courts` and `/courts/:courtId`, search/filter/sort, detail view, navigation links, and verification completed |
+| UI design system | Codex | DONE | Theme tokens, header, search/filter bar, court cards/grid, badges, drawer, common states, and mobile bottom nav verified with API data |
+| Court listing/detail | Codex | DONE | Real API `/courts` and `/courts/:courtId`, search/filter/sort, detail view, navigation links, and verification completed |
 | Frontend auth pages | Codex | DONE | Login/register forms, Zod validation, auth service/store actions, logout, current user display, role redirect helper, and backend USER auth flow verified |
 | User pages | Codex | DONE | Real court detail/availability and browser booking/payment/my-bookings/detail E2E verified against backend |
 | Manager pages | Codex | DONE | Real FIELD_MANAGER login, today schedule, check-in, complete, no-show, court status pages and RBAC verified |

@@ -1,14 +1,12 @@
-import { Badge } from "../../../components/common/Badge";
 import { Card } from "../../../components/common/Card";
 import type { AvailabilitySlotViewModel } from "../types/availability.types";
 
 type CourtPriceSummaryProps = {
   selectedSlot: AvailabilitySlotViewModel | null;
   availableSlotCount: number;
-  source: "api" | "mock";
 };
 
-export function CourtPriceSummary({ availableSlotCount, selectedSlot, source }: CourtPriceSummaryProps) {
+export function CourtPriceSummary({ availableSlotCount, selectedSlot }: CourtPriceSummaryProps) {
   return (
     <Card as="section" className="detail-card price-summary">
       <div>
@@ -24,12 +22,6 @@ export function CourtPriceSummary({ availableSlotCount, selectedSlot, source }: 
         <div>
           <dt>Slot còn trống</dt>
           <dd>{availableSlotCount}</dd>
-        </div>
-        <div>
-          <dt>Nguồn dữ liệu</dt>
-          <dd>
-            <Badge tone={source === "api" ? "success" : "neutral"}>{source === "api" ? "API thật" : "Mock preview"}</Badge>
-          </dd>
         </div>
       </dl>
     </Card>

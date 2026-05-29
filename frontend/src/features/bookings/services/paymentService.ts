@@ -1,6 +1,5 @@
 import { apiRequest } from "../../../api/client";
-import { getMockBookingById, saveMockBooking } from "./bookingService";
-import type { BookingOrder, BookingPayment, PaymentStatus } from "../types/booking.types";
+import type { PaymentStatus } from "../types/booking.types";
 import type { CreatePaymentPayload, MockPaymentCallbackPayload, PaymentDetail } from "../types/payment.types";
 
 function bytesToHex(bytes: ArrayBuffer): string {
@@ -23,47 +22,7 @@ async function signMockCallback(input: { gatewayTransactionId: string; status: P
   return bytesToHex(signature);
 }
 
-function createMockPayment(booking: BookingOrder): PaymentDetail {
-  const now = new Date().toISOString();
-  const gatewayTransactionId = `mock_${booking.bookingOrderId}`;
-  const payment: BookingPayment = {
-    id: `mock-payment-${booking.bookingOrderId}`,
-    amount: booking.totalAmount,
-    paymentMethod: "MOCK",
-    gatewayTransactionId,
-    paymentStatus: "PROCESSING",
-    paymentUrl: `/mock-payment/${gatewayTransactionId}`,
-    createdAt: now
-  };
-
-  saveMockBooking({
-    ...booking,
-    bookingStatus: "PAYMENT_PROCESSING",
-    paymentStatus: "PROCESSING",
-    items: booking.items.map((item) => ({
-      ...item,
-      bookingStatus: "PAYMENT_PROCESSING"
-    })),
-    payments: [payment, ...(booking.payments ?? [])],
-    updatedAt: now
-  });
-
-  return {
-    ...payment,
-    bookingOrder: booking
-  };
-}
-
 export async function createPayment(bookingOrderId: string, payload: CreatePaymentPayload): Promise<PaymentDetail> {
-  if (bookingOrderId.startsWith("mock-booking-")) {
-    const booking = getMockBookingById(bookingOrderId);
-    if (!booking) {
-      throw new Error("Không tìm thấy đơn đặt sân.");
-    }
-
-    return createMockPayment(booking);
-  }
-
   const response = await apiRequest<{ payment: PaymentDetail }>(`/api/bookings/${bookingOrderId}/payments`, {
     auth: true,
     method: "POST",
@@ -74,53 +33,6 @@ export async function createPayment(bookingOrderId: string, payload: CreatePayme
 }
 
 export async function confirmMockPaymentSuccess(payment: PaymentDetail): Promise<PaymentDetail> {
-  if (payment.id.startsWith("mock-payment-") && payment.bookingOrder?.bookingOrderId) {
-    const booking = getMockBookingById(payment.bookingOrder.bookingOrderId);
-    if (!booking) {
-      throw new Error("Không tìm thấy đơn đặt sân.");
-    }
-
-    const now = new Date().toISOString();
-    const successPayment: BookingPayment = {
-      id: payment.id,
-      amount: payment.amount,
-      paymentMethod: payment.paymentMethod,
-      gatewayTransactionId: payment.gatewayTransactionId,
-      paymentStatus: "SUCCESS",
-      paymentUrl: payment.paymentUrl,
-      paidAt: now,
-      createdAt: payment.createdAt
-    };
-
-    const confirmedBooking = saveMockBooking({
-      ...booking,
-      bookingStatus: "CONFIRMED",
-      paymentStatus: "SUCCESS",
-      holdExpiresAt: null,
-      payments: [successPayment, ...(booking.payments ?? []).filter((item) => item.id !== successPayment.id)],
-      items: booking.items.map((item) => ({
-        ...item,
-        bookingStatus: "CONFIRMED"
-      })),
-      statusHistories: [
-        ...(booking.statusHistories ?? []),
-        {
-          oldStatus: booking.bookingStatus,
-          newStatus: "CONFIRMED",
-          actionType: "PAYMENT_SUCCESS_CONFIRM_BOOKING",
-          note: "Mock payment success confirmed booking",
-          changedAt: now
-        }
-      ],
-      updatedAt: now
-    });
-
-    return {
-      ...successPayment,
-      bookingOrder: confirmedBooking
-    };
-  }
-
   const signature = await signMockCallback({
     gatewayTransactionId: payment.gatewayTransactionId,
     status: "SUCCESS"

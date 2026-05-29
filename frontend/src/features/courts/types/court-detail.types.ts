@@ -8,12 +8,12 @@ export type CourtOperatingHour = {
 
 export type CourtDetailViewModel = CourtCardViewModel & {
   courtType: string;
-  area: string;
-  capacity: number;
+  area?: string;
+  capacity?: number;
   description: string;
   amenities: string[];
   operatingHours: CourtOperatingHour[];
   gallery: string[];
 };
 
-export type CourtSortOption = "name_asc" | "capacity_asc" | "capacity_desc" | "available_first";
+export type CourtSortOption = "name_asc" | "available_first";

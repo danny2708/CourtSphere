@@ -1,5 +1,4 @@
 import { apiRequest } from "../../../api/client";
-import { ApiClientError } from "../../../types/api.types";
 import type { CourtDetailViewModel } from "../types/court-detail.types";
 import type {
   AvailabilityApiResponse,
@@ -23,8 +22,6 @@ const timeFormatter = new Intl.DateTimeFormat("vi-VN", {
   minute: "2-digit"
 });
 
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 const defaultPolicy: AvailabilityPolicyViewModel = {
   holdMinutes: 10,
   cancelBeforeHours: 2,
@@ -36,10 +33,6 @@ const defaultPolicy: AvailabilityPolicyViewModel = {
   advanceBookingDays: 7,
   canJoinWaitlist: true
 };
-
-function isUuid(value: string): boolean {
-  return uuidPattern.test(value);
-}
 
 function formatTime(isoDate: string): string {
   return timeFormatter.format(new Date(isoDate));
@@ -130,165 +123,21 @@ function mapApiResponse(response: AvailabilityApiResponse): CourtAvailabilityVie
       ...defaultPolicy,
       ...response.policy
     },
-    slots: response.slots.map((slot) => mapApiSlot(response.court.id, slot)),
-    source: "api"
+    slots: response.slots.map((slot) => mapApiSlot(response.court.id, slot))
   };
-}
-
-function buildDateTime(date: string, time: string): string {
-  return new Date(`${date}T${time}:00`).toISOString();
-}
-
-function buildMockSlot(input: {
-  court: CourtDetailViewModel;
-  date: string;
-  startTime: string;
-  endTime: string;
-  status: AvailabilitySlotStatus;
-  reasonText?: string;
-  priceAmount?: number;
-}): AvailabilitySlotViewModel {
-  const startDatetime = buildDateTime(input.date, input.startTime);
-  const endDatetime = buildDateTime(input.date, input.endTime);
-  const isPastSlot = new Date(endDatetime).getTime() <= Date.now();
-  const status = input.status === "AVAILABLE" && isPastSlot ? "UNAVAILABLE" : input.status;
-
-  return {
-    id: `${input.court.id}-${startDatetime}`,
-    courtId: input.court.id,
-    startDatetime,
-    endDatetime,
-    startTimeText: input.startTime,
-    endTimeText: input.endTime,
-    status,
-    isAvailable: status === "AVAILABLE",
-    priceAmount: input.priceAmount,
-    priceText: formatPrice(input.priceAmount),
-    reasonText: status === "UNAVAILABLE" && isPastSlot ? "Khung giờ đã qua." : input.reasonText
-  };
-}
-
-function buildMockAvailability(court: CourtDetailViewModel, date: string): CourtAvailabilityViewModel {
-  const basePrice = court.startingPrice ?? 100000;
-
-  if (court.status !== "ACTIVE") {
-    const reasonText =
-      court.status === "MAINTENANCE"
-        ? "Sân đang bảo trì."
-        : court.status === "TEMP_CLOSED"
-          ? "Sân đang tạm đóng."
-          : "Sân đã ngừng sử dụng.";
-
-    return {
-      courtId: court.id,
-      date,
-      durationMinutes: 60,
-      policy: defaultPolicy,
-      slots: [
-        ["08:00", "09:00"],
-        ["09:00", "10:00"],
-        ["10:00", "11:00"],
-        ["11:00", "12:00"]
-      ].map(([startTime, endTime]) =>
-        buildMockSlot({
-          court,
-          date,
-          startTime,
-          endTime,
-          status: "UNAVAILABLE",
-          reasonText,
-          priceAmount: basePrice
-        })
-      ),
-      source: "mock"
-    };
-  }
-
-  return {
-    courtId: court.id,
-    date,
-    durationMinutes: 60,
-    policy: defaultPolicy,
-    slots: [
-      buildMockSlot({ court, date, startTime: "08:00", endTime: "09:00", status: "AVAILABLE", priceAmount: basePrice }),
-      buildMockSlot({
-        court,
-        date,
-        startTime: "09:00",
-        endTime: "10:00",
-        status: "PENDING_PAYMENT",
-        reasonText: "Khung giờ đang được giữ chỗ chờ thanh toán.",
-        priceAmount: basePrice
-      }),
-      buildMockSlot({
-        court,
-        date,
-        startTime: "10:00",
-        endTime: "11:00",
-        status: "CONFIRMED",
-        reasonText: "Khung giờ đã có người đặt.",
-        priceAmount: basePrice
-      }),
-      buildMockSlot({ court, date, startTime: "11:00", endTime: "12:00", status: "AVAILABLE", priceAmount: basePrice }),
-      buildMockSlot({
-        court,
-        date,
-        startTime: "13:00",
-        endTime: "14:00",
-        status: "UNAVAILABLE",
-        reasonText: "Khung giờ không nằm trong cấu hình hoạt động.",
-        priceAmount: basePrice
-      }),
-      buildMockSlot({
-        court,
-        date,
-        startTime: "14:00",
-        endTime: "15:00",
-        status: "PAYMENT_PROCESSING",
-        reasonText: "Khung giờ đang xử lý thanh toán.",
-        priceAmount: basePrice
-      }),
-      buildMockSlot({ court, date, startTime: "16:00", endTime: "17:00", status: "AVAILABLE", priceAmount: basePrice + 20000 })
-    ],
-    source: "mock"
-  };
-}
-
-function canFallbackToMock(error: unknown): boolean {
-  if (!import.meta.env.DEV) {
-    return false;
-  }
-
-  if (error instanceof ApiClientError) {
-    return error.status === 404;
-  }
-
-  return true;
 }
 
 export async function getCourtAvailability(input: {
   court: CourtDetailViewModel;
   date: string;
 }): Promise<CourtAvailabilityViewModel> {
-  if (!isUuid(input.court.id)) {
-    return buildMockAvailability(input.court, input.date);
-  }
-
-  try {
-    const response = await apiRequest<AvailabilityApiResponse>(
-      `/api/courts/${input.court.id}/availability?date=${encodeURIComponent(input.date)}&includePricing=true`,
-      {
-        auth: true,
-        method: "GET"
-      }
-    );
-
-    return mapApiResponse(response);
-  } catch (error) {
-    if (canFallbackToMock(error)) {
-      return buildMockAvailability(input.court, input.date);
+  const response = await apiRequest<AvailabilityApiResponse>(
+    `/api/courts/${input.court.id}/availability?date=${encodeURIComponent(input.date)}&includePricing=true`,
+    {
+      auth: true,
+      method: "GET"
     }
+  );
 
-    throw error;
-  }
+  return mapApiResponse(response);
 }

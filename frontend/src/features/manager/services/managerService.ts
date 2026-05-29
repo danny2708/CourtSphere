@@ -1,6 +1,4 @@
 import { apiRequest } from "../../../api/client";
-import { ApiClientError } from "../../../types/api.types";
-import { mockCourts } from "../../courts/data/mockCourts";
 import type {
   ManagerActionPayload,
   ManagerBookingItemStatus,
@@ -83,23 +81,6 @@ const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
   year: "numeric"
 });
 
-const MANAGER_MOCK_STORAGE_KEY = "courtsphere.manager.mockItems";
-
-function isAuthError(error: unknown): boolean {
-  return error instanceof ApiClientError && (error.status === 401 || error.status === 403);
-}
-
-function canUseMockFallback(error: unknown): boolean {
-  return import.meta.env.DEV && !isAuthError(error);
-}
-
-function buildDateTime(hours: number, minutes = 0): string {
-  const now = new Date();
-  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
-
-  return date.toISOString();
-}
-
 function toMoneyText(value: number | undefined): string | undefined {
   return value === undefined ? undefined : currencyFormatter.format(value);
 }
@@ -159,91 +140,6 @@ function extractCourts(response: CourtsResponse): ApiCourt[] {
   return response.courts ?? response.data?.items ?? response.data?.courts ?? [];
 }
 
-function buildDefaultMockItems(): ManagerBookingItemViewModel[] {
-  return [
-    mapBookingItem({
-      bookingItemId: "mock-manager-item-confirmed",
-      bookingOrderId: "mock-manager-order-confirmed",
-      bookingCode: "BK-MOCK-CHECKIN",
-      court: { id: "court-football-01", courtName: "Sân bóng đá trung tâm", status: "ACTIVE", courtType: { typeName: "Bóng đá" } },
-      user: { fullName: "Nguyễn Văn A", email: "user@example.com" },
-      startDatetime: buildDateTime(8),
-      endDatetime: buildDateTime(9),
-      amount: 180000,
-      itemStatus: "CONFIRMED",
-      paymentStatus: "SUCCESS"
-    }),
-    mapBookingItem({
-      bookingItemId: "mock-manager-item-in-use",
-      bookingOrderId: "mock-manager-order-in-use",
-      bookingCode: "BK-MOCK-INUSE",
-      court: { id: "court-badminton-02", courtName: "Sân cầu lông nhà thi đấu", status: "ACTIVE", courtType: { typeName: "Cầu lông" } },
-      user: { fullName: "Trần Thị B", email: "student@example.com" },
-      startDatetime: buildDateTime(10),
-      endDatetime: buildDateTime(11),
-      amount: 90000,
-      itemStatus: "IN_USE",
-      paymentStatus: "SUCCESS"
-    }),
-    mapBookingItem({
-      bookingItemId: "mock-manager-item-expired",
-      bookingOrderId: "mock-manager-order-expired",
-      bookingCode: "BK-MOCK-NOSHOW",
-      court: { id: "court-tennis-03", courtName: "Sân tennis ngoài trời", status: "ACTIVE", courtType: { typeName: "Tennis" } },
-      user: { fullName: "Lê Minh C", email: "late@example.com" },
-      startDatetime: buildDateTime(13),
-      endDatetime: buildDateTime(14),
-      amount: 150000,
-      itemStatus: "CHECKIN_EXPIRED",
-      paymentStatus: "SUCCESS"
-    })
-  ];
-}
-
-function getStoredMockItems(): ManagerBookingItemViewModel[] {
-  const rawValue = window.localStorage.getItem(MANAGER_MOCK_STORAGE_KEY);
-
-  if (!rawValue) {
-    const defaultItems = buildDefaultMockItems();
-    window.localStorage.setItem(MANAGER_MOCK_STORAGE_KEY, JSON.stringify(defaultItems));
-    return defaultItems;
-  }
-
-  try {
-    return JSON.parse(rawValue) as ManagerBookingItemViewModel[];
-  } catch {
-    const defaultItems = buildDefaultMockItems();
-    window.localStorage.setItem(MANAGER_MOCK_STORAGE_KEY, JSON.stringify(defaultItems));
-    return defaultItems;
-  }
-}
-
-function saveMockItems(items: ManagerBookingItemViewModel[]): void {
-  window.localStorage.setItem(MANAGER_MOCK_STORAGE_KEY, JSON.stringify(items));
-}
-
-function updateMockItem(bookingItemId: string, status: ManagerBookingItemStatus, note?: string): ManagerBookingItemViewModel {
-  const items = getStoredMockItems();
-  const updatedItems = items.map((item) =>
-    item.bookingItemId === bookingItemId
-      ? {
-          ...item,
-          status,
-          checkinTime: status === "IN_USE" ? new Date().toISOString() : item.checkinTime,
-          managerNote: note ?? item.managerNote
-        }
-      : item
-  );
-  saveMockItems(updatedItems);
-
-  const updatedItem = updatedItems.find((item) => item.bookingItemId === bookingItemId);
-  if (!updatedItem) {
-    throw new Error("Không tìm thấy booking item mock.");
-  }
-
-  return updatedItem;
-}
-
 export async function getManagerTodaySchedule(query: {
   courtId?: string;
   status?: ManagerBookingItemStatus;
@@ -256,31 +152,15 @@ export async function getManagerTodaySchedule(query: {
     params.set("status", query.status);
   }
 
-  try {
-    const response = await apiRequest<ManagerScheduleResponse>(
-      `/api/manager/bookings/today${params.toString() ? `?${params.toString()}` : ""}`,
-      { auth: true, method: "GET" }
-    );
+  const response = await apiRequest<ManagerScheduleResponse>(
+    `/api/manager/bookings/today${params.toString() ? `?${params.toString()}` : ""}`,
+    { auth: true, method: "GET" }
+  );
 
-    return extractBookingItems(response).map(mapBookingItem);
-  } catch (error) {
-    if (!canUseMockFallback(error)) {
-      throw error;
-    }
-
-    return getStoredMockItems().filter((item) => {
-      const byCourt = query.courtId ? item.courtId === query.courtId : true;
-      const byStatus = query.status ? item.status === query.status : true;
-      return byCourt && byStatus;
-    });
-  }
+  return extractBookingItems(response).map(mapBookingItem);
 }
 
 export async function checkInBookingItem(bookingItemId: string): Promise<ManagerBookingItemViewModel> {
-  if (bookingItemId.startsWith("mock-manager-item-")) {
-    return updateMockItem(bookingItemId, "IN_USE");
-  }
-
   const response = await apiRequest<{ bookingItem: ApiManagerBookingItem }>(
     `/api/manager/booking-items/${bookingItemId}/check-in`,
     { auth: true, method: "POST" }
@@ -293,10 +173,6 @@ export async function overrideLateCheckIn(
   bookingItemId: string,
   payload: ManagerActionPayload
 ): Promise<ManagerBookingItemViewModel> {
-  if (bookingItemId.startsWith("mock-manager-item-")) {
-    return updateMockItem(bookingItemId, "IN_USE", payload.reason);
-  }
-
   const response = await apiRequest<{ bookingItem: ApiManagerBookingItem }>(
     `/api/manager/booking-items/${bookingItemId}/override-checkin`,
     { auth: true, body: { reason: payload.reason ?? "" }, method: "POST" }
@@ -309,10 +185,6 @@ export async function markNoShow(
   bookingItemId: string,
   payload: ManagerActionPayload
 ): Promise<ManagerBookingItemViewModel> {
-  if (bookingItemId.startsWith("mock-manager-item-")) {
-    return updateMockItem(bookingItemId, "NO_SHOW", payload.reason);
-  }
-
   const response = await apiRequest<{ bookingItem: ApiManagerBookingItem }>(
     `/api/manager/booking-items/${bookingItemId}/no-show`,
     { auth: true, body: { reason: payload.reason ?? "" }, method: "POST" }
@@ -325,10 +197,6 @@ export async function overrideComplete(
   bookingItemId: string,
   payload: ManagerActionPayload
 ): Promise<ManagerBookingItemViewModel> {
-  if (bookingItemId.startsWith("mock-manager-item-")) {
-    return updateMockItem(bookingItemId, "COMPLETED", payload.reason);
-  }
-
   const response = await apiRequest<{ bookingItem: ApiManagerBookingItem }>(
     `/api/manager/booking-items/${bookingItemId}/override-complete`,
     { auth: true, body: { reason: payload.reason ?? "" }, method: "POST" }
@@ -341,26 +209,6 @@ export async function managerCancelBooking(
   bookingOrderId: string,
   payload: ManagerActionPayload
 ): Promise<ManagerCancelBookingResponse> {
-  if (bookingOrderId.startsWith("mock-manager-order-")) {
-    const items = getStoredMockItems().map((item) =>
-      item.bookingOrderId === bookingOrderId ? { ...item, status: "CANCELLED_BY_MANAGER" as const, managerNote: payload.reason } : item
-    );
-    saveMockItems(items);
-    return {
-      bookingOrder: {
-        bookingOrderId,
-        bookingStatus: "CANCELLED_BY_MANAGER",
-        cancelReason: payload.reason,
-        refundable: true
-      },
-      refund: {
-        id: `mock-refund-${Date.now()}`,
-        refundAmount: items.find((item) => item.bookingOrderId === bookingOrderId)?.amount,
-        refundStatus: "REQUESTED"
-      }
-    };
-  }
-
   return apiRequest<ManagerCancelBookingResponse>(`/api/manager/bookings/${bookingOrderId}/cancel`, {
     auth: true,
     body: { reason: payload.reason ?? "" },
@@ -369,23 +217,8 @@ export async function managerCancelBooking(
 }
 
 export async function listManagerCourts(): Promise<ManagerCourtViewModel[]> {
-  try {
-    const response = await apiRequest<CourtsResponse>("/api/courts", { auth: true, method: "GET" });
-    return extractCourts(response).map(mapCourt);
-  } catch (error) {
-    if (!canUseMockFallback(error)) {
-      throw error;
-    }
-
-    return mockCourts.map((court) => ({
-      id: court.id,
-      name: court.name,
-      status: court.status,
-      courtTypeName: court.tags[0],
-      description: court.description,
-      imageUrl: court.imageUrl
-    }));
-  }
+  const response = await apiRequest<CourtsResponse>("/api/courts", { auth: true, method: "GET" });
+  return extractCourts(response).map(mapCourt);
 }
 
 export async function updateCourtStatus(input: {
@@ -393,15 +226,6 @@ export async function updateCourtStatus(input: {
   status: ManagerCourtStatus;
   reason?: string;
 }): Promise<ManagerCourtViewModel> {
-  if (input.courtId.startsWith("court-")) {
-    return {
-      id: input.courtId,
-      name: mockCourts.find((court) => court.id === input.courtId)?.name ?? "Sân thể thao",
-      status: input.status,
-      courtTypeName: mockCourts.find((court) => court.id === input.courtId)?.tags[0]
-    };
-  }
-
   const response = await apiRequest<{ court: ApiCourt }>(`/api/admin/courts/${input.courtId}/status`, {
     auth: true,
     body: { reason: input.reason ?? "", status: input.status },

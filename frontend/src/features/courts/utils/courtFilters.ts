@@ -42,11 +42,11 @@ export function filterCourts(
   const keyword = normalize(searchKeyword);
 
   return courts.filter((court) => {
-    const searchableText = [court.name, court.courtType, court.area, court.address ?? "", ...court.tags].join(" ");
+    const searchableText = [court.name, court.courtType, court.area ?? "", court.address ?? "", ...court.tags].join(" ");
     const matchesKeyword = !keyword || normalize(searchableText).includes(keyword);
     const matchesType = filters.courtTypes.length === 0 || filters.courtTypes.includes(court.courtType);
     const matchesStatus = filters.statuses.length === 0 || filters.statuses.includes(court.status);
-    const matchesArea = filters.areas.length === 0 || filters.areas.includes(court.area);
+    const matchesArea = filters.areas.length === 0 || Boolean(court.area && filters.areas.includes(court.area));
     const matchesFavorite = !filters.favoritesOnly || court.isFavorite;
     const price = court.startingPrice ?? 0;
     const matchesPrice = price >= filters.priceRange[0] && price <= filters.priceRange[1];
@@ -60,14 +60,6 @@ export function sortCourts(courts: CourtDetailViewModel[], sortBy: CourtSortOpti
 
   if (sortBy === "name_asc") {
     return sortedCourts.sort((first, second) => first.name.localeCompare(second.name, "vi"));
-  }
-
-  if (sortBy === "capacity_asc") {
-    return sortedCourts.sort((first, second) => first.capacity - second.capacity);
-  }
-
-  if (sortBy === "capacity_desc") {
-    return sortedCourts.sort((first, second) => second.capacity - first.capacity);
   }
 
   return sortedCourts.sort((first, second) => Number(second.status === "ACTIVE") - Number(first.status === "ACTIVE"));
