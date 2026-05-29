@@ -1647,7 +1647,7 @@ a {
 }
 
 .booking-summary-card,
-.fake-payment-panel,
+.momo-payment-panel,
 .booking-facts,
 .booking-item-card,
 .my-booking-card {
@@ -1738,7 +1738,7 @@ a {
 
 .my-booking-card__actions,
 .detail-actions-stack,
-.fake-payment-panel__actions {
+.momo-payment-panel__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -1761,7 +1761,7 @@ a {
   gap: 16px;
 }
 
-.fake-payment-panel p,
+.momo-payment-panel p,
 .payment-assurance {
   margin: 0;
   color: var(--color-text-secondary);
@@ -1773,6 +1773,33 @@ a {
   border: 1px solid rgba(14, 165, 233, 0.22);
   border-radius: var(--radius-button);
   background: var(--color-primary-light);
+}
+
+.payment-return-panel {
+  max-width: 620px;
+  display: grid;
+  gap: 18px;
+  padding: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
+}
+
+.payment-return-panel > svg {
+  color: var(--color-primary-dark);
+}
+
+.payment-return-panel h1 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.12;
+}
+
+.payment-return-panel p {
+  margin: 8px 0 0;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
 }
 
 .booking-timeline {

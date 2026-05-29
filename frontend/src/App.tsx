@@ -6,6 +6,7 @@ import { CourtDetailPage } from "./features/courts/pages/CourtDetailPage";
 import { CourtListPage } from "./features/courts/pages/CourtListPage";
 import { BookingCreatePage } from "./features/bookings/pages/BookingCreatePage";
 import { BookingDetailPage } from "./features/bookings/pages/BookingDetailPage";
+import { MomoPaymentReturnPage } from "./features/bookings/pages/MomoPaymentReturnPage";
 import { MyBookingsPage } from "./features/bookings/pages/MyBookingsPage";
 import { PaymentPage } from "./features/bookings/pages/PaymentPage";
 import { NotFoundPage } from "./pages/misc/NotFoundPage";
@@ -49,6 +50,7 @@ export default function App() {
           <Route index element={<HomePage />} />
           <Route path={ROUTE_PATHS.courts} element={<CourtListPage />} />
           <Route path={ROUTE_PATHS.courtDetail} element={<CourtDetailPage />} />
+          <Route path={ROUTE_PATHS.momoPaymentReturn} element={<MomoPaymentReturnPage />} />
           <Route path={ROUTE_PATHS.map} element={<PlaceholderPage title="Bản đồ sân" message="Map view sẽ được triển khai sau khi có dữ liệu vị trí thật." />} />
           <Route path={ROUTE_PATHS.featured} element={<PlaceholderPage title="Sân nổi bật" message="Danh sách sân nổi bật sẽ được kết nối ở module court browsing nâng cao." />} />
           <Route path={ROUTE_PATHS.account} element={<PlaceholderPage title="Tài khoản" message="Trang tài khoản sẽ được triển khai trong module auth/user profile." />} />

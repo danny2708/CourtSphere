@@ -2,6 +2,7 @@ import type { BookingOrder, PaymentStatus } from "./booking.types";
 
 export type CreatePaymentPayload = {
   amount: number;
+  paymentMethod?: "MOCK" | "MOMO";
 };
 
 export type PaymentDetail = {
@@ -21,3 +22,5 @@ export type MockPaymentCallbackPayload = {
   status: Extract<PaymentStatus, "SUCCESS" | "FAILED" | "CANCELLED" | "EXPIRED">;
   signature: string;
 };
+
+export type MomoPaymentReturnPayload = Record<string, string>;

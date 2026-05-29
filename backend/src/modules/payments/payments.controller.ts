@@ -3,7 +3,8 @@ import type { Request, Response } from "express";
 import type {
   AdminListPaymentsQuery,
   CreatePaymentInput,
-  MockPaymentCallbackInput
+  MockPaymentCallbackInput,
+  MomoPaymentCallbackInput
 } from "./payments.types";
 import { paymentsService, type PaymentsService } from "./payments.service";
 
@@ -35,6 +36,12 @@ export class PaymentsController {
     res.status(200).json({ payment });
   };
 
+  handleMomoCallback = async (req: Request, res: Response): Promise<void> => {
+    const payment = await this.service.handleMomoCallback(req.body as MomoPaymentCallbackInput);
+
+    res.status(200).json({ payment });
+  };
+
   getPaymentDetail = async (req: Request, res: Response): Promise<void> => {
     const payment = await this.service.getPaymentDetail(
       { userId: req.user!.id, roles: req.user!.roles },
@@ -54,4 +61,3 @@ export class PaymentsController {
 }
 
 export const paymentsController = new PaymentsController();
-

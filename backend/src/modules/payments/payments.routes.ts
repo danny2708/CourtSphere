@@ -9,6 +9,7 @@ import {
   adminListPaymentsQuerySchema,
   bookingPaymentParamsSchema,
   createPaymentSchema,
+  momoPaymentCallbackSchema,
   mockPaymentCallbackSchema,
   paymentIdParamsSchema
 } from "./payments.validators";
@@ -30,6 +31,11 @@ export function createPaymentsRouter(
     validateRequest({ body: mockPaymentCallbackSchema }),
     asyncHandler(controller.handleMockCallback)
   );
+  router.post(
+    "/payments/callback/momo",
+    validateRequest({ body: momoPaymentCallbackSchema }),
+    asyncHandler(controller.handleMomoCallback)
+  );
   router.get(
     "/payments/:id",
     requireAuth,
@@ -48,4 +54,3 @@ export function createPaymentsRouter(
 }
 
 export default createPaymentsRouter();
-

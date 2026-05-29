@@ -31,6 +31,9 @@ function createMockController() {
   controller.handleMockCallback = vi.fn(async (_req: Request, res: Response): Promise<void> => {
     res.status(200).json({ payment: { id: paymentId, paymentStatus: "SUCCESS" } });
   });
+  controller.handleMomoCallback = vi.fn(async (_req: Request, res: Response): Promise<void> => {
+    res.status(200).json({ payment: { id: paymentId, paymentStatus: "SUCCESS" } });
+  });
   controller.getPaymentDetail = vi.fn(async (req: Request, res: Response): Promise<void> => {
     res.status(200).json({ payment: { id: req.params.id } });
   });
@@ -116,6 +119,30 @@ describe("payments routes", () => {
     expect(controller.handleMockCallback).not.toHaveBeenCalled();
   });
 
+  it("allows public MoMo payment callback with valid payload shape", async () => {
+    const controller = createMockController();
+    const app = createTestApp(controller);
+
+    const response = await request(app).post("/api/payments/callback/momo").send({
+      partnerCode: "MOMO",
+      orderId: "CS-123",
+      requestId: "CS-123",
+      amount: 50000,
+      orderInfo: "CourtSphere booking",
+      orderType: "momo_wallet",
+      transId: 123456,
+      resultCode: 0,
+      message: "Successful.",
+      payType: "qr",
+      responseTime: 1770000000000,
+      extraData: "",
+      signature: "signature"
+    });
+
+    expect(response.status).toBe(200);
+    expect(controller.handleMomoCallback).toHaveBeenCalledOnce();
+  });
+
   it("allows authenticated users to get payment detail", async () => {
     const controller = createMockController();
     const app = createTestApp(controller);
@@ -146,4 +173,3 @@ describe("payments routes", () => {
     expect(controller.listPaymentsForAdmin).toHaveBeenCalledOnce();
   });
 });
-

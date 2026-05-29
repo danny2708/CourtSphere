@@ -7,6 +7,10 @@ const isoDateTimeSchema = z
   .refine((value) => !Number.isNaN(Date.parse(value)), "Expected a valid ISO datetime")
   .transform((value) => new Date(value));
 
+const momoStringValueSchema = z
+  .union([z.string(), z.number(), z.boolean()])
+  .transform((value) => String(value));
+
 export const bookingPaymentParamsSchema = z.object({
   id: z.string().uuid()
 });
@@ -16,7 +20,8 @@ export const paymentIdParamsSchema = z.object({
 });
 
 export const createPaymentSchema = z.object({
-  amount: z.coerce.number().positive()
+  amount: z.coerce.number().positive(),
+  paymentMethod: z.enum(["MOCK", "MOMO"]).optional()
 });
 
 export const mockPaymentCallbackSchema = z.object({
@@ -29,6 +34,24 @@ export const mockPaymentCallbackSchema = z.object({
   ]),
   signature: z.string().trim().min(1)
 });
+
+export const momoPaymentCallbackSchema = z
+  .object({
+    partnerCode: momoStringValueSchema,
+    orderId: momoStringValueSchema,
+    requestId: momoStringValueSchema,
+    amount: momoStringValueSchema,
+    orderInfo: momoStringValueSchema,
+    orderType: momoStringValueSchema,
+    transId: momoStringValueSchema,
+    resultCode: momoStringValueSchema,
+    message: momoStringValueSchema,
+    payType: momoStringValueSchema,
+    responseTime: momoStringValueSchema,
+    extraData: momoStringValueSchema.default(""),
+    signature: z.string().trim().min(1)
+  })
+  .passthrough();
 
 export const adminListPaymentsQuerySchema = z
   .object({
@@ -45,4 +68,3 @@ export const adminListPaymentsQuerySchema = z
       path: ["toDate"]
     }
   );
-

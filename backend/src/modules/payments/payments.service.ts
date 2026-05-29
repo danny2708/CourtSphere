@@ -6,6 +6,7 @@ import {
   PrismaClient
 } from "@prisma/client";
 
+import { env } from "../../config/env";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../middlewares/error.middleware";
 import { bookingStateService, type BookingStateService } from "../bookings/booking-state.service";
@@ -17,10 +18,15 @@ import {
   mockPaymentGateway,
   type MockPaymentGateway
 } from "./payment-gateway.mock";
+import {
+  momoPaymentGateway,
+  type MomoPaymentGateway
+} from "./payment-gateway.momo";
 import type {
   AdminListPaymentsQuery,
   CreatePaymentInput,
-  MockPaymentCallbackInput
+  MockPaymentCallbackInput,
+  MomoPaymentCallbackInput
 } from "./payments.types";
 
 const paymentInclude = {
@@ -65,6 +71,11 @@ type PaymentOrder = {
   paymentStatus: PaymentStatus;
   holdExpiresAt: Date | null;
   totalAmount: Prisma.Decimal;
+  user?: {
+    fullName: string;
+    email: string;
+    phoneNumber?: string | null;
+  };
   items: Array<{
     bookingItemId: string;
     bookingStatus: BookingStatus;
@@ -142,8 +153,26 @@ function isTerminalStatus(status: PaymentStatus): boolean {
   return terminalPaymentStatuses.includes(status);
 }
 
-function paymentUrlForGatewayTransaction(gatewayTransactionId: string | null): string | undefined {
-  return gatewayTransactionId ? `/mock-payment/${gatewayTransactionId}` : undefined;
+function paymentUrlFromRawCallback(rawCallback: Prisma.JsonValue | null): string | undefined {
+  if (!rawCallback || typeof rawCallback !== "object" || Array.isArray(rawCallback)) {
+    return undefined;
+  }
+
+  const createResponse = rawCallback.createResponse;
+  if (!createResponse || typeof createResponse !== "object" || Array.isArray(createResponse)) {
+    return undefined;
+  }
+
+  const payUrl = createResponse.payUrl;
+  return typeof payUrl === "string" ? payUrl : undefined;
+}
+
+function paymentUrlForPayment(payment: { paymentMethod: string; gatewayTransactionId: string | null; rawCallback: Prisma.JsonValue | null }): string | undefined {
+  if (payment.paymentMethod === "MOMO") {
+    return paymentUrlFromRawCallback(payment.rawCallback);
+  }
+
+  return payment.gatewayTransactionId ? `/mock-payment/${payment.gatewayTransactionId}` : undefined;
 }
 
 function handleKnownPrismaError(error: unknown): never {
@@ -170,11 +199,13 @@ export class PaymentsService {
     private readonly gateway: MockPaymentGateway = mockPaymentGateway,
     private readonly state: BookingStateService = bookingStateService,
     private readonly nowProvider: () => Date = () => new Date(),
-    private readonly notifications: NotificationsService = notificationsService
+    private readonly notifications: NotificationsService = notificationsService,
+    private readonly momoGateway: MomoPaymentGateway = momoPaymentGateway
   ) {}
 
   async createPaymentForBooking(userId: string, bookingOrderId: string, input: CreatePaymentInput) {
     const now = this.nowProvider();
+    const paymentMethod = input.paymentMethod ?? (env.PAYMENT_GATEWAY === "momo" ? "MOMO" : "MOCK");
 
     try {
       const result = await this.db.$transaction(
@@ -200,6 +231,13 @@ export class PaymentsService {
                   bookingItemId: true,
                   bookingStatus: true
                 }
+              },
+              user: {
+                select: {
+                  fullName: true,
+                  email: true,
+                  phoneNumber: true
+                }
               }
             }
           });
@@ -214,19 +252,20 @@ export class PaymentsService {
           if (existingPayment) {
             return {
               paymentId: existingPayment.paymentId,
-              paymentUrl: paymentUrlForGatewayTransaction(existingPayment.gatewayTransactionId)
+              paymentUrl: paymentUrlForPayment(existingPayment)
             };
           }
 
-          const gatewayTransaction = this.gateway.createTransaction();
+          const gatewayTransaction = await this.createGatewayTransaction(paymentMethod, order, now);
           const payment = await tx.payment.create({
             data: {
               bookingOrderId: order.bookingOrderId,
               userId,
               amount: order.totalAmount,
-              paymentMethod: "MOCK",
+              paymentMethod,
               gatewayTransactionId: gatewayTransaction.gatewayTransactionId,
-              paymentStatus: PaymentStatus.PROCESSING
+              paymentStatus: PaymentStatus.PROCESSING,
+              ...(gatewayTransaction.rawCallback ? { rawCallback: gatewayTransaction.rawCallback } : {})
             },
             select: {
               paymentId: true
@@ -257,7 +296,7 @@ export class PaymentsService {
               newStatus: BookingStatus.PAYMENT_PROCESSING,
               actionType: "USER_CREATE_PAYMENT",
               actionByUserId: userId,
-              note: "Mock payment created, waiting for callback"
+              note: `${paymentMethod} payment created, waiting for callback`
             });
 
             for (const item of order.items.filter(
@@ -269,7 +308,7 @@ export class PaymentsService {
                 newStatus: BookingStatus.PAYMENT_PROCESSING,
                 actionType: "USER_CREATE_PAYMENT",
                 actionByUserId: userId,
-                note: "Mock payment created, waiting for callback"
+                note: `${paymentMethod} payment created, waiting for callback`
               });
             }
           } else {
@@ -303,6 +342,32 @@ export class PaymentsService {
       throw new AppError(401, "Invalid mock payment signature", "INVALID_PAYMENT_SIGNATURE");
     }
 
+    return this.applyPaymentCallback({
+      gatewayTransactionId: input.gatewayTransactionId,
+      status: input.status,
+      rawCallback: input as Prisma.InputJsonObject
+    });
+  }
+
+  async handleMomoCallback(input: MomoPaymentCallbackInput) {
+    if (!this.momoGateway.verifyPaymentResult(input)) {
+      throw new AppError(401, "Invalid MoMo payment signature", "INVALID_PAYMENT_SIGNATURE");
+    }
+
+    return this.applyPaymentCallback({
+      gatewayTransactionId: input.orderId,
+      status: this.momoGateway.paymentStatus(input),
+      rawCallback: input as Prisma.InputJsonObject,
+      expectedAmount: Number(input.amount)
+    });
+  }
+
+  private async applyPaymentCallback(input: {
+    gatewayTransactionId: string;
+    status: Extract<PaymentStatus, "SUCCESS" | "FAILED" | "CANCELLED" | "EXPIRED">;
+    rawCallback: Prisma.InputJsonValue;
+    expectedAmount?: number;
+  }) {
     const now = this.nowProvider();
 
     try {
@@ -328,6 +393,13 @@ export class PaymentsService {
 
           if (!payment) {
             throw new AppError(404, "Payment not found", "PAYMENT_NOT_FOUND");
+          }
+
+          if (
+            input.expectedAmount !== undefined &&
+            !new Prisma.Decimal(input.expectedAmount).equals(payment.amount)
+          ) {
+            throw new AppError(400, "Callback amount does not match payment amount", "PAYMENT_AMOUNT_MISMATCH");
           }
 
           if (isTerminalStatus(payment.paymentStatus)) {
@@ -503,6 +575,56 @@ export class PaymentsService {
     });
 
     return payments.map((payment) => toPaymentDto(payment));
+  }
+
+  private async createGatewayTransaction(
+    paymentMethod: "MOCK" | "MOMO",
+    order: PaymentOrder,
+    now: Date
+  ): Promise<{
+    gatewayTransactionId: string;
+    paymentUrl: string;
+    rawCallback: Prisma.InputJsonObject | null;
+  }> {
+    if (paymentMethod === "MOCK") {
+      const gatewayTransaction = this.gateway.createTransaction();
+
+      return {
+        ...gatewayTransaction,
+        rawCallback: null
+      };
+    }
+
+    const amount = decimalToNumber(order.totalAmount);
+    if (!Number.isInteger(amount) || amount < 1000 || amount > 50_000_000) {
+      throw new AppError(400, "MoMo amount must be an integer between 1,000 and 50,000,000 VND", "MOMO_AMOUNT_OUT_OF_RANGE");
+    }
+
+    const gatewayTransaction = await this.momoGateway.createPayment({
+      orderId: this.momoGateway.createOrderId(),
+      amount,
+      orderInfo: `CourtSphere booking ${order.bookingCode}`,
+      extraData: this.momoGateway.encodeExtraData({
+        bookingOrderId: order.bookingOrderId,
+        userId: order.userId
+      }),
+      orderExpireMinutes: order.holdExpiresAt
+        ? Math.max(1, Math.ceil((order.holdExpiresAt.getTime() - now.getTime()) / 60_000))
+        : undefined,
+      userInfo: {
+        name: order.user?.fullName,
+        phoneNumber: order.user?.phoneNumber,
+        email: order.user?.email
+      }
+    });
+
+    return {
+      gatewayTransactionId: gatewayTransaction.gatewayTransactionId,
+      paymentUrl: gatewayTransaction.paymentUrl,
+      rawCallback: {
+        createResponse: gatewayTransaction.rawResponse
+      } as Prisma.InputJsonObject
+    };
   }
 
   private async getPaymentOrThrow(paymentId: string): Promise<PaymentWithRelations> {

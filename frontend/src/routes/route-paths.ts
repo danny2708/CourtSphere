@@ -9,6 +9,7 @@ export const ROUTE_PATHS = {
   myBookings: "/bookings/my",
   bookingDetail: "/bookings/:bookingOrderId",
   bookingPayment: "/bookings/:bookingOrderId/payment",
+  momoPaymentReturn: "/payments/momo-return",
   managerHome: "/manager",
   managerToday: "/manager/today",
   managerCheckIn: "/manager/check-in",

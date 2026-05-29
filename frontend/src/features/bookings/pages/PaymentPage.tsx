@@ -5,14 +5,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ErrorState } from "../../../components/common/ErrorState";
 import { LoadingState } from "../../../components/common/LoadingState";
 import { buildBookingDetailPath, ROUTE_PATHS } from "../../../routes/route-paths";
-import { useToastStore } from "../../../stores/toast.store";
 import { getErrorMessage } from "../../../utils/format-error";
 import { BookingItemCard } from "../components/BookingItemCard";
 import { BookingStatusBadge } from "../components/BookingStatusBadge";
-import { FakePaymentPanel } from "../components/FakePaymentPanel";
+import { MomoPaymentPanel } from "../components/MomoPaymentPanel";
 import { PaymentStatusBadge } from "../components/PaymentStatusBadge";
 import { getBookingDetail } from "../services/bookingService";
-import { confirmMockPaymentSuccess, createPayment } from "../services/paymentService";
+import { createPayment } from "../services/paymentService";
 import type { BookingOrder } from "../types/booking.types";
 
 function isPayable(booking: BookingOrder): boolean {
@@ -26,7 +25,6 @@ function isHoldExpired(booking: BookingOrder): boolean {
 export function PaymentPage() {
   const navigate = useNavigate();
   const { bookingOrderId } = useParams<{ bookingOrderId: string }>();
-  const { addToast } = useToastStore();
   const [booking, setBooking] = useState<BookingOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,14 +72,23 @@ export function PaymentPage() {
     setError(null);
 
     try {
-      const payment = await createPayment(booking.bookingOrderId, { amount: booking.totalAmount });
-      await confirmMockPaymentSuccess(payment);
-      addToast({ type: "success", title: "Thanh toán thành công", message: "Đơn đặt sân đã được xác nhận." });
-      await loadBooking();
+      const payment = await createPayment(booking.bookingOrderId, {
+        amount: booking.totalAmount,
+        paymentMethod: "MOMO"
+      });
+
+      if (!payment.paymentUrl) {
+        throw new Error("MoMo không trả về đường dẫn thanh toán.");
+      }
+
+      window.location.assign(payment.paymentUrl);
     } catch (paymentError) {
       setError(getErrorMessage(paymentError));
-    } finally {
       setIsProcessing(false);
+    } finally {
+      if (document.visibilityState === "visible") {
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -125,7 +132,12 @@ export function PaymentPage() {
       {error ? <p className="form-alert" role="alert">{error}</p> : null}
 
       <div className="booking-create-layout">
-        <FakePaymentPanel booking={booking} isProcessing={isProcessing} onPay={handlePay} />
+        <MomoPaymentPanel
+          booking={booking}
+          isMockBooking={booking.bookingOrderId.startsWith("mock-booking-")}
+          isProcessing={isProcessing}
+          onPay={handlePay}
+        />
         <div className="booking-side-panel">
           {booking.items.map((item) => (
             <BookingItemCard key={item.bookingItemId} item={item} />

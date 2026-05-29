@@ -10,6 +10,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { BookingStateService } from "../bookings/booking-state.service";
+import type { MomoPaymentGateway } from "./payment-gateway.momo";
 import type { MockPaymentGateway } from "./payment-gateway.mock";
 import { PaymentsService } from "./payments.service";
 
@@ -123,10 +124,29 @@ function createGateway(overrides: Partial<MockPaymentGateway> = {}) {
   } as unknown as MockPaymentGateway;
 }
 
+function createMomoGateway(overrides: Partial<MomoPaymentGateway> = {}) {
+  return {
+    createOrderId: vi.fn().mockReturnValue("CS-20260520-momo"),
+    encodeExtraData: vi.fn().mockReturnValue("encoded-extra-data"),
+    createPayment: vi.fn().mockResolvedValue({
+      gatewayTransactionId: "CS-20260520-momo",
+      paymentUrl: "https://test-payment.momo.vn/v2/gateway/pay?t=test",
+      rawResponse: {
+        resultCode: 0,
+        payUrl: "https://test-payment.momo.vn/v2/gateway/pay?t=test"
+      }
+    }),
+    verifyPaymentResult: vi.fn().mockReturnValue(true),
+    paymentStatus: vi.fn().mockReturnValue(PaymentStatus.SUCCESS),
+    ...overrides
+  } as unknown as MomoPaymentGateway;
+}
+
 function createService(input: {
   tx?: unknown;
   payment?: unknown;
   gateway?: MockPaymentGateway;
+  momoGateway?: MomoPaymentGateway;
 }) {
   const db = {
     $transaction: vi.fn((callback) => callback(input.tx)),
@@ -141,7 +161,9 @@ function createService(input: {
       db,
       input.gateway ?? createGateway(),
       new BookingStateService(),
-      () => now
+      () => now,
+      undefined,
+      input.momoGateway
     ),
     db: db as unknown as {
       $transaction: ReturnType<typeof vi.fn>;
@@ -221,6 +243,77 @@ describe("PaymentsService", () => {
           oldStatus: BookingStatus.PENDING_PAYMENT,
           newStatus: BookingStatus.PAYMENT_PROCESSING,
           actionType: "USER_CREATE_PAYMENT"
+        })
+      })
+    );
+  });
+
+  it("creates a MoMo payment session when requested", async () => {
+    const momoGateway = createMomoGateway();
+    const tx = {
+      bookingOrder: {
+        findFirst: vi.fn().mockResolvedValue(buildOrder({ payments: [] })),
+        update: vi.fn().mockResolvedValue({})
+      },
+      bookingItem: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 })
+      },
+      payment: {
+        create: vi.fn().mockResolvedValue({ paymentId })
+      },
+      bookingOrderStatusHistory: {
+        create: vi.fn().mockResolvedValue({})
+      },
+      bookingItemStatusHistory: {
+        create: vi.fn().mockResolvedValue({})
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({})
+      }
+    };
+    const { service } = createService({
+      tx,
+      momoGateway,
+      payment: buildPayment({
+        paymentMethod: "MOMO",
+        gatewayTransactionId: "CS-20260520-momo",
+        rawCallback: {
+          createResponse: {
+            payUrl: "https://test-payment.momo.vn/v2/gateway/pay?t=test"
+          }
+        }
+      })
+    });
+
+    const payment = await service.createPaymentForBooking(userId, bookingOrderId, {
+      amount: 50000,
+      paymentMethod: "MOMO"
+    });
+
+    expect(payment).toMatchObject({
+      id: paymentId,
+      paymentMethod: "MOMO",
+      paymentUrl: "https://test-payment.momo.vn/v2/gateway/pay?t=test"
+    });
+    expect(momoGateway.createPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 50000,
+        extraData: "encoded-extra-data",
+        orderId: "CS-20260520-momo"
+      })
+    );
+    expect(tx.payment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentMethod: "MOMO",
+          gatewayTransactionId: "CS-20260520-momo",
+          rawCallback: {
+            createResponse: {
+              resultCode: 0,
+              payUrl: "https://test-payment.momo.vn/v2/gateway/pay?t=test"
+            }
+          }
         })
       })
     );
