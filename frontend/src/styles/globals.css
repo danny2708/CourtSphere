@@ -19,6 +19,13 @@
   --radius-pill: 999px;
   --shadow-card: 0 4px 12px rgba(15, 23, 42, 0.08);
   --shadow-floating: 0 8px 24px rgba(15, 23, 42, 0.12);
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
   --header-height: 76px;
 }
 
@@ -98,7 +105,8 @@ a {
   margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: var(--space-6);
+  min-width: 0;
 }
 
 .brand-link {
@@ -129,8 +137,8 @@ a {
   min-height: 34px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-pill);
   color: rgba(255, 255, 255, 0.9);
@@ -142,18 +150,29 @@ a {
 .top-nav {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin-left: auto;
+  min-width: 0;
 }
 
 .top-nav__link {
   min-height: 40px;
   display: inline-flex;
   align-items: center;
-  padding: 0 14px;
+  padding: 0 var(--space-4);
   border-radius: var(--radius-pill);
   color: rgba(255, 255, 255, 0.76);
   font-weight: 600;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.top-nav__link:hover {
+  color: var(--color-card);
+  background: color-mix(in srgb, var(--color-card) 14%, transparent);
+  transform: translateY(-1px);
 }
 
 .top-nav__link--active {
@@ -164,23 +183,30 @@ a {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-left: 8px;
+  gap: var(--space-3);
+  margin-left: var(--space-2);
+  min-width: 0;
 }
 
 .user-chip {
-  max-width: 220px;
+  max-width: clamp(140px, 18vw, 220px);
   min-height: 40px;
+  min-width: 0;
+  flex: 0 1 auto;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
   font-size: 14px;
   font-weight: 600;
+}
+
+.header-icon-button {
+  flex: 0 0 auto;
 }
 
 .user-chip__name {
@@ -215,7 +241,7 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
   border-radius: var(--radius-button);
   transition:
     transform 140ms ease,
@@ -227,6 +253,23 @@ a {
 
 .ui-button:hover:not(:disabled) {
   transform: translateY(-1px);
+  box-shadow: var(--shadow-card);
+}
+
+.ui-button--secondary:hover:not(:disabled),
+.ui-button--ghost:hover:not(:disabled),
+.ui-button--icon:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-primary) 28%, transparent);
+  color: var(--color-primary-dark);
+  background: var(--color-primary-light);
+}
+
+.ui-button--primary:hover:not(:disabled) {
+  background: var(--color-accent);
+}
+
+.ui-button--danger:hover:not(:disabled) {
+  background: var(--color-danger);
 }
 
 .ui-button:disabled {
@@ -328,6 +371,25 @@ a {
   border-radius: var(--radius-card);
   background: var(--color-card);
   box-shadow: var(--shadow-card);
+  padding: var(--space-5);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.ui-card:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 22%, transparent);
+  box-shadow: var(--shadow-floating);
+  transform: translateY(-1px);
+}
+
+.ui-card h1,
+.ui-card h2,
+.ui-card h3,
+.ui-card p {
+  overflow-wrap: anywhere;
 }
 
 .ui-badge {
@@ -860,6 +922,7 @@ a {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  padding: 0;
 }
 
 .court-card__media {
@@ -1806,9 +1869,14 @@ a {
 
 .manager-nav {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   overflow-x: auto;
-  padding: 6px 0 2px;
+  padding: var(--space-2) 0 var(--space-1);
+  scrollbar-width: none;
+}
+
+.manager-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .manager-nav__link {
@@ -1816,19 +1884,34 @@ a {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 14px;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
   color: var(--color-text-secondary);
   background: var(--color-card);
   font-weight: 800;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.manager-nav__link:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 28%, transparent);
+  color: var(--color-primary-dark);
+  background: var(--color-primary-light);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-1px);
 }
 
 .manager-nav__link--active {
-  border-color: rgba(14, 165, 233, 0.28);
+  border-color: color-mix(in srgb, var(--color-primary) 28%, transparent);
   color: var(--color-primary-dark);
   background: var(--color-primary-light);
+  box-shadow: var(--shadow-card);
 }
 
 .manager-header {
@@ -1839,7 +1922,7 @@ a {
 .manager-booking-grid,
 .manager-court-grid {
   display: grid;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .manager-dashboard-grid {
@@ -1856,11 +1939,11 @@ a {
 .manager-court-card {
   height: 100%;
   display: grid;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .manager-dashboard-card {
-  padding: 22px;
+  padding: var(--space-6);
 }
 
 .manager-dashboard-card svg {
@@ -1882,9 +1965,14 @@ a {
 
 .manager-tabs {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   overflow-x: auto;
   padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.manager-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .manager-tabs .ui-button {
@@ -1894,8 +1982,8 @@ a {
 .manager-filters {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px) minmax(160px, 200px);
-  gap: 12px;
-  padding: 14px;
+  gap: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-card);
@@ -1931,7 +2019,7 @@ a {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .manager-booking-card__header h3 {
@@ -1973,7 +2061,7 @@ a {
 .manager-card-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .manager-court-card {
@@ -2002,41 +2090,61 @@ a {
 .manager-court-card__body {
   display: grid;
   align-content: start;
-  gap: 12px;
-  padding: 18px;
+  gap: var(--space-3);
+  padding: var(--space-5);
 }
 
 .admin-page {
   display: grid;
-  gap: 18px;
+  gap: var(--space-5);
 }
 
 .admin-nav {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   overflow-x: auto;
-  padding: 6px 0 2px;
+  padding: var(--space-2) 0 var(--space-1);
+  scrollbar-width: none;
+}
+
+.admin-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .admin-nav__link {
-  min-height: 40px;
+  min-height: 42px;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
   color: var(--color-text-secondary);
   background: var(--color-card);
   font-size: 14px;
   font-weight: 800;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.admin-nav__link:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 28%, transparent);
+  color: var(--color-primary-dark);
+  background: var(--color-primary-light);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-1px);
 }
 
 .admin-nav__link--active {
-  border-color: rgba(14, 165, 233, 0.28);
+  border-color: color-mix(in srgb, var(--color-primary) 28%, transparent);
   color: var(--color-primary-dark);
   background: var(--color-primary-light);
+  box-shadow: var(--shadow-card);
 }
 
 .admin-header {
@@ -2048,7 +2156,7 @@ a {
 .admin-dashboard-links,
 .admin-report-grid {
   display: grid;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .admin-stat-grid {
@@ -2070,11 +2178,13 @@ a {
 .admin-report-card,
 .admin-form-card {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .admin-stat-card {
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  min-height: 128px;
 }
 
 .admin-stat-card span {
@@ -2090,6 +2200,10 @@ a {
   line-height: 1.1;
 }
 
+.admin-stat-card p {
+  grid-column: 1 / -1;
+}
+
 .admin-stat-card p,
 .admin-info-card p,
 .admin-dashboard-link p {
@@ -2103,11 +2217,40 @@ a {
   color: var(--color-primary-dark);
 }
 
+.admin-stat-card__icon {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-button);
+  background: var(--color-primary-light);
+}
+
+.admin-dashboard-link {
+  min-height: 108px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.admin-dashboard-link strong {
+  font-size: 18px;
+}
+
+.admin-dashboard-links a {
+  min-width: 0;
+}
+
+.admin-dashboard-links a:hover .admin-dashboard-link {
+  border-color: color-mix(in srgb, var(--color-primary) 28%, transparent);
+  background: var(--color-primary-light);
+}
+
 .admin-filter-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 12px;
+  gap: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-card);
@@ -2265,6 +2408,17 @@ a {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 960px) {
+  .top-nav,
+  .header-date {
+    display: none;
+  }
+
+  .header-actions {
+    margin-left: auto;
   }
 }
 

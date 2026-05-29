@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   BadgeDollarSign,
   BarChart3,
@@ -35,6 +35,8 @@ const navItems = [
 ];
 
 export function AdminNavigation() {
+  const location = useLocation();
+
   return (
     <nav className="admin-nav" aria-label="Điều hướng quản trị">
       {navItems.map((item) => {
@@ -42,7 +44,11 @@ export function AdminNavigation() {
 
         return (
           <NavLink
-            className={({ isActive }) => `admin-nav__link${isActive ? " admin-nav__link--active" : ""}`}
+            className={({ isActive }) => {
+              const isDashboardAlias = item.to === ROUTE_PATHS.adminDashboard && location.pathname === ROUTE_PATHS.adminHome;
+
+              return `admin-nav__link${isActive || isDashboardAlias ? " admin-nav__link--active" : ""}`;
+            }}
             key={item.to}
             to={item.to}
           >

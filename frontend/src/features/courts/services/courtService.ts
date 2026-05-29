@@ -33,10 +33,16 @@ type CourtDetailApiResponse = {
   court: ApiCourt;
 };
 
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function isUuid(value: string): boolean {
+  return uuidPattern.test(value);
 }
 
 function canUseMockFallback(error: unknown): boolean {
@@ -45,7 +51,7 @@ function canUseMockFallback(error: unknown): boolean {
   }
 
   if (error instanceof ApiClientError) {
-    return [401, 403, 404].includes(error.status);
+    return [400, 401, 403, 404].includes(error.status);
   }
 
   return true;
@@ -145,6 +151,11 @@ export async function listCourts(options: { simulateError?: boolean } = {}): Pro
 }
 
 export async function getCourtById(courtId: string): Promise<CourtDetailViewModel | null> {
+  if (!isUuid(courtId)) {
+    await delay(120);
+    return mockCourts.find((court) => court.id === courtId) ?? null;
+  }
+
   try {
     const response = await apiRequest<CourtDetailApiResponse>(`/api/courts/${courtId}`, {
       auth: true,
