@@ -173,8 +173,10 @@ export type AdminViolation = {
 export type AdminOverviewReport = {
   totalBookingOrders?: number;
   totalBookingItems?: number;
+  grossRevenue?: number;
   totalRevenue?: number;
   totalRefundAmount?: number;
+  netRevenue?: number;
   totalCancelled?: number;
   totalNoShow?: number;
   totalUsers?: number;

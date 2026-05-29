@@ -1972,8 +1972,10 @@ Formula:
 
 - `totalBookingOrders`: count `booking_orders.created_at` in range.
 - `totalBookingItems`: count `booking_items.start_datetime` in range.
-- `totalRevenue`: sum `payments.amount` where `paymentStatus = SUCCESS` and `paidAt` in range.
+- `grossRevenue`: sum `payments.amount` where `paymentStatus = SUCCESS` and `paidAt` in range.
 - `totalRefundAmount`: sum `refunds.refundAmount` where `refundStatus = SUCCESS` and `processedAt` in range.
+- `netRevenue`: `grossRevenue - totalRefundAmount`.
+- `totalRevenue`: backward-compatible alias for `netRevenue`; dashboard revenue must subtract successful refunds.
 - `totalCancelled`: count `booking_items` in range with `CANCELLED_BY_USER`, `CANCELLED_BY_MANAGER`, or `CANCELLED_BY_ADMIN`.
 - `totalNoShow`: count `booking_items` in range with `NO_SHOW`.
 - `totalUsers`: count users created up to `toDate`.
@@ -1992,8 +1994,10 @@ Response `200`:
     },
     "totalBookingOrders": 10,
     "totalBookingItems": 14,
-    "totalRevenue": 700000,
+    "grossRevenue": 700000,
     "totalRefundAmount": 50000,
+    "netRevenue": 650000,
+    "totalRevenue": 650000,
     "totalCancelled": 2,
     "totalNoShow": 1,
     "totalUsers": 42,

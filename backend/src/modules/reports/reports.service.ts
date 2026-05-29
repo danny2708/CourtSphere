@@ -185,12 +185,18 @@ export class ReportsService {
       })
     ]);
 
+    const grossRevenue = roundMoney(decimalToNumber(revenueAggregate._sum.amount));
+    const totalRefundAmount = roundMoney(decimalToNumber(refundAggregate._sum.refundAmount));
+    const netRevenue = roundMoney(grossRevenue - totalRefundAmount);
+
     return {
       dateRange: range,
       totalBookingOrders,
       totalBookingItems,
-      totalRevenue: roundMoney(decimalToNumber(revenueAggregate._sum.amount)),
-      totalRefundAmount: roundMoney(decimalToNumber(refundAggregate._sum.refundAmount)),
+      grossRevenue,
+      totalRefundAmount,
+      netRevenue,
+      totalRevenue: netRevenue,
       totalCancelled,
       totalNoShow,
       totalUsers,

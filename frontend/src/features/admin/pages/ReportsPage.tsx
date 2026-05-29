@@ -12,6 +12,22 @@ import type { AdminReportBundle } from "../types/admin.types";
 import { formatMoney, stringifyCompact } from "../utils/adminFormat";
 import { getErrorMessage } from "../../../utils/format-error";
 
+function getNetRevenue(overview: AdminReportBundle["overview"]): number | undefined {
+  if (!overview) {
+    return undefined;
+  }
+
+  if (typeof overview.netRevenue === "number") {
+    return overview.netRevenue;
+  }
+
+  if (typeof overview.totalRevenue === "number" && typeof overview.totalRefundAmount === "number") {
+    return overview.totalRevenue - overview.totalRefundAmount;
+  }
+
+  return overview.totalRevenue;
+}
+
 export function ReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,7 +64,7 @@ export function ReportsPage() {
         <>
           <div className="admin-stat-grid">
             <AdminStatCard label="Booking orders" value={reports.overview?.totalBookingOrders ?? 0} />
-            <AdminStatCard label="Revenue" value={formatMoney(reports.overview?.totalRevenue)} />
+            <AdminStatCard label="Net revenue" value={formatMoney(getNetRevenue(reports.overview))} />
             <AdminStatCard label="Refunded" value={formatMoney(reports.overview?.totalRefundAmount)} />
             <AdminStatCard label="Violations" value={reports.overview?.violationCount ?? 0} />
           </div>

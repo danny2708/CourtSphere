@@ -23,6 +23,18 @@ const quickLinks = [
   { icon: FileWarning, label: "Violations", to: ROUTE_PATHS.adminViolations }
 ];
 
+function getNetRevenue(overview: AdminOverviewReport): number | undefined {
+  if (typeof overview.netRevenue === "number") {
+    return overview.netRevenue;
+  }
+
+  if (typeof overview.totalRevenue === "number" && typeof overview.totalRefundAmount === "number") {
+    return overview.totalRevenue - overview.totalRefundAmount;
+  }
+
+  return overview.totalRevenue;
+}
+
 export function AdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,7 +87,7 @@ export function AdminDashboardPage() {
           <div className="admin-stat-grid">
             <AdminStatCard label="Tổng đơn" value={overview.totalBookingOrders ?? 0} />
             <AdminStatCard label="Booking items" value={overview.totalBookingItems ?? 0} />
-            <AdminStatCard label="Doanh thu" value={formatMoney(overview.totalRevenue)} />
+            <AdminStatCard label="Doanh thu ròng" value={formatMoney(getNetRevenue(overview))} />
             <AdminStatCard label="Refund success" value={formatMoney(overview.totalRefundAmount)} />
             <AdminStatCard label="No-show" value={overview.totalNoShow ?? 0} />
             <AdminStatCard label="Sân active" value={overview.activeCourts ?? 0} />

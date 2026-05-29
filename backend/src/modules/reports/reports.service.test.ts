@@ -61,7 +61,7 @@ function createDb(overrides: Record<string, unknown> = {}) {
 }
 
 describe("ReportsService", () => {
-  it("returns overview with SUCCESS payment revenue only", async () => {
+  it("returns overview with net revenue after SUCCESS refunds", async () => {
     const db = createDb();
     vi.mocked(db.bookingOrder.count).mockResolvedValue(2);
     vi.mocked(db.bookingItem.count)
@@ -85,8 +85,10 @@ describe("ReportsService", () => {
     expect(overview).toMatchObject({
       totalBookingOrders: 2,
       totalBookingItems: 4,
-      totalRevenue: 150000,
+      grossRevenue: 150000,
       totalRefundAmount: 50000,
+      netRevenue: 100000,
+      totalRevenue: 100000,
       totalCancelled: 1,
       totalNoShow: 1,
       totalUsers: 10,
