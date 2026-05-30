@@ -136,8 +136,8 @@ describe("AvailabilityService", () => {
     expect(availability.durationMinutes).toBe(60);
     expect(availability.slots).toHaveLength(4);
     expect(availability.slots[0]).toEqual({
-      startDatetime: "2026-05-20T08:00:00.000Z",
-      endDatetime: "2026-05-20T09:00:00.000Z",
+      startDatetime: "2026-05-20T01:00:00.000Z",
+      endDatetime: "2026-05-20T02:00:00.000Z",
       status: "AVAILABLE",
       priceAmount: 50000
     });
@@ -150,8 +150,8 @@ describe("AvailabilityService", () => {
           bookingItemId: "00000000-0000-4000-8000-000000000311",
           bookingOrderId: "00000000-0000-4000-8000-000000000411",
           bookingStatus: BookingStatus.CONFIRMED,
-          startDatetime: date("2026-05-20T08:30:00.000Z"),
-          endDatetime: date("2026-05-20T09:30:00.000Z"),
+          startDatetime: date("2026-05-20T01:30:00.000Z"),
+          endDatetime: date("2026-05-20T02:30:00.000Z"),
           bookingOrder: {
             holdExpiresAt: null
           }
@@ -160,8 +160,8 @@ describe("AvailabilityService", () => {
           bookingItemId: "00000000-0000-4000-8000-000000000312",
           bookingOrderId: "00000000-0000-4000-8000-000000000412",
           bookingStatus: BookingStatus.PENDING_PAYMENT,
-          startDatetime: date("2026-05-20T10:00:00.000Z"),
-          endDatetime: date("2026-05-20T11:00:00.000Z"),
+          startDatetime: date("2026-05-20T03:00:00.000Z"),
+          endDatetime: date("2026-05-20T04:00:00.000Z"),
           bookingOrder: {
             holdExpiresAt: date("2026-05-18T00:10:00.000Z")
           }
@@ -170,8 +170,8 @@ describe("AvailabilityService", () => {
           bookingItemId: "00000000-0000-4000-8000-000000000313",
           bookingOrderId: "00000000-0000-4000-8000-000000000413",
           bookingStatus: BookingStatus.PENDING_PAYMENT,
-          startDatetime: date("2026-05-20T11:00:00.000Z"),
-          endDatetime: date("2026-05-20T12:00:00.000Z"),
+          startDatetime: date("2026-05-20T04:00:00.000Z"),
+          endDatetime: date("2026-05-20T05:00:00.000Z"),
           bookingOrder: {
             holdExpiresAt: date("2026-05-17T23:59:00.000Z")
           }

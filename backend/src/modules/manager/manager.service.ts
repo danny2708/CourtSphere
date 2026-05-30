@@ -10,6 +10,7 @@ import {
 import { prisma } from "../../config/prisma";
 import { recomputeBookingOrderStatus } from "../../jobs/booking-order-aggregate";
 import { AppError } from "../../middlewares/error.middleware";
+import { startOfVietnamDay } from "../../utils/vietnam-time";
 import {
   ACTIVE_BOOKING_STATUSES,
   bookingConflictService,
@@ -72,10 +73,6 @@ function addDays(date: Date, days: number): Date {
 
 function addMinutes(date: Date, minutes: number): Date {
   return new Date(date.getTime() + minutes * 60_000);
-}
-
-function startOfUtcDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
 function decimalToNumber(value: Prisma.Decimal): number {
@@ -157,7 +154,7 @@ export class ManagerService {
 
   async getTodaySchedule(query: ManagerTodayScheduleQuery) {
     const now = this.nowProvider();
-    const dayStart = startOfUtcDay(now);
+    const dayStart = startOfVietnamDay(now);
     const dayEnd = addDays(dayStart, 1);
     const items = await this.db.bookingItem.findMany({
       where: {

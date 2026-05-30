@@ -2,6 +2,7 @@ import { CalendarDays, LogIn, LogOut, ShieldCheck, UserRound } from "lucide-reac
 import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import { ROUTE_PATHS } from "../../routes/route-paths";
+import { NotificationBell } from "../../features/notifications/components/NotificationBell";
 import { useAuthStore } from "../../stores/auth.store";
 import { useToastStore } from "../../stores/toast.store";
 import type { RoleName } from "../../types/auth.types";
@@ -90,6 +91,7 @@ export function AppHeader() {
                 <span className="user-chip__name">{user.fullName}</span>
                 <span className="user-chip__role">{getPrimaryRoleLabel(user.roles)}</span>
               </div>
+              <NotificationBell />
               <Button className="header-icon-button" size="sm" variant="icon" onClick={handleLogout} aria-label="Đăng xuất">
                 <LogOut aria-hidden="true" size={18} />
               </Button>

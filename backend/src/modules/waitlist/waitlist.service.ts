@@ -24,6 +24,11 @@ import {
   type NotificationsService
 } from "../notifications/notifications.service";
 import { RulesRepository } from "../rules/rules.repository";
+import {
+  getVietnamIsoWeekday,
+  startOfVietnamDay,
+  vietnamMinutesFromDate
+} from "../../utils/vietnam-time";
 import type {
   JoinWaitlistInput,
   ListMyWaitlistQuery,
@@ -118,26 +123,13 @@ function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60_000);
 }
 
-function startOfUtcDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
-
 function minutesBetween(start: Date, end: Date): number {
   return Math.floor((end.getTime() - start.getTime()) / 60_000);
-}
-
-function getIsoWeekday(date: Date): number {
-  const day = date.getUTCDay();
-  return day === 0 ? 7 : day;
 }
 
 function minutesFromTime(time: string): number {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
-}
-
-function utcMinutesFromDate(date: Date): number {
-  return date.getUTCHours() * 60 + date.getUTCMinutes();
 }
 
 function decimalToNumber(value: Prisma.Decimal): number {
@@ -447,24 +439,60 @@ export class WaitlistService {
         status: WaitlistStatus.WAITING
       },
       orderBy: [{ priorityOrder: "asc" }, { registeredAt: "asc" }],
-      include: waitlistEntryInclude
+      include: waitlistEntryForBookingInclude
     });
 
     if (!candidate) {
       return null;
     }
 
-    const responseMinutes = await new RulesRepository(tx).getWaitlistResponseMinutes();
-    const expiresAt = addMinutes(now, responseMinutes);
+    this.assertUserCanUseWaitlist(candidate.user, now);
+
+    const policy = await new RulesRepository(tx).getEffectivePolicy({
+      priorityGroupId: candidate.user.priorityGroupId,
+      priorityGroupAdvanceBookingDays: candidate.user.priorityGroup?.advanceBookingDays ?? null
+    });
+    const operatingHour = this.validateRequestedSlot({
+      court: candidate.court,
+      startDatetime: candidate.desiredStartDatetime,
+      endDatetime: candidate.desiredEndDatetime,
+      now,
+      maxDurationMinutes: policy.maxDurationMinutes,
+      advanceBookingDays: policy.advanceBookingDays
+    });
+
+    await this.assertDailyQuotaAvailable(tx, candidate.userId, candidate.desiredStartDatetime, now, policy.maxBookingsPerDay);
+    await this.state.expireOverlappingPaymentHolds(tx, {
+      courtId: candidate.courtId,
+      startDatetime: candidate.desiredStartDatetime,
+      endDatetime: candidate.desiredEndDatetime,
+      now
+    });
+    await this.assertSlotAvailableForBooking(tx, {
+      courtId: candidate.courtId,
+      startDatetime: candidate.desiredStartDatetime,
+      endDatetime: candidate.desiredEndDatetime,
+      now
+    });
+
+    const pricing = this.calculateItemAmount({
+      startDatetime: candidate.desiredStartDatetime,
+      endDatetime: candidate.desiredEndDatetime,
+      slotDurationMinutes: operatingHour.slotDurationMinutes,
+      pricingRules: candidate.court.pricingRules,
+      userPriorityGroupId: candidate.user.priorityGroupId,
+      weekday: getVietnamIsoWeekday(candidate.desiredStartDatetime)
+    });
+    const holdExpiresAt = addMinutes(now, policy.holdMinutes);
     const updated = await tx.waitlistEntry.updateMany({
       where: {
         waitlistEntryId: candidate.waitlistEntryId,
         status: WaitlistStatus.WAITING
       },
       data: {
-        status: WaitlistStatus.NOTIFIED,
+        status: WaitlistStatus.BOOKED,
         notifiedAt: now,
-        expiresAt
+        expiresAt: holdExpiresAt
       }
     });
 
@@ -472,11 +500,60 @@ export class WaitlistService {
       return null;
     }
 
+    const createdOrder = await tx.bookingOrder.create({
+      data: {
+        bookingCode: this.codeGenerator(now),
+        userId: candidate.userId,
+        totalAmount: pricing.amount,
+        bookingStatus: BookingStatus.PENDING_PAYMENT,
+        paymentStatus: PaymentStatus.INITIATED,
+        holdExpiresAt,
+        refundable: true,
+        note: "Created from waitlist turn notification",
+        items: {
+          create: [
+            {
+              courtId: candidate.courtId,
+              startDatetime: candidate.desiredStartDatetime,
+              endDatetime: candidate.desiredEndDatetime,
+              unitPrice: pricing.unitPrice,
+              amount: pricing.amount,
+              bookingStatus: BookingStatus.PENDING_PAYMENT
+            }
+          ]
+        }
+      },
+      select: {
+        bookingOrderId: true,
+        bookingCode: true
+      }
+    });
+    const createdItem = await tx.bookingItem.findFirstOrThrow({
+      where: { bookingOrderId: createdOrder.bookingOrderId },
+      select: { bookingItemId: true }
+    });
+
+    await this.state.recordOrderStatusHistory(tx, {
+      bookingOrderId: createdOrder.bookingOrderId,
+      oldStatus: null,
+      newStatus: BookingStatus.PENDING_PAYMENT,
+      actionType: "SYSTEM_CREATE_BOOKING_ORDER_FROM_WAITLIST_TURN",
+      note: "Booking order hold created when waitlist turn became available"
+    });
+    await this.state.recordItemStatusHistory(tx, {
+      bookingItemId: createdItem.bookingItemId,
+      oldStatus: null,
+      newStatus: BookingStatus.PENDING_PAYMENT,
+      actionType: "SYSTEM_CREATE_BOOKING_ITEM_FROM_WAITLIST_TURN",
+      note: "Booking item hold created when waitlist turn became available"
+    });
     await this.notifications.createWaitlistNotification(tx, {
       userId: candidate.userId,
+      bookingOrderId: createdOrder.bookingOrderId,
+      bookingItemId: createdItem.bookingItemId,
       notificationType: NotificationType.WAITLIST_NOTIFIED,
-      title: "Waitlist slot available",
-      content: `The slot you are waiting for is available. You have ${responseMinutes} minutes to confirm booking.`,
+      title: "Đến lượt giữ chỗ từ hàng chờ",
+      content: `Đã tạo giữ chỗ ${createdOrder.bookingCode} cho khung giờ bạn đăng ký hàng chờ. Vui lòng thanh toán trước khi hết hạn giữ chỗ.`,
       dedupe: false
     });
 
@@ -562,7 +639,7 @@ export class WaitlistService {
             slotDurationMinutes: operatingHour.slotDurationMinutes,
             pricingRules: entry.court.pricingRules,
             userPriorityGroupId: entry.user.priorityGroupId,
-            weekday: getIsoWeekday(entry.desiredStartDatetime)
+            weekday: getVietnamIsoWeekday(entry.desiredStartDatetime)
           });
           const createdOrder = await tx.bookingOrder.create({
             data: {
@@ -822,7 +899,7 @@ export class WaitlistService {
   }
 
   private getOperatingHourOrThrow(court: CourtForWaitlist, startDatetime: Date): OperatingHourForWaitlist {
-    const weekday = getIsoWeekday(startDatetime);
+    const weekday = getVietnamIsoWeekday(startDatetime);
     const operatingHour = court.operatingHours.find(
       (hour) => hour.weekday === weekday && hour.status === EntityStatus.ACTIVE
     );
@@ -839,8 +916,8 @@ export class WaitlistService {
     endDatetime: Date,
     operatingHour: OperatingHourForWaitlist
   ): void {
-    const startMinutes = utcMinutesFromDate(startDatetime);
-    const endMinutes = utcMinutesFromDate(endDatetime);
+    const startMinutes = vietnamMinutesFromDate(startDatetime);
+    const endMinutes = vietnamMinutesFromDate(endDatetime);
     const openMinutes = minutesFromTime(operatingHour.openTime);
     const closeMinutes = minutesFromTime(operatingHour.closeTime);
 
@@ -854,7 +931,7 @@ export class WaitlistService {
     endDatetime: Date,
     operatingHour: OperatingHourForWaitlist
   ): void {
-    const startOffset = utcMinutesFromDate(startDatetime) - minutesFromTime(operatingHour.openTime);
+    const startOffset = vietnamMinutesFromDate(startDatetime) - minutesFromTime(operatingHour.openTime);
     const durationMinutes = minutesBetween(startDatetime, endDatetime);
 
     if (
@@ -893,8 +970,8 @@ export class WaitlistService {
       return;
     }
 
-    const today = startOfUtcDay(now);
-    if (startOfUtcDay(startDatetime) > addDays(today, advanceBookingDays)) {
+    const today = startOfVietnamDay(now);
+    if (startOfVietnamDay(startDatetime) > addDays(today, advanceBookingDays)) {
       throw new AppError(
         400,
         "Waitlist slot is outside the user's advance booking window",
@@ -1018,7 +1095,7 @@ export class WaitlistService {
     now: Date,
     maxBookingsPerDay: number
   ): Promise<void> {
-    const dayStart = startOfUtcDay(startDatetime);
+    const dayStart = startOfVietnamDay(startDatetime);
     const dayEnd = addDays(dayStart, 1);
     const existingCount = await tx.bookingOrder.count({
       where: {
@@ -1141,8 +1218,8 @@ export class WaitlistService {
     userPriorityGroupId: string | null;
     weekday: number;
   }): PricingRuleForWaitlist {
-    const slotStartMinutes = utcMinutesFromDate(input.startDatetime);
-    const slotEndMinutes = utcMinutesFromDate(input.endDatetime);
+    const slotStartMinutes = vietnamMinutesFromDate(input.startDatetime);
+    const slotEndMinutes = vietnamMinutesFromDate(input.endDatetime);
     const matchingRules = input.pricingRules.filter((rule) => {
       const ruleStartMinutes = minutesFromTime(rule.startTime);
       const ruleEndMinutes = minutesFromTime(rule.endTime);
