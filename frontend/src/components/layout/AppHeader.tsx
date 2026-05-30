@@ -86,12 +86,12 @@ export function AppHeader() {
         <div className="header-actions">
           {isAuthenticated && user ? (
             <>
-              <NotificationBell />
               <div className="user-chip" title={user.email}>
                 {user.roles.includes("ADMIN") ? <ShieldCheck aria-hidden="true" size={16} /> : <UserRound aria-hidden="true" size={16} />}
                 <span className="user-chip__name">{user.fullName}</span>
                 <span className="user-chip__role">{getPrimaryRoleLabel(user.roles)}</span>
               </div>
+              <NotificationBell />
               <Button className="header-icon-button" size="sm" variant="icon" onClick={handleLogout} aria-label="Đăng xuất">
                 <LogOut aria-hidden="true" size={18} />
               </Button>
