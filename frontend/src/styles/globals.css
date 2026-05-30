@@ -1527,8 +1527,87 @@ a {
   gap: 8px;
 }
 
+.court-booking-layout,
 .availability-panel {
   scroll-margin-top: 112px;
+}
+
+.court-booking-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+}
+
+.court-booking-sidebar {
+  position: sticky;
+  top: 112px;
+  display: grid;
+  gap: 16px;
+}
+
+.court-booking-panel {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  box-shadow: var(--shadow-floating);
+}
+
+.court-booking-panel h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.court-booking-panel dl,
+.court-availability-facts dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.court-booking-panel dl div,
+.court-availability-facts dl div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.court-booking-panel dl div:last-child,
+.court-availability-facts dl div:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.court-booking-panel dt,
+.court-availability-facts dt {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.court-booking-panel dd,
+.court-availability-facts dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 950;
+}
+
+.court-booking-panel__note {
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--radius-button);
+  color: #075985;
+  background: var(--color-primary-light);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 .availability-header {
@@ -1746,10 +1825,21 @@ a {
 
 .availability-week-head--time,
 .availability-week-time {
+  position: sticky;
+  left: 0;
+  box-shadow: 1px 0 0 var(--color-border);
   color: var(--color-text-secondary);
   font-size: 12px;
   font-weight: 900;
   text-transform: uppercase;
+}
+
+.availability-week-head--time {
+  z-index: 4;
+}
+
+.availability-week-time {
+  z-index: 3;
 }
 
 .availability-week-head strong,
@@ -3343,8 +3433,13 @@ a {
   }
 
   .booking-create-layout,
-  .booking-detail-layout {
+  .booking-detail-layout,
+  .court-booking-layout {
     grid-template-columns: 1fr;
+  }
+
+  .court-booking-sidebar {
+    position: static;
   }
 
   .my-booking-grid {
@@ -3591,6 +3686,8 @@ a {
   }
 
   .booking-intent,
+  .court-booking-panel dl div,
+  .court-availability-facts dl div,
   .price-summary dl div,
   .booking-summary-card dl div,
   .booking-facts dl div {
@@ -3603,6 +3700,8 @@ a {
   }
 
   .price-summary dd,
+  .court-booking-panel dd,
+  .court-availability-facts dd,
   .booking-summary-card dd,
   .booking-facts dd {
     text-align: left;

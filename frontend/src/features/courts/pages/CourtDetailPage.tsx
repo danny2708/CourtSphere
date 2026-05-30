@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Clock, MapPin, UsersRound } from "lucide-react";
+import { ArrowLeft, CalendarClock, Clock, MapPin, UsersRound } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { Badge } from "../../../components/common/Badge";
@@ -17,7 +17,6 @@ import { getErrorMessage } from "../../../utils/format-error";
 import { AvailabilityDatePicker } from "../components/AvailabilityDatePicker";
 import { AvailabilityWeekGrid } from "../components/AvailabilityWeekGrid";
 import { CourtPolicyPanel } from "../components/CourtPolicyPanel";
-import { CourtPriceSummary } from "../components/CourtPriceSummary";
 import { saveBookingSelection } from "../../bookings/utils/bookingSelectionStorage";
 import { getCourtAvailability } from "../services/availabilityService";
 import { getCourtById } from "../services/courtService";
@@ -222,6 +221,12 @@ export function CourtDetailPage() {
 
   const canBook = court.status === "ACTIVE";
   const canContinueBooking = canBook && selectedSlots.length > 0;
+  const selectedTotalAmount = selectedSlots.reduce((sum, slot) => sum + (slot.priceAmount ?? 0), 0);
+  const selectedSlotsText = selectedSlots.length
+    ? selectedSlots
+        .map((slot) => `${shortDateFormatter.format(new Date(slot.startDatetime))} ${slot.startTimeText}-${slot.endTimeText}`)
+        .join(", ")
+    : "Chưa chọn khung giờ";
 
   const handleSelectSlot = (slot: AvailabilitySlotViewModel) => {
     if (!slot.isAvailable) {
@@ -378,78 +383,107 @@ export function CourtDetailPage() {
         </div>
       </div>
 
-      <Card as="section" className="detail-card detail-card--wide availability-panel" id="court-availability">
-        <div className="availability-header">
-          <div>
-            <p className="eyebrow">Lịch trống</p>
-            <h2>Chọn tuần và khung giờ</h2>
-            <p>Ô xanh có thể chọn nhiều slot. Ô đóng cửa thể hiện thời gian sân không hoạt động theo cấu hình thật.</p>
+      <div className="court-booking-layout" id="court-availability">
+        <Card as="section" className="detail-card availability-panel">
+          <div className="availability-header">
+            <div>
+              <p className="eyebrow">Lịch trống</p>
+              <h2>Chọn tuần và khung giờ</h2>
+              <p>Ô xanh có thể chọn nhiều slot. Ô đóng cửa thể hiện thời gian sân không hoạt động theo cấu hình thật.</p>
+            </div>
+            <div className="availability-controls">
+              <AvailabilityDatePicker
+                error={dateError}
+                minDate={todayDate}
+                value={selectedDate}
+                onChange={setSelectedDate}
+              />
+              <label className="availability-time-control">
+                <span>Từ giờ</span>
+                <input type="time" value={visibleStartTime} onChange={(event) => setVisibleStartTime(event.target.value)} />
+              </label>
+              <label className="availability-time-control">
+                <span>Đến giờ</span>
+                <input type="time" value={visibleEndTime} onChange={(event) => setVisibleEndTime(event.target.value)} />
+              </label>
+            </div>
           </div>
-          <div className="availability-controls">
-            <AvailabilityDatePicker
-              error={dateError}
-              minDate={todayDate}
-              value={selectedDate}
-              onChange={setSelectedDate}
+
+          {!canBook ? (
+            <p className="availability-warning" role="status">
+              Sân không ở trạng thái hoạt động nên tất cả khung giờ đặt lịch đều bị khóa.
+            </p>
+          ) : null}
+
+          {isLoadingAvailability ? (
+            <LoadingState compact message="Đang tải lịch trống..." />
+          ) : availabilityError ? (
+            <ErrorState
+              compact
+              actionLabel="Thử lại"
+              message={availabilityError}
+              title="Không tải được lịch trống"
+              onAction={() => setAvailabilityReloadKey((key) => key + 1)}
             />
-            <label className="availability-time-control">
-              <span>Từ giờ</span>
-              <input type="time" value={visibleStartTime} onChange={(event) => setVisibleStartTime(event.target.value)} />
-            </label>
-            <label className="availability-time-control">
-              <span>Đến giờ</span>
-              <input type="time" value={visibleEndTime} onChange={(event) => setVisibleEndTime(event.target.value)} />
-            </label>
-          </div>
-        </div>
+          ) : weekAvailabilities.length ? (
+            <AvailabilityWeekGrid
+              availabilities={weekAvailabilities}
+              canJoinWaitlist={canBook && Boolean(availabilityPolicy?.canJoinWaitlist)}
+              joiningWaitlistSlotId={joiningWaitlistSlotId}
+              selectedDate={selectedDate}
+              selectedSlotIds={selectedSlotIds}
+              visibleEndTime={visibleEndTime}
+              visibleStartTime={visibleStartTime}
+              weekStartDate={weekStartDate}
+              onJoinWaitlist={handleJoinWaitlist}
+              onSelectSlot={handleSelectSlot}
+            />
+          ) : null}
+        </Card>
 
-        {!canBook ? (
-          <p className="availability-warning" role="status">
-            Sân không ở trạng thái hoạt động nên tất cả khung giờ đặt lịch đều bị khóa.
-          </p>
-        ) : null}
+        <aside className="court-booking-sidebar" aria-label="Đặt sân">
+          <Card as="section" className="court-booking-panel">
+            <div>
+              <p className="eyebrow">Đặt sân</p>
+              <h2>Preview đơn đặt sân</h2>
+            </div>
 
-        {isLoadingAvailability ? (
-          <LoadingState compact message="Đang tải lịch trống..." />
-        ) : availabilityError ? (
-          <ErrorState
-            compact
-            actionLabel="Thử lại"
-            message={availabilityError}
-            title="Không tải được lịch trống"
-            onAction={() => setAvailabilityReloadKey((key) => key + 1)}
-          />
-        ) : weekAvailabilities.length ? (
-          <AvailabilityWeekGrid
-            availabilities={weekAvailabilities}
-            canJoinWaitlist={canBook && Boolean(availabilityPolicy?.canJoinWaitlist)}
-            joiningWaitlistSlotId={joiningWaitlistSlotId}
-            selectedDate={selectedDate}
-            selectedSlotIds={selectedSlotIds}
-            visibleEndTime={visibleEndTime}
-            visibleStartTime={visibleStartTime}
-            weekStartDate={weekStartDate}
-            onJoinWaitlist={handleJoinWaitlist}
-            onSelectSlot={handleSelectSlot}
-          />
-        ) : null}
+            <dl>
+              <div>
+                <dt>Sân</dt>
+                <dd>{court.name}</dd>
+              </div>
+              <div>
+                <dt>Khung giờ</dt>
+                <dd>{selectedSlotsText}</dd>
+              </div>
+              <div>
+                <dt>Số slot</dt>
+                <dd>{selectedSlots.length}</dd>
+              </div>
+              <div>
+                <dt>Tạm tính</dt>
+                <dd>{selectedSlots.length ? currencyFormatter.format(selectedTotalAmount) : "Chưa có giá"}</dd>
+              </div>
+              <div>
+                <dt>Giữ chỗ thanh toán</dt>
+                <dd>{availabilityPolicy?.holdMinutes ? `${availabilityPolicy.holdMinutes} phút` : "Theo cấu hình"}</dd>
+              </div>
+            </dl>
 
-        <div className="booking-intent">
-          <div>
-            <span>Khung giờ đã chọn</span>
-            <strong>
-              {selectedSlots.length
-                ? `${selectedSlots.length} slot: ${selectedSlots
-                    .map((slot) => `${shortDateFormatter.format(new Date(slot.startDatetime))} ${slot.startTimeText}-${slot.endTimeText}`)
-                    .join(", ")}`
-                : "Chưa chọn khung giờ"}
-            </strong>
-          </div>
-          <Button disabled={!canContinueBooking} onClick={handleBookingIntent}>
-            Đặt lịch
-          </Button>
-        </div>
-      </Card>
+            <Button disabled={!canContinueBooking} size="lg" onClick={handleBookingIntent}>
+              <CalendarClock aria-hidden="true" size={18} />
+              Đặt lịch
+            </Button>
+
+            <p className="court-booking-panel__note">
+              Booking chỉ được xác nhận sau khi thanh toán 100%.
+            </p>
+          </Card>
+
+          {availabilityPolicy ? <CourtPolicyPanel policy={availabilityPolicy} /> : null}
+        </aside>
+      </div>
 
       <div className="court-detail-grid">
         <Card as="section" className="detail-card">
@@ -511,13 +545,23 @@ export function CourtDetailPage() {
         </Card>
 
         {weekAvailabilities.length ? (
-          <>
-            <CourtPriceSummary
-              availableSlotCount={availableSlotCount}
-              selectedSlots={selectedSlots}
-            />
-            {availabilityPolicy ? <CourtPolicyPanel policy={availabilityPolicy} /> : null}
-          </>
+          <Card as="section" className="detail-card detail-card--wide court-availability-facts">
+            <h2>Tổng quan lịch</h2>
+            <dl>
+              <div>
+                <dt>Slot còn trống</dt>
+                <dd>{availableSlotCount}</dd>
+              </div>
+              <div>
+                <dt>Slot đã chọn</dt>
+                <dd>{selectedSlots.length}</dd>
+              </div>
+              <div>
+                <dt>Tạm tính hiện tại</dt>
+                <dd>{selectedSlots.length ? currencyFormatter.format(selectedTotalAmount) : "Chưa có giá"}</dd>
+              </div>
+            </dl>
+          </Card>
         ) : null}
       </div>
     </section>

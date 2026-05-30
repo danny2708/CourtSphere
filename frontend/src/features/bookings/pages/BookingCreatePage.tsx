@@ -129,6 +129,7 @@ export function BookingCreatePage() {
     () => availability?.slots.find((slot) => slot.id === selectedSlotId) ?? null,
     [availability?.slots, selectedSlotId]
   );
+  const hasStoredSelection = selectedSlotsFromSelection.length > 0;
   const selectedSlotsForSummary = selectedSlotsFromSelection.length > 0 ? selectedSlotsFromSelection : selectedSlot ? [selectedSlot] : [];
 
   const handleSelectSlot = (slot: AvailabilitySlotViewModel) => {
@@ -269,28 +270,26 @@ export function BookingCreatePage() {
             </div>
 
             {error ? <p className="form-alert" role="alert">{error}</p> : null}
-            {selectedSlotsFromSelection.length > 0 ? (
-              <p className="hint-text" role="status">
-                Đã nhận {selectedSlotsFromSelection.length} slot từ lịch tuần. Chọn slot khác bên dưới sẽ thay thế lựa chọn này.
-              </p>
-            ) : null}
+            {!hasStoredSelection ? (
+              <>
+                <AvailabilityDatePicker
+                  error={dateError}
+                  minDate={todayDate}
+                  value={selectedDate}
+                  onChange={handleDateChange}
+                />
 
-            <AvailabilityDatePicker
-              error={dateError}
-              minDate={todayDate}
-              value={selectedDate}
-              onChange={handleDateChange}
-            />
-
-            {availability ? (
-              <AvailabilitySlotPicker
-                canJoinWaitlist={court?.status === "ACTIVE" && Boolean(availability.policy.canJoinWaitlist)}
-                joiningWaitlistSlotId={joiningWaitlistSlotId}
-                selectedSlotId={selectedSlotId}
-                slots={availability.slots}
-                onJoinWaitlist={handleJoinWaitlist}
-                onSelectSlot={handleSelectSlot}
-              />
+                {availability ? (
+                  <AvailabilitySlotPicker
+                    canJoinWaitlist={court?.status === "ACTIVE" && Boolean(availability.policy.canJoinWaitlist)}
+                    joiningWaitlistSlotId={joiningWaitlistSlotId}
+                    selectedSlotId={selectedSlotId}
+                    slots={availability.slots}
+                    onJoinWaitlist={handleJoinWaitlist}
+                    onSelectSlot={handleSelectSlot}
+                  />
+                ) : null}
+              </>
             ) : null}
 
             <label className="form-field">
