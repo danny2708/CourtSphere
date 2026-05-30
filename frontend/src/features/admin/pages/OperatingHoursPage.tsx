@@ -10,6 +10,7 @@ import { entityStatusLabel, getStatusLabel } from "../../../utils/status-label";
 import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
+import { AdminRowActions } from "../components/AdminRowActions";
 import { AdminSelectDialog } from "../components/AdminSelectDialog";
 import { AdminTextFormDialog } from "../components/AdminTextFormDialog";
 import { ManagerNavigation } from "../../manager/components/ManagerNavigation";
@@ -119,14 +120,12 @@ export function OperatingHoursPage({ variant = "admin" }: OperatingHoursPageProp
       header: "Thao tác",
       key: "actions",
       render: (item) => (
-        <div className="admin-action-row">
-          <Button size="sm" onClick={() => setDialog({ type: "edit", item })}>
-            Sửa giờ
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setDialog({ type: "status", item })}>
-            Status
-          </Button>
-        </div>
+        <AdminRowActions
+          actions={[
+            { label: "Sửa giờ", onSelect: () => setDialog({ type: "edit", item }), tone: "primary" },
+            { label: "Cập nhật status", onSelect: () => setDialog({ type: "status", item }) }
+          ]}
+        />
       )
     }
   ];

@@ -10,6 +10,7 @@ import { getErrorMessage } from "../../../utils/format-error";
 import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
+import { AdminRowActions } from "../components/AdminRowActions";
 import { AdminTextFormDialog } from "../components/AdminTextFormDialog";
 import { listPriorityGroups, updatePriorityGroup } from "../services/adminService";
 import type { AdminPriorityGroup } from "../types/admin.types";
@@ -70,7 +71,17 @@ export function PriorityGroupManagementPage() {
       key: "status",
       render: (group) => <Badge tone={group.status === "ACTIVE" ? "success" : "neutral"}>{getStatusLabel(entityStatusLabel, group.status ?? "ACTIVE")}</Badge>
     },
-    { header: "Thao tác", key: "actions", render: (group) => <Button size="sm" onClick={() => setActiveGroup(group)}>Sửa</Button> }
+    {
+      header: "Thao tác",
+      key: "actions",
+      render: (group) => (
+        <AdminRowActions
+          actions={[
+            { label: "Sửa", onSelect: () => setActiveGroup(group), tone: "primary" }
+          ]}
+        />
+      )
+    }
   ];
 
   return (

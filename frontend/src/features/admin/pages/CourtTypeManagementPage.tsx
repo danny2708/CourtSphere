@@ -10,6 +10,7 @@ import { entityStatusLabel, getStatusLabel } from "../../../utils/status-label";
 import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
+import { AdminRowActions } from "../components/AdminRowActions";
 import { AdminSelectDialog } from "../components/AdminSelectDialog";
 import { AdminTextFormDialog } from "../components/AdminTextFormDialog";
 import { createCourtType, listCourtTypes, updateCourtType, updateCourtTypeStatus } from "../services/adminService";
@@ -69,10 +70,12 @@ export function CourtTypeManagementPage() {
       header: "Thao tác",
       key: "actions",
       render: (type) => (
-        <div className="admin-action-row">
-          <Button size="sm" onClick={() => setDialog({ type: "edit", courtType: type })}>Sửa</Button>
-          <Button size="sm" variant="ghost" onClick={() => setDialog({ type: "status", courtType: type })}>Status</Button>
-        </div>
+        <AdminRowActions
+          actions={[
+            { label: "Sửa", onSelect: () => setDialog({ type: "edit", courtType: type }), tone: "primary" },
+            { label: "Cập nhật status", onSelect: () => setDialog({ type: "status", courtType: type }) }
+          ]}
+        />
       )
     }
   ];

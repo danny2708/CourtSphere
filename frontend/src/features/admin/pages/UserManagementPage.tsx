@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Badge } from "../../../components/common/Badge";
 import { Button } from "../../../components/common/Button";
@@ -15,6 +15,7 @@ import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
 import { AdminMultiSelectDialog } from "../components/AdminMultiSelectDialog";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
+import { AdminRowActions } from "../components/AdminRowActions";
 import { AdminSelectDialog } from "../components/AdminSelectDialog";
 import {
   assignUserRole,
@@ -63,7 +64,6 @@ export function UserManagementPage() {
   const [dialog, setDialog] = useState<DialogState>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [keyword, setKeyword] = useState("");
   const [priorityGroups, setPriorityGroups] = useState<AdminPriorityGroup[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -100,19 +100,6 @@ export function UserManagementPage() {
       isMounted = false;
     };
   }, [reloadKey]);
-
-  const filteredUsers = useMemo(() => {
-    const normalizedKeyword = keyword.trim().toLowerCase();
-    if (!normalizedKeyword) {
-      return users;
-    }
-
-    return users.filter((user) =>
-      [user.fullName, user.email, user.phoneNumber, user.identityCode, user.roles.join(" ")]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(normalizedKeyword))
-    );
-  }, [keyword, users]);
 
   async function runAction(action: () => Promise<unknown>) {
     try {
@@ -178,23 +165,15 @@ export function UserManagementPage() {
       header: "Thao tác",
       key: "actions",
       render: (user) => (
-        <div className="admin-action-row">
-          <Button size="sm" variant="secondary" onClick={() => setDialog({ type: "assignRole", user })}>
-            Gán role
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setDialog({ type: "removeRole", user })}>
-            Gỡ role
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setDialog({ type: "accountStatus", user })}>
-            Account
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setDialog({ type: "bookingPermission", user })}>
-            Booking
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setDialog({ type: "priority", user })}>
-            Priority
-          </Button>
-        </div>
+        <AdminRowActions
+          actions={[
+            { label: "Gán role", onSelect: () => setDialog({ type: "assignRole", user }), tone: "primary" },
+            { label: "Gỡ role", onSelect: () => setDialog({ type: "removeRole", user }) },
+            { label: "Account", onSelect: () => setDialog({ type: "accountStatus", user }) },
+            { label: "Booking", onSelect: () => setDialog({ type: "bookingPermission", user }) },
+            { label: "Priority", onSelect: () => setDialog({ type: "priority", user }) }
+          ]}
+        />
       )
     }
   ];
@@ -208,13 +187,9 @@ export function UserManagementPage() {
         actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>}
       />
 
-      <div className="admin-filter-bar">
-        <input placeholder="Tìm theo tên, email, role..." value={keyword} onChange={(event) => setKeyword(event.target.value)} />
-      </div>
-
       {isLoading ? <LoadingState message="Đang tải users..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được users" onAction={() => setReloadKey((value) => value + 1)} /> : null}
-      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(user) => user.id} rows={filteredUsers} /> : null}
+      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(user) => user.id} rows={users} /> : null}
 
       {dialog?.type === "assignRole" ? (
         <AdminMultiSelectDialog

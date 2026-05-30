@@ -10,6 +10,7 @@ import { getErrorMessage } from "../../../utils/format-error";
 import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
+import { AdminRowActions } from "../components/AdminRowActions";
 import { AdminSelectDialog } from "../components/AdminSelectDialog";
 import { AdminTextFormDialog } from "../components/AdminTextFormDialog";
 import { createCourt, listAdminCourts, listCourtTypes, updateCourt, updateCourtStatus } from "../services/adminService";
@@ -76,10 +77,12 @@ export function CourtManagementPage() {
       header: "Thao tác",
       key: "actions",
       render: (court) => (
-        <div className="admin-action-row">
-          <Button size="sm" onClick={() => setDialog({ type: "edit", court })}>Sửa</Button>
-          <Button size="sm" variant="ghost" onClick={() => setDialog({ type: "status", court })}>Status</Button>
-        </div>
+        <AdminRowActions
+          actions={[
+            { label: "Sửa", onSelect: () => setDialog({ type: "edit", court }), tone: "primary" },
+            { label: "Cập nhật status", onSelect: () => setDialog({ type: "status", court }) }
+          ]}
+        />
       )
     }
   ];

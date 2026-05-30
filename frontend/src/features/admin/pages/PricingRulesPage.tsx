@@ -10,6 +10,7 @@ import { entityStatusLabel, getStatusLabel } from "../../../utils/status-label";
 import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
+import { AdminRowActions } from "../components/AdminRowActions";
 import { AdminSelectDialog } from "../components/AdminSelectDialog";
 import { AdminTextFormDialog } from "../components/AdminTextFormDialog";
 import { createPricingRule, listAdminCourts, listPricingRules, updatePricingRuleStatus } from "../services/adminService";
@@ -87,7 +88,17 @@ export function PricingRulesPage() {
     { header: "Day", key: "day", render: (rule) => rule.applicableDay ?? "Tất cả" },
     { header: "Price", key: "price", render: (rule) => formatMoney(rule.priceAmount) },
     { header: "Status", key: "status", render: (rule) => <Badge tone={rule.status === "ACTIVE" ? "success" : "neutral"}>{getStatusLabel(entityStatusLabel, rule.status)}</Badge> },
-    { header: "Thao tác", key: "actions", render: (rule) => <Button size="sm" onClick={() => setDialog({ type: "status", item: rule })}>Status</Button> }
+    {
+      header: "Thao tác",
+      key: "actions",
+      render: (rule) => (
+        <AdminRowActions
+          actions={[
+            { label: "Cập nhật status", onSelect: () => setDialog({ type: "status", item: rule }), tone: "primary" }
+          ]}
+        />
+      )
+    }
   ];
 
   return (

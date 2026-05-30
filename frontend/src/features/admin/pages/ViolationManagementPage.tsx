@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Badge } from "../../../components/common/Badge";
 import { Button } from "../../../components/common/Button";
@@ -11,6 +11,7 @@ import { AdminConfirmDialog } from "../components/AdminConfirmDialog";
 import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
+import { AdminRowActions } from "../components/AdminRowActions";
 import { AdminTextFormDialog } from "../components/AdminTextFormDialog";
 import { adjustViolationPoints, listViolations, waiveViolation } from "../services/adminService";
 import type { AdminViolation } from "../types/admin.types";
@@ -23,7 +24,6 @@ export function ViolationManagementPage() {
   const [dialog, setDialog] = useState<DialogState>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [keyword, setKeyword] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [violations, setViolations] = useState<AdminViolation[]>([]);
 
@@ -46,17 +46,6 @@ export function ViolationManagementPage() {
       isMounted = false;
     };
   }, [reloadKey]);
-
-  const filtered = useMemo(() => {
-    const normalized = keyword.trim().toLowerCase();
-    return normalized
-      ? violations.filter((violation) =>
-          [violation.id, violation.user?.email, violation.user?.fullName, violation.violationType, violation.bookingItem?.bookingOrder?.bookingCode]
-            .filter(Boolean)
-            .some((value) => value!.toLowerCase().includes(normalized))
-        )
-      : violations;
-  }, [keyword, violations]);
 
   async function runAction(action: () => Promise<unknown>) {
     try {
@@ -84,14 +73,17 @@ export function ViolationManagementPage() {
       header: "Thao tác",
       key: "actions",
       render: (violation) => (
-        <div className="admin-action-row">
-          <Button disabled={violation.isWaived} size="sm" variant="secondary" onClick={() => setDialog({ type: "waive", violation })}>
-            Waive
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setDialog({ type: "adjust", violation })}>
-            Adjust
-          </Button>
-        </div>
+        <AdminRowActions
+          actions={[
+            {
+              disabled: violation.isWaived,
+              label: "Waive",
+              onSelect: () => setDialog({ type: "waive", violation }),
+              tone: "primary"
+            },
+            { label: "Adjust points", onSelect: () => setDialog({ type: "adjust", violation }) }
+          ]}
+        />
       )
     }
   ];
@@ -100,12 +92,9 @@ export function ViolationManagementPage() {
     <div className="admin-page">
       <AdminNavigation />
       <AdminPageHeader title="Violation management" description="Theo dõi vi phạm, miễn vi phạm và điều chỉnh điểm có audit." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
-      <div className="admin-filter-bar">
-        <input placeholder="Tìm user, booking, loại vi phạm..." value={keyword} onChange={(event) => setKeyword(event.target.value)} />
-      </div>
       {isLoading ? <LoadingState message="Đang tải violations..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được violations" onAction={() => setReloadKey((value) => value + 1)} /> : null}
-      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(violation) => violation.id} rows={filtered} /> : null}
+      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(violation) => violation.id} rows={violations} /> : null}
       {dialog?.type === "waive" ? (
         <AdminConfirmDialog
           message="Miễn vi phạm sẽ trừ điểm penalty khỏi user và ghi audit log."

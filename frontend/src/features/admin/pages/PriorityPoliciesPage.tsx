@@ -10,6 +10,7 @@ import { entityStatusLabel, getStatusLabel } from "../../../utils/status-label";
 import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
+import { AdminRowActions } from "../components/AdminRowActions";
 import { AdminTextFormDialog } from "../components/AdminTextFormDialog";
 import { listPriorityPolicies, updatePriorityPolicy } from "../services/adminService";
 import type { AdminPriorityPolicy } from "../types/admin.types";
@@ -69,7 +70,17 @@ export function PriorityPoliciesPage() {
       key: "status",
       render: (policy) => <Badge tone={policy.status === "ACTIVE" ? "success" : "neutral"}>{getStatusLabel(entityStatusLabel, policy.status ?? "ACTIVE")}</Badge>
     },
-    { header: "Thao tác", key: "actions", render: (policy) => <Button size="sm" onClick={() => setActivePolicy(policy)}>Sửa</Button> }
+    {
+      header: "Thao tác",
+      key: "actions",
+      render: (policy) => (
+        <AdminRowActions
+          actions={[
+            { label: "Sửa", onSelect: () => setActivePolicy(policy), tone: "primary" }
+          ]}
+        />
+      )
+    }
   ];
 
   return (

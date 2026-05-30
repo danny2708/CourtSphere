@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Badge } from "../../../components/common/Badge";
 import { Button } from "../../../components/common/Button";
@@ -10,6 +10,7 @@ import { getStatusLabel, refundStatusLabel } from "../../../utils/status-label";
 import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
+import { AdminRowActions } from "../components/AdminRowActions";
 import { AdminSelectDialog } from "../components/AdminSelectDialog";
 import { listRefunds, retryRefund } from "../services/adminService";
 import type { AdminRefund, RefundStatus } from "../types/admin.types";
@@ -28,7 +29,6 @@ export function RefundManagementPage() {
   const [activeRefund, setActiveRefund] = useState<AdminRefund | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [keyword, setKeyword] = useState("");
   const [refunds, setRefunds] = useState<AdminRefund[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -51,17 +51,6 @@ export function RefundManagementPage() {
       isMounted = false;
     };
   }, [reloadKey]);
-
-  const filtered = useMemo(() => {
-    const normalized = keyword.trim().toLowerCase();
-    return normalized
-      ? refunds.filter((refund) =>
-          [refund.id, refund.bookingOrder?.bookingCode, refund.refundStatus, refund.refundReason]
-            .filter(Boolean)
-            .some((value) => value!.toLowerCase().includes(normalized))
-        )
-      : refunds;
-  }, [keyword, refunds]);
 
   async function handleRetry(mockResult: RetryResult, reason: string) {
     if (!activeRefund) return;
@@ -89,13 +78,16 @@ export function RefundManagementPage() {
       header: "Thao tác",
       key: "actions",
       render: (refund) => (
-        <Button
-          disabled={!["REQUESTED", "FAILED", "MANUAL_REVIEW"].includes(refund.refundStatus)}
-          size="sm"
-          onClick={() => setActiveRefund(refund)}
-        >
-          Retry
-        </Button>
+        <AdminRowActions
+          actions={[
+            {
+              disabled: !["REQUESTED", "FAILED", "MANUAL_REVIEW"].includes(refund.refundStatus),
+              label: "Retry refund",
+              onSelect: () => setActiveRefund(refund),
+              tone: "primary"
+            }
+          ]}
+        />
       )
     }
   ];
@@ -104,12 +96,9 @@ export function RefundManagementPage() {
     <div className="admin-page">
       <AdminNavigation />
       <AdminPageHeader title="Refund management" description="Theo dõi và retry các refund sandbox." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
-      <div className="admin-filter-bar">
-        <input placeholder="Tìm refund, booking code..." value={keyword} onChange={(event) => setKeyword(event.target.value)} />
-      </div>
       {isLoading ? <LoadingState message="Đang tải refunds..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được refunds" onAction={() => setReloadKey((value) => value + 1)} /> : null}
-      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(refund) => refund.id} rows={filtered} /> : null}
+      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(refund) => refund.id} rows={refunds} /> : null}
       {activeRefund ? (
         <AdminSelectDialog
           label="Kết quả retry"
