@@ -174,6 +174,23 @@ describe("courts routes", () => {
     expect(createOperatingHour).not.toHaveBeenCalled();
   });
 
+  it("allows FIELD_MANAGER to create operating hours", async () => {
+    const { app, createOperatingHour } = createMockController();
+
+    const response = await request(app)
+      .post(`/api/admin/courts/${courtId}/operating-hours`)
+      .set("Authorization", bearerToken(["FIELD_MANAGER"]))
+      .send({
+        weekday: 1,
+        openTime: "07:00",
+        closeTime: "23:00",
+        slotDurationMinutes: 60
+      });
+
+    expect(response.status).toBe(201);
+    expect(createOperatingHour).toHaveBeenCalledOnce();
+  });
+
   it("rejects pricing rules with negative prices", async () => {
     const { app, createPricingRule } = createMockController();
 

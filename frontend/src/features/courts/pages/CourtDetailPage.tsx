@@ -11,13 +11,14 @@ import { CourtStatusBadge } from "../../../components/courts/CourtStatusBadge";
 import { CourtTagBadge } from "../../../components/courts/CourtTagBadge";
 import { FavoriteButton } from "../../../components/courts/FavoriteButton";
 import { ShareButton } from "../../../components/courts/ShareButton";
-import { buildBookingCreatePath, ROUTE_PATHS } from "../../../routes/route-paths";
+import { buildBookingCreateSelectionPath, ROUTE_PATHS } from "../../../routes/route-paths";
 import { useToastStore } from "../../../stores/toast.store";
 import { getErrorMessage } from "../../../utils/format-error";
 import { AvailabilityDatePicker } from "../components/AvailabilityDatePicker";
-import { AvailabilitySlotPicker } from "../components/AvailabilitySlotPicker";
+import { AvailabilityWeekGrid } from "../components/AvailabilityWeekGrid";
 import { CourtPolicyPanel } from "../components/CourtPolicyPanel";
 import { CourtPriceSummary } from "../components/CourtPriceSummary";
+import { saveBookingSelection } from "../../bookings/utils/bookingSelectionStorage";
 import { getCourtAvailability } from "../services/availabilityService";
 import { getCourtById } from "../services/courtService";
 import { joinWaitlist } from "../services/waitlistService";
@@ -29,6 +30,11 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   currency: "VND",
   maximumFractionDigits: 0,
   style: "currency"
+});
+
+const shortDateFormatter = new Intl.DateTimeFormat("vi-VN", {
+  day: "2-digit",
+  month: "2-digit"
 });
 
 function getAvailabilityText(court: CourtDetailViewModel): string {
@@ -51,13 +57,34 @@ function isPastDate(date: string, minDate: string): boolean {
   return date < minDate;
 }
 
+function parseDateInput(date: string): Date {
+  return new Date(`${date}T00:00:00`);
+}
+
+function addDays(date: Date, days: number): Date {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate;
+}
+
+function getWeekStartDate(date: string): string {
+  const parsedDate = parseDateInput(date);
+  const day = parsedDate.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  return toDateInputValue(addDays(parsedDate, diffToMonday));
+}
+
+function getWeekDates(weekStartDate: string): string[] {
+  const weekStart = parseDateInput(weekStartDate);
+  return Array.from({ length: 7 }, (_, index) => toDateInputValue(addDays(weekStart, index)));
+}
+
 export function CourtDetailPage() {
   const navigate = useNavigate();
   const { courtId } = useParams<{ courtId: string }>();
   const { addToast } = useToastStore();
   const todayDate = useMemo(() => toDateInputValue(new Date()), []);
   const defaultAvailabilityDate = useMemo(() => getDefaultAvailabilityDate(), []);
-  const [availability, setAvailability] = useState<CourtAvailabilityViewModel | null>(null);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [availabilityReloadKey, setAvailabilityReloadKey] = useState(0);
   const [court, setCourt] = useState<CourtDetailViewModel | null>(null);
@@ -68,7 +95,11 @@ export function CourtDetailPage() {
   const [joiningWaitlistSlotId, setJoiningWaitlistSlotId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [selectedDate, setSelectedDate] = useState(defaultAvailabilityDate);
-  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const [selectedSlotIds, setSelectedSlotIds] = useState<string[]>([]);
+  const [visibleEndTime, setVisibleEndTime] = useState("23:00");
+  const [visibleStartTime, setVisibleStartTime] = useState("07:00");
+  const [weekAvailabilities, setWeekAvailabilities] = useState<CourtAvailabilityViewModel[]>([]);
+  const weekStartDate = useMemo(() => getWeekStartDate(selectedDate), [selectedDate]);
 
   useEffect(() => {
     let isMounted = true;
@@ -103,39 +134,41 @@ export function CourtDetailPage() {
   useEffect(() => {
     let isMounted = true;
 
-    async function loadAvailability() {
+    async function loadAvailabilityWeek() {
       if (!court) {
         return;
       }
 
       if (isPastDate(selectedDate, todayDate)) {
         setDateError("Vui lòng chọn một ngày hợp lệ.");
-        setAvailability(null);
+        setWeekAvailabilities([]);
         setAvailabilityError(null);
         setIsLoadingAvailability(false);
-        setSelectedSlotId(null);
+        setSelectedSlotIds([]);
         return;
       }
 
       setDateError(null);
       setAvailabilityError(null);
       setIsLoadingAvailability(true);
-      setSelectedSlotId(null);
+      setSelectedSlotIds([]);
 
       try {
-        const loadedAvailability = await getCourtAvailability({ court, date: selectedDate });
+        const loadedAvailabilities = await Promise.all(
+          getWeekDates(weekStartDate).map((date) => getCourtAvailability({ court, date }))
+        );
 
         if (!isMounted) {
           return;
         }
 
-        setAvailability(loadedAvailability);
+        setWeekAvailabilities(loadedAvailabilities);
       } catch (error) {
         if (!isMounted) {
           return;
         }
 
-        setAvailability(null);
+        setWeekAvailabilities([]);
         setAvailabilityError(getErrorMessage(error));
       } finally {
         if (isMounted) {
@@ -144,18 +177,23 @@ export function CourtDetailPage() {
       }
     }
 
-    void loadAvailability();
+    void loadAvailabilityWeek();
 
     return () => {
       isMounted = false;
     };
-  }, [availabilityReloadKey, court, selectedDate, todayDate]);
+  }, [availabilityReloadKey, court, selectedDate, todayDate, weekStartDate]);
 
-  const selectedSlot = useMemo(
-    () => availability?.slots.find((slot) => slot.id === selectedSlotId) ?? null,
-    [availability?.slots, selectedSlotId]
+  const allWeekSlots = useMemo(
+    () => weekAvailabilities.flatMap((availability) => availability.slots),
+    [weekAvailabilities]
   );
-  const availableSlotCount = availability?.slots.filter((slot) => slot.isAvailable).length ?? 0;
+  const selectedSlots = useMemo(
+    () => allWeekSlots.filter((slot) => selectedSlotIds.includes(slot.id)),
+    [allWeekSlots, selectedSlotIds]
+  );
+  const availabilityPolicy = weekAvailabilities[0]?.policy;
+  const availableSlotCount = allWeekSlots.filter((slot) => slot.isAvailable).length;
 
   if (isLoading) {
     return <LoadingState message="Đang tải chi tiết sân..." title="Chi tiết sân" />;
@@ -173,7 +211,7 @@ export function CourtDetailPage() {
   }
 
   const canBook = court.status === "ACTIVE";
-  const canContinueBooking = canBook && Boolean(selectedSlot?.isAvailable);
+  const canContinueBooking = canBook && selectedSlots.length > 0;
 
   const handleSelectSlot = (slot: AvailabilitySlotViewModel) => {
     if (!slot.isAvailable) {
@@ -185,11 +223,13 @@ export function CourtDetailPage() {
       return;
     }
 
-    setSelectedSlotId(slot.id);
+    setSelectedSlotIds((currentIds) =>
+      currentIds.includes(slot.id) ? currentIds.filter((slotId) => slotId !== slot.id) : [...currentIds, slot.id]
+    );
   };
 
   const handleJoinWaitlist = async (slot: AvailabilitySlotViewModel) => {
-    if (!availability?.policy.canJoinWaitlist) {
+    if (!availabilityPolicy?.canJoinWaitlist) {
       addToast({
         type: "warning",
         title: "Không thể tham gia hàng chờ",
@@ -232,11 +272,11 @@ export function CourtDetailPage() {
       return;
     }
 
-    if (!selectedSlot) {
+    if (selectedSlots.length === 0) {
       addToast({
         type: "info",
         title: "Chọn khung giờ",
-        message: "Vui lòng chọn một khung giờ còn trống trước khi đặt lịch."
+        message: "Vui lòng chọn ít nhất một khung giờ còn trống trước khi đặt lịch."
       });
       return;
     }
@@ -246,12 +286,8 @@ export function CourtDetailPage() {
       title: "Chuẩn bị đặt lịch",
       message: "Chuyển sang bước tạo giữ chỗ."
     });
-    navigate(buildBookingCreatePath({
-      courtId: court.id,
-      date: selectedDate,
-      startDatetime: selectedSlot.startDatetime,
-      endDatetime: selectedSlot.endDatetime
-    }));
+    const selectionId = saveBookingSelection(court.id, selectedSlots);
+    navigate(buildBookingCreateSelectionPath({ courtId: court.id, selectionId }));
   };
 
   return (
@@ -336,15 +372,25 @@ export function CourtDetailPage() {
         <div className="availability-header">
           <div>
             <p className="eyebrow">Lịch trống</p>
-            <h2>Chọn ngày và khung giờ</h2>
-            <p>Slot còn trống có thể chọn để tạo giữ chỗ và chuyển sang bước thanh toán.</p>
+            <h2>Chọn tuần và khung giờ</h2>
+            <p>Ô xanh có thể chọn nhiều slot. Ô đóng cửa thể hiện thời gian sân không hoạt động theo cấu hình thật.</p>
           </div>
-          <AvailabilityDatePicker
-            error={dateError}
-            minDate={todayDate}
-            value={selectedDate}
-            onChange={setSelectedDate}
-          />
+          <div className="availability-controls">
+            <AvailabilityDatePicker
+              error={dateError}
+              minDate={todayDate}
+              value={selectedDate}
+              onChange={setSelectedDate}
+            />
+            <label className="availability-time-control">
+              <span>Từ giờ</span>
+              <input type="time" value={visibleStartTime} onChange={(event) => setVisibleStartTime(event.target.value)} />
+            </label>
+            <label className="availability-time-control">
+              <span>Đến giờ</span>
+              <input type="time" value={visibleEndTime} onChange={(event) => setVisibleEndTime(event.target.value)} />
+            </label>
+          </div>
         </div>
 
         {!canBook ? (
@@ -363,12 +409,16 @@ export function CourtDetailPage() {
             title="Không tải được lịch trống"
             onAction={() => setAvailabilityReloadKey((key) => key + 1)}
           />
-        ) : availability ? (
-          <AvailabilitySlotPicker
-            canJoinWaitlist={canBook && Boolean(availability.policy.canJoinWaitlist)}
+        ) : weekAvailabilities.length ? (
+          <AvailabilityWeekGrid
+            availabilities={weekAvailabilities}
+            canJoinWaitlist={canBook && Boolean(availabilityPolicy?.canJoinWaitlist)}
             joiningWaitlistSlotId={joiningWaitlistSlotId}
-            selectedSlotId={selectedSlotId}
-            slots={availability.slots}
+            selectedDate={selectedDate}
+            selectedSlotIds={selectedSlotIds}
+            visibleEndTime={visibleEndTime}
+            visibleStartTime={visibleStartTime}
+            weekStartDate={weekStartDate}
             onJoinWaitlist={handleJoinWaitlist}
             onSelectSlot={handleSelectSlot}
           />
@@ -377,7 +427,13 @@ export function CourtDetailPage() {
         <div className="booking-intent">
           <div>
             <span>Khung giờ đã chọn</span>
-            <strong>{selectedSlot ? `${selectedSlot.startTimeText} - ${selectedSlot.endTimeText}` : "Chưa chọn khung giờ"}</strong>
+            <strong>
+              {selectedSlots.length
+                ? `${selectedSlots.length} slot: ${selectedSlots
+                    .map((slot) => `${shortDateFormatter.format(new Date(slot.startDatetime))} ${slot.startTimeText}-${slot.endTimeText}`)
+                    .join(", ")}`
+                : "Chưa chọn khung giờ"}
+            </strong>
           </div>
           <Button disabled={!canContinueBooking} onClick={handleBookingIntent}>
             Đặt lịch
@@ -444,13 +500,13 @@ export function CourtDetailPage() {
           </div>
         </Card>
 
-        {availability ? (
+        {weekAvailabilities.length ? (
           <>
             <CourtPriceSummary
               availableSlotCount={availableSlotCount}
-              selectedSlot={selectedSlot}
+              selectedSlots={selectedSlots}
             />
-            <CourtPolicyPanel policy={availability.policy} />
+            {availabilityPolicy ? <CourtPolicyPanel policy={availabilityPolicy} /> : null}
           </>
         ) : null}
       </div>

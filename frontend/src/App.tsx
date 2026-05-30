@@ -69,6 +69,7 @@ export default function App() {
               <Route path={ROUTE_PATHS.managerInUse} element={<ManagerInUsePage />} />
               <Route path={ROUTE_PATHS.managerNoShow} element={<ManagerNoShowPage />} />
               <Route path={ROUTE_PATHS.managerCourts} element={<ManagerCourtStatusPage />} />
+              <Route path={ROUTE_PATHS.managerOperatingHours} element={<OperatingHoursPage variant="manager" />} />
               <Route path={ROUTE_PATHS.managerHistory} element={<ManagerUsageHistoryPage />} />
             </Route>
 

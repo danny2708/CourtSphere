@@ -1291,6 +1291,35 @@ a {
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
 }
 
+.availability-controls {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.availability-time-control {
+  min-width: 132px;
+  display: grid;
+  gap: 8px;
+}
+
+.availability-time-control span {
+  color: var(--color-text-primary);
+  font-weight: 850;
+}
+
+.availability-time-control input {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  color: var(--color-text-primary);
+  background: var(--color-background);
+  font-weight: 750;
+}
+
 .availability-date-picker small,
 .availability-slot p {
   color: var(--color-text-secondary);
@@ -1388,6 +1417,220 @@ a {
 .availability-slot__button {
   width: 100%;
   min-height: 38px;
+}
+
+.availability-week-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+}
+
+.availability-week-grid {
+  min-width: 1040px;
+  display: grid;
+  grid-template-columns: 92px repeat(7, minmax(126px, 1fr));
+}
+
+.availability-week-mobile {
+  display: none;
+}
+
+.availability-week-row {
+  display: contents;
+}
+
+.availability-week-head,
+.availability-week-time,
+.availability-week-cell {
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.availability-week-head {
+  min-height: 58px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 10px;
+  background: #f8fafc;
+  color: var(--color-text-primary);
+}
+
+.availability-week-head--time,
+.availability-week-time {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.availability-week-head strong,
+.availability-week-head span {
+  display: block;
+}
+
+.availability-week-head span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.availability-week-time {
+  min-height: 92px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12px;
+  background: #ffffff;
+}
+
+.availability-week-cell {
+  min-height: 92px;
+  display: grid;
+  gap: 8px;
+  align-content: stretch;
+  padding: 8px;
+  background: #ffffff;
+}
+
+.availability-week-cell--available {
+  background: #ecfdf5;
+}
+
+.availability-week-cell--selected {
+  border-color: rgba(14, 165, 233, 0.52);
+  background: #e0f2fe;
+  box-shadow: inset 0 0 0 2px rgba(14, 165, 233, 0.32);
+}
+
+.availability-week-cell--pending-payment,
+.availability-week-cell--payment-processing {
+  background: #fffbeb;
+}
+
+.availability-week-cell--confirmed,
+.availability-week-cell--in-use {
+  background: #f8fafc;
+}
+
+.availability-week-cell--unavailable {
+  background: #fef2f2;
+}
+
+.availability-week-cell--closed {
+  align-content: center;
+  justify-items: center;
+  color: var(--color-text-secondary);
+  background: #f8fafc;
+  text-align: center;
+}
+
+.availability-week-cell--closed strong {
+  color: var(--color-text-primary);
+  font-size: 13px;
+}
+
+.availability-week-cell--closed span {
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.availability-week-cell__time {
+  color: var(--color-primary-dark);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.availability-week-slot {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-primary);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.availability-week-slot:disabled {
+  cursor: default;
+}
+
+.availability-week-slot__meta {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.availability-week-slot__meta svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--color-primary-dark);
+}
+
+.availability-week-slot__meta strong {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.availability-week-slot__price {
+  color: var(--color-primary-dark);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.availability-week-waitlist {
+  min-height: 32px;
+  width: 100%;
+  font-size: 12px;
+}
+
+.availability-week-empty {
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  color: var(--color-text-secondary);
+  background: #f8fafc;
+  font-weight: 800;
+}
+
+.availability-week-mobile-day {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
+}
+
+.availability-week-mobile-day__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border);
+  background: #f8fafc;
+}
+
+.availability-week-mobile-day__header strong {
+  font-size: 15px;
+}
+
+.availability-week-mobile-day__header span {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.availability-week-mobile-day__slots {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
 }
 
 .booking-intent {
@@ -2674,6 +2917,10 @@ a {
     flex-direction: column;
   }
 
+  .availability-controls {
+    justify-content: flex-start;
+  }
+
   .availability-date-picker {
     min-width: 0;
   }
@@ -2784,6 +3031,70 @@ a {
 
   .availability-slot-grid {
     grid-template-columns: 1fr;
+  }
+
+  .availability-controls,
+  .availability-time-control {
+    width: 100%;
+  }
+
+  .availability-time-control input {
+    width: 100%;
+  }
+
+  .availability-week-wrap {
+    display: grid;
+    gap: 12px;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  .availability-week-grid {
+    display: none;
+  }
+
+  .availability-week-mobile {
+    display: grid;
+    gap: 12px;
+  }
+
+  .availability-week-mobile .availability-week-cell {
+    min-height: 0;
+    padding: 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-button);
+  }
+
+  .availability-week-mobile .availability-week-cell--selected {
+    border-color: rgba(14, 165, 233, 0.52);
+  }
+
+  .availability-week-mobile .availability-week-cell--closed {
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+    align-items: center;
+    gap: 2px 8px;
+    text-align: left;
+  }
+
+  .availability-week-mobile .availability-week-cell--closed svg {
+    grid-row: 1 / 4;
+  }
+
+  .availability-week-mobile .availability-week-slot {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 6px 10px;
+  }
+
+  .availability-week-mobile .availability-week-slot__price {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .availability-week-mobile .availability-week-slot .ui-badge {
+    grid-column: 1 / -1;
   }
 
   .booking-intent,

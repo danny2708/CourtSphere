@@ -85,28 +85,28 @@ export function createCourtsRouter(controller: CourtsController = courtsControll
   router.get(
     "/admin/courts/:courtId/operating-hours",
     requireAuth,
-    requireRole(["ADMIN"]),
+    requireRole(["FIELD_MANAGER", "ADMIN"]),
     validateRequest({ params: courtIdParamSchema }),
     asyncHandler(controller.listOperatingHours)
   );
   router.post(
     "/admin/courts/:courtId/operating-hours",
     requireAuth,
-    requireRole(["ADMIN"]),
+    requireRole(["FIELD_MANAGER", "ADMIN"]),
     validateRequest({ params: courtIdParamSchema, body: createOperatingHourSchema }),
     asyncHandler(controller.createOperatingHour)
   );
   router.put(
     "/admin/operating-hours/:id",
     requireAuth,
-    requireRole(["ADMIN"]),
+    requireRole(["FIELD_MANAGER", "ADMIN"]),
     validateRequest({ params: idParamSchema, body: updateOperatingHourSchema }),
     asyncHandler(controller.updateOperatingHour)
   );
   router.patch(
     "/admin/operating-hours/:id/status",
     requireAuth,
-    requireRole(["ADMIN"]),
+    requireRole(["FIELD_MANAGER", "ADMIN"]),
     validateRequest({ params: idParamSchema, body: updateEntityStatusSchema }),
     asyncHandler(controller.updateOperatingHourStatus)
   );

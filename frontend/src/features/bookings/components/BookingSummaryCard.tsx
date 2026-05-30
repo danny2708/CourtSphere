@@ -17,12 +17,19 @@ const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
 
 type BookingSummaryCardProps = {
   court: CourtDetailViewModel | null;
-  slot: AvailabilitySlotViewModel | null;
+  slot?: AvailabilitySlotViewModel | null;
+  slots?: AvailabilitySlotViewModel[];
   policy?: AvailabilityPolicyViewModel;
 };
 
-export function BookingSummaryCard({ court, policy, slot }: BookingSummaryCardProps) {
-  const startDate = slot ? new Date(slot.startDatetime) : null;
+export function BookingSummaryCard({ court, policy, slot = null, slots }: BookingSummaryCardProps) {
+  const selectedSlots = slots ?? (slot ? [slot] : []);
+  const firstSlot = selectedSlots[0] ?? null;
+  const startDate = firstSlot ? new Date(firstSlot.startDatetime) : null;
+  const totalAmount = selectedSlots.reduce((sum, currentSlot) => sum + (currentSlot.priceAmount ?? 0), 0);
+  const selectedDateText = selectedSlots.length
+    ? Array.from(new Set(selectedSlots.map((currentSlot) => dateFormatter.format(new Date(currentSlot.startDatetime))))).join(", ")
+    : "Chưa chọn";
 
   return (
     <Card as="section" className="booking-summary-card">
@@ -32,15 +39,25 @@ export function BookingSummaryCard({ court, policy, slot }: BookingSummaryCardPr
       <dl>
         <div>
           <dt>Ngày</dt>
-          <dd>{startDate ? dateFormatter.format(startDate) : "Chưa chọn"}</dd>
+          <dd>{startDate ? selectedDateText : "Chưa chọn"}</dd>
         </div>
         <div>
           <dt>Khung giờ</dt>
-          <dd>{slot ? `${slot.startTimeText} - ${slot.endTimeText}` : "Chưa chọn"}</dd>
+          <dd>
+            {selectedSlots.length
+              ? selectedSlots
+                  .map((currentSlot) => `${dateFormatter.format(new Date(currentSlot.startDatetime))} ${currentSlot.startTimeText} - ${currentSlot.endTimeText}`)
+                  .join(", ")
+              : "Chưa chọn"}
+          </dd>
         </div>
         <div>
           <dt>Giá</dt>
-          <dd>{slot?.priceText ?? (slot?.priceAmount ? currencyFormatter.format(slot.priceAmount) : "Chưa có giá")}</dd>
+          <dd>{selectedSlots.length ? currencyFormatter.format(totalAmount) : "Chưa có giá"}</dd>
+        </div>
+        <div>
+          <dt>Số slot</dt>
+          <dd>{selectedSlots.length}</dd>
         </div>
         <div>
           <dt>Giữ chỗ thanh toán</dt>

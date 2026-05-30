@@ -16,6 +16,7 @@ export const ROUTE_PATHS = {
   managerInUse: "/manager/in-use",
   managerNoShow: "/manager/no-show",
   managerCourts: "/manager/courts",
+  managerOperatingHours: "/manager/operating-hours",
   managerHistory: "/manager/history",
   adminHome: "/admin",
   adminDashboard: "/admin/dashboard",
@@ -63,6 +64,18 @@ export function buildBookingCreatePath(input: {
     date: input.date,
     start: input.startDatetime,
     end: input.endDatetime
+  });
+
+  return `${ROUTE_PATHS.bookingCreate}?${params.toString()}`;
+}
+
+export function buildBookingCreateSelectionPath(input: {
+  courtId: string;
+  selectionId: string;
+}): string {
+  const params = new URLSearchParams({
+    courtId: input.courtId,
+    selectionId: input.selectionId
   });
 
   return `${ROUTE_PATHS.bookingCreate}?${params.toString()}`;
