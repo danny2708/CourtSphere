@@ -13,6 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { RefundsService } from "../refunds/refunds.service";
 import { RulesRepository } from "../rules/rules.repository";
 import type { ViolationsService } from "../violations/violations.service";
+import type { WaitlistService } from "../waitlist/waitlist.service";
 import { BookingsService } from "./bookings.service";
 
 const userId = "00000000-0000-4000-8000-000000000801";
@@ -171,8 +172,8 @@ function buildOrder(overrides: Record<string, unknown> = {}) {
         bookingItemId,
         bookingOrderId,
         courtId,
-        startDatetime: new Date("2026-05-21T08:00:00.000Z"),
-        endDatetime: new Date("2026-05-21T09:00:00.000Z"),
+        startDatetime: new Date("2026-05-21T01:00:00.000Z"),
+        endDatetime: new Date("2026-05-21T02:00:00.000Z"),
         unitPrice: new Prisma.Decimal(50000),
         amount: new Prisma.Decimal(50000),
         bookingStatus: BookingStatus.PENDING_PAYMENT,
@@ -261,8 +262,13 @@ function createService(
     rules?: RulesRepository;
     refunds?: RefundsService;
     violations?: ViolationsService;
+    waitlist?: WaitlistService;
   } = {}
 ) {
+  const waitlist = overrides.waitlist ?? ({
+    notifyNextForSlotInTransaction: vi.fn().mockResolvedValue(null)
+  } as unknown as WaitlistService);
+
   return new BookingsService(
     {
       $transaction: vi.fn((callback) => callback(tx))
@@ -273,7 +279,9 @@ function createService(
     overrides.refunds,
     overrides.violations,
     () => now,
-    () => "BK-20260520-TEST01"
+    () => "BK-20260520-TEST01",
+    undefined,
+    waitlist
   );
 }
 
@@ -286,8 +294,8 @@ describe("BookingsService", () => {
       items: [
         {
           courtId,
-          startDatetime: new Date("2026-05-21T08:00:00.000Z"),
-          endDatetime: new Date("2026-05-21T09:00:00.000Z")
+          startDatetime: new Date("2026-05-21T01:00:00.000Z"),
+          endDatetime: new Date("2026-05-21T02:00:00.000Z")
         }
       ],
       note: "Class training"
@@ -372,13 +380,13 @@ describe("BookingsService", () => {
       items: [
         {
           courtId,
-          startDatetime: new Date("2026-05-21T08:00:00.000Z"),
-          endDatetime: new Date("2026-05-21T09:00:00.000Z")
+          startDatetime: new Date("2026-05-21T01:00:00.000Z"),
+          endDatetime: new Date("2026-05-21T02:00:00.000Z")
         },
         {
           courtId: secondCourtId,
-          startDatetime: new Date("2026-05-21T09:00:00.000Z"),
-          endDatetime: new Date("2026-05-21T10:00:00.000Z")
+          startDatetime: new Date("2026-05-21T02:00:00.000Z"),
+          endDatetime: new Date("2026-05-21T03:00:00.000Z")
         }
       ]
     });
@@ -407,8 +415,8 @@ describe("BookingsService", () => {
           bookingItemId: "00000000-0000-4000-8000-000000000899",
           bookingOrderId: "00000000-0000-4000-8000-000000000898",
           bookingStatus: BookingStatus.CONFIRMED,
-          startDatetime: new Date("2026-05-21T09:30:00.000Z"),
-          endDatetime: new Date("2026-05-21T10:30:00.000Z"),
+          startDatetime: new Date("2026-05-21T02:30:00.000Z"),
+          endDatetime: new Date("2026-05-21T03:30:00.000Z"),
           bookingOrder: {
             holdExpiresAt: null
           }
@@ -422,13 +430,13 @@ describe("BookingsService", () => {
         items: [
           {
             courtId,
-            startDatetime: new Date("2026-05-21T08:00:00.000Z"),
-            endDatetime: new Date("2026-05-21T09:00:00.000Z")
+            startDatetime: new Date("2026-05-21T01:00:00.000Z"),
+            endDatetime: new Date("2026-05-21T02:00:00.000Z")
           },
           {
             courtId: secondCourtId,
-            startDatetime: new Date("2026-05-21T09:00:00.000Z"),
-            endDatetime: new Date("2026-05-21T10:00:00.000Z")
+            startDatetime: new Date("2026-05-21T02:00:00.000Z"),
+            endDatetime: new Date("2026-05-21T03:00:00.000Z")
           }
         ]
       })
@@ -504,7 +512,10 @@ describe("BookingsService", () => {
     const rules = {
       getEffectivePolicy: vi.fn().mockResolvedValue(effectivePolicy())
     } as unknown as RulesRepository;
-    const service = createService(tx, { rules });
+    const waitlist = {
+      notifyNextForSlotInTransaction: vi.fn().mockResolvedValue(null)
+    } as unknown as WaitlistService;
+    const service = createService(tx, { rules, waitlist });
 
     const order = await service.cancelMyBooking(userId, bookingOrderId, {
       reason: "Changed plan"
@@ -537,6 +548,15 @@ describe("BookingsService", () => {
           actionType: "USER_CANCEL_BOOKING_ORDER"
         })
       })
+    );
+    expect(waitlist.notifyNextForSlotInTransaction).toHaveBeenCalledWith(
+      tx,
+      {
+        courtId,
+        startDatetime: currentOrder.items[0].startDatetime,
+        endDatetime: currentOrder.items[0].endDatetime
+      },
+      now
     );
   });
 

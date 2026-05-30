@@ -19,7 +19,8 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
 const timeFormatter = new Intl.DateTimeFormat("vi-VN", {
   hour: "2-digit",
   hour12: false,
-  minute: "2-digit"
+  minute: "2-digit",
+  timeZone: "Asia/Ho_Chi_Minh"
 });
 
 const defaultPolicy: AvailabilityPolicyViewModel = {

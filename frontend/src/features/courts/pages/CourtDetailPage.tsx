@@ -132,6 +132,16 @@ export function CourtDetailPage() {
   }, [courtId]);
 
   useEffect(() => {
+    if (court?.openTime) {
+      setVisibleStartTime(court.openTime);
+    }
+
+    if (court?.closeTime) {
+      setVisibleEndTime(court.closeTime);
+    }
+  }, [court?.closeTime, court?.openTime]);
+
+  useEffect(() => {
     let isMounted = true;
 
     async function loadAvailabilityWeek() {

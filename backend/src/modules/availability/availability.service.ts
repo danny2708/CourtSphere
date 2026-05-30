@@ -12,6 +12,13 @@ import {
   RulesRepository,
   rulesRepository
 } from "../rules/rules.repository";
+import {
+  combineVietnamDateAndTime,
+  getVietnamIsoWeekday,
+  startOfVietnamDay,
+  vietnamMinutesFromDate,
+  vietnamWallTimeToUtcDate
+} from "../../utils/vietnam-time";
 import type { EffectiveBookingPolicy } from "../rules/rules.types";
 import type {
   AvailabilityQuery,
@@ -43,33 +50,12 @@ type CourtWithAvailabilityRelations = Prisma.CourtGetPayload<{
 }>;
 type PricingRule = CourtWithAvailabilityRelations["pricingRules"][number];
 
-function parseDateOnly(value: string): Date {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
-}
-
 function addMinutes(date: Date, minutes: number): Date {
   return new Date(date.getTime() + minutes * 60_000);
 }
 
 function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60_000);
-}
-
-function startOfUtcDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
-
-function getIsoWeekday(date: Date): number {
-  const day = date.getUTCDay();
-  return day === 0 ? 7 : day;
-}
-
-function combineDateAndTime(date: Date, time: string): Date {
-  const [hours, minutes] = time.split(":").map(Number);
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), hours, minutes)
-  );
 }
 
 function minutesFromTime(time: string): number {
@@ -102,8 +88,8 @@ export class AvailabilityService {
   ) {}
 
   async getCourtAvailability(courtId: string, viewerUserId: string, query: AvailabilityQuery) {
-    const requestedDate = parseDateOnly(query.date);
-    const weekday = getIsoWeekday(requestedDate);
+    const requestedDate = vietnamWallTimeToUtcDate(query.date);
+    const weekday = getVietnamIsoWeekday(requestedDate);
     const includePricing = query.includePricing ?? true;
     const now = this.nowProvider();
 
@@ -242,8 +228,8 @@ export class AvailabilityService {
     operatingHour: CourtWithAvailabilityRelations["operatingHours"][number],
     durationMinutes: number
   ): SlotWindow[] {
-    const openTime = combineDateAndTime(date, operatingHour.openTime);
-    const closeTime = combineDateAndTime(date, operatingHour.closeTime);
+    const openTime = combineVietnamDateAndTime(date, operatingHour.openTime);
+    const closeTime = combineVietnamDateAndTime(date, operatingHour.closeTime);
     const slots: SlotWindow[] = [];
 
     for (
@@ -359,8 +345,8 @@ export class AvailabilityService {
     userPriorityGroupId: string | null,
     weekday: number
   ): number | undefined {
-    const slotStartMinutes = slot.startDatetime.getUTCHours() * 60 + slot.startDatetime.getUTCMinutes();
-    const slotEndMinutes = slot.endDatetime.getUTCHours() * 60 + slot.endDatetime.getUTCMinutes();
+    const slotStartMinutes = vietnamMinutesFromDate(slot.startDatetime);
+    const slotEndMinutes = vietnamMinutesFromDate(slot.endDatetime);
 
     const matchingRules = pricingRules.filter((rule) => {
       const ruleStartMinutes = minutesFromTime(rule.startTime);
@@ -396,8 +382,8 @@ export class AvailabilityService {
       return false;
     }
 
-    const today = startOfUtcDay(now);
-    return requestedDate > addDays(today, advanceBookingDays);
+    const today = startOfVietnamDay(now);
+    return startOfVietnamDay(requestedDate) > addDays(today, advanceBookingDays);
   }
 }
 

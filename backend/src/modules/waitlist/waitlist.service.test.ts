@@ -26,8 +26,8 @@ const bookingItemId = "00000000-0000-4000-8000-000000002108";
 const conflictingBookingOrderId = "00000000-0000-4000-8000-000000002109";
 const conflictingBookingItemId = "00000000-0000-4000-8000-000000002110";
 const now = new Date("2026-05-20T00:00:00.000Z");
-const startDatetime = new Date("2026-05-21T08:00:00.000Z");
-const endDatetime = new Date("2026-05-21T09:00:00.000Z");
+const startDatetime = new Date("2026-05-21T01:00:00.000Z");
+const endDatetime = new Date("2026-05-21T02:00:00.000Z");
 
 function buildUser(overrides: Record<string, unknown> = {}) {
   return {
@@ -277,7 +277,7 @@ function createTx(input: {
       updateMany: vi.fn().mockResolvedValue({ count: input.waitlistUpdateCount ?? 1 }),
       findUniqueOrThrow: vi.fn().mockResolvedValue(
         buildWaitlistEntry({
-          status: WaitlistStatus.NOTIFIED,
+          status: WaitlistStatus.BOOKED,
           notifiedAt: now,
           expiresAt: new Date("2026-05-20T00:10:00.000Z")
         })
@@ -408,12 +408,14 @@ describe("WaitlistService", () => {
   });
 
   it("notifies next waitlist entry by priority order and registered time", async () => {
-    const candidate = buildWaitlistEntry({
+    const candidate = buildWaitlistEntryForBooking({
       status: WaitlistStatus.WAITING,
-      priorityOrder: 1
+      priorityOrder: 1,
+      notifiedAt: null,
+      expiresAt: null
     });
     const tx = createTx({ conflicts: [], notifyCandidate: candidate });
-    const { service } = createService(tx);
+    const { service, state } = createService(tx);
 
     const notified = await service.notifyNextForSlot({
       courtId,
@@ -423,7 +425,7 @@ describe("WaitlistService", () => {
 
     expect(notified).toMatchObject({
       id: waitlistEntryId,
-      status: WaitlistStatus.NOTIFIED
+      status: WaitlistStatus.BOOKED
     });
     expect(tx.waitlistEntry.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -433,15 +435,33 @@ describe("WaitlistService", () => {
     expect(tx.waitlistEntry.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          status: WaitlistStatus.NOTIFIED,
+          status: WaitlistStatus.BOOKED,
           expiresAt: new Date("2026-05-20T00:10:00.000Z")
         })
+      })
+    );
+    expect(tx.bookingOrder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId,
+          bookingStatus: BookingStatus.PENDING_PAYMENT,
+          paymentStatus: PaymentStatus.INITIATED,
+          holdExpiresAt: new Date("2026-05-20T00:10:00.000Z")
+        })
+      })
+    );
+    expect(state.recordOrderStatusHistory).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        actionType: "SYSTEM_CREATE_BOOKING_ORDER_FROM_WAITLIST_TURN",
+        newStatus: BookingStatus.PENDING_PAYMENT
       })
     );
     expect(tx.notification.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           userId,
+          bookingOrderId,
           notificationType: NotificationType.WAITLIST_NOTIFIED
         })
       })
@@ -582,9 +602,11 @@ describe("WaitlistService", () => {
       status: WaitlistStatus.NOTIFIED,
       expiresAt: new Date("2026-05-19T23:59:00.000Z")
     };
-    const nextEntry = buildWaitlistEntry({
+    const nextEntry = buildWaitlistEntryForBooking({
       waitlistEntryId: "00000000-0000-4000-8000-000000002120",
-      status: WaitlistStatus.WAITING
+      status: WaitlistStatus.WAITING,
+      notifiedAt: null,
+      expiresAt: null
     });
     const tx = createTx({ conflicts: [], notifyCandidate: nextEntry });
 

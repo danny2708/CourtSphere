@@ -2,6 +2,7 @@ import { CalendarDays, LogIn, LogOut, ShieldCheck, UserRound } from "lucide-reac
 import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import { ROUTE_PATHS } from "../../routes/route-paths";
+import { NotificationBell } from "../../features/notifications/components/NotificationBell";
 import { useAuthStore } from "../../stores/auth.store";
 import { useToastStore } from "../../stores/toast.store";
 import type { RoleName } from "../../types/auth.types";
@@ -85,6 +86,7 @@ export function AppHeader() {
         <div className="header-actions">
           {isAuthenticated && user ? (
             <>
+              <NotificationBell />
               <div className="user-chip" title={user.email}>
                 {user.roles.includes("ADMIN") ? <ShieldCheck aria-hidden="true" size={16} /> : <UserRound aria-hidden="true" size={16} />}
                 <span className="user-chip__name">{user.fullName}</span>
