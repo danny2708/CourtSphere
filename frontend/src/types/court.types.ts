@@ -25,6 +25,6 @@ export type CourtFilterState = {
   statuses: CourtStatus[];
   areas: string[];
   priceRange: [number, number];
-  timeSlot: string;
+  timeSlots: string[];
   favoritesOnly: boolean;
 };

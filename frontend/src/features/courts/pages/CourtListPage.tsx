@@ -45,6 +45,12 @@ export function CourtListPage() {
     }
   };
 
+  const areaOptions = useMemo(() => {
+    return Array.from(
+      new Set(courts.map((court) => court.area).filter((area): area is string => Boolean(area)))
+    ).sort((first, second) => first.localeCompare(second, "vi"));
+  }, [courts]);
+
   useEffect(() => {
     void loadCourts();
   }, []);
@@ -134,6 +140,7 @@ export function CourtListPage() {
       />
 
       <CourtFilterDrawer
+        areas={areaOptions}
         courtTypes={courtTypeOptions}
         filters={filters}
         isOpen={isFilterOpen}

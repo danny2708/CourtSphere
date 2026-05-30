@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 
 import { Button } from "../common/Button";
+import { SearchableMultiSelect } from "./SearchableMultiSelect";
 import { courtStatusLabel } from "../../utils/status-label";
 import type { CourtFilterState, CourtStatus } from "../../types/court.types";
 
@@ -8,6 +9,7 @@ type CourtFilterDrawerProps = {
   filters: CourtFilterState;
   isOpen: boolean;
   courtTypes: string[];
+  areas?: string[];
   onApply: (filters: CourtFilterState) => void;
   onChange: (filters: CourtFilterState) => void;
   onClear: () => void;
@@ -17,15 +19,16 @@ type CourtFilterDrawerProps = {
 const courtStatuses: CourtStatus[] = ["ACTIVE", "MAINTENANCE", "TEMP_CLOSED", "RETIRED"];
 const timeSlots = ["Sáng", "Chiều", "Tối"];
 
-function toggleString(values: string[], value: string): string[] {
-  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
-}
-
-function toggleStatus(values: CourtStatus[], value: CourtStatus): CourtStatus[] {
-  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
-}
-
-export function CourtFilterDrawer({ courtTypes, filters, isOpen, onApply, onChange, onClear, onClose }: CourtFilterDrawerProps) {
+export function CourtFilterDrawer({
+  areas = [],
+  courtTypes,
+  filters,
+  isOpen,
+  onApply,
+  onChange,
+  onClear,
+  onClose
+}: CourtFilterDrawerProps) {
   if (!isOpen) {
     return null;
   }
@@ -45,37 +48,29 @@ export function CourtFilterDrawer({ courtTypes, filters, isOpen, onApply, onChan
           </Button>
         </div>
 
-        <div className="filter-section">
-          <h3>Loại sân</h3>
-          <div className="filter-chip-grid">
-            {courtTypes.map((type) => (
-              <label key={type} className="filter-chip">
-                <input
-                  checked={filters.courtTypes.includes(type)}
-                  type="checkbox"
-                  onChange={() => onChange({ ...filters, courtTypes: toggleString(filters.courtTypes, type) })}
-                />
-                <span>{type}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+        <SearchableMultiSelect
+          label="Loại sân"
+          options={courtTypes.map((type) => ({ value: type, label: type }))}
+          values={filters.courtTypes}
+          onChange={(courtTypes) => onChange({ ...filters, courtTypes })}
+        />
 
-        <div className="filter-section">
-          <h3>Trạng thái sân</h3>
-          <div className="filter-chip-grid">
-            {courtStatuses.map((status) => (
-              <label key={status} className="filter-chip">
-                <input
-                  checked={filters.statuses.includes(status)}
-                  type="checkbox"
-                  onChange={() => onChange({ ...filters, statuses: toggleStatus(filters.statuses, status) })}
-                />
-                <span>{courtStatusLabel[status]}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+        <SearchableMultiSelect<CourtStatus>
+          label="Trạng thái sân"
+          options={courtStatuses.map((status) => ({
+            value: status,
+            label: courtStatusLabel[status]
+          }))}
+          values={filters.statuses}
+          onChange={(statuses) => onChange({ ...filters, statuses })}
+        />
+
+        <SearchableMultiSelect
+          label="Khu vực"
+          options={areas.map((area) => ({ value: area, label: area }))}
+          values={filters.areas}
+          onChange={(areas) => onChange({ ...filters, areas })}
+        />
 
         <div className="filter-section">
           <h3>Khoảng giá</h3>
@@ -103,22 +98,12 @@ export function CourtFilterDrawer({ courtTypes, filters, isOpen, onApply, onChan
           </div>
         </div>
 
-        <div className="filter-section">
-          <h3>Khung giờ</h3>
-          <div className="filter-chip-grid">
-            {timeSlots.map((slot) => (
-              <label key={slot} className="filter-chip">
-                <input
-                  checked={filters.timeSlot === slot}
-                  name="timeSlot"
-                  type="radio"
-                  onChange={() => onChange({ ...filters, timeSlot: slot })}
-                />
-                <span>{slot}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+        <SearchableMultiSelect
+          label="Khung giờ"
+          options={timeSlots.map((slot) => ({ value: slot, label: slot }))}
+          values={filters.timeSlots}
+          onChange={(timeSlots) => onChange({ ...filters, timeSlots })}
+        />
 
         <label className="filter-toggle">
           <input

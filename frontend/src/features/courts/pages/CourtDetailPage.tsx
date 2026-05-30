@@ -20,6 +20,7 @@ import { CourtPolicyPanel } from "../components/CourtPolicyPanel";
 import { CourtPriceSummary } from "../components/CourtPriceSummary";
 import { getCourtAvailability } from "../services/availabilityService";
 import { getCourtById } from "../services/courtService";
+import { joinWaitlist } from "../services/waitlistService";
 import type { AvailabilitySlotViewModel, CourtAvailabilityViewModel } from "../types/availability.types";
 import type { CourtDetailViewModel } from "../types/court-detail.types";
 import { getDefaultAvailabilityDate, toDateInputValue } from "../utils/dateUtils";
@@ -64,6 +65,7 @@ export function CourtDetailPage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [joiningWaitlistSlotId, setJoiningWaitlistSlotId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [selectedDate, setSelectedDate] = useState(defaultAvailabilityDate);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
@@ -184,6 +186,40 @@ export function CourtDetailPage() {
     }
 
     setSelectedSlotId(slot.id);
+  };
+
+  const handleJoinWaitlist = async (slot: AvailabilitySlotViewModel) => {
+    if (!availability?.policy.canJoinWaitlist) {
+      addToast({
+        type: "warning",
+        title: "Không thể tham gia hàng chờ",
+        message: "Nhóm tài khoản hiện tại chưa được phép tham gia hàng chờ."
+      });
+      return;
+    }
+
+    setJoiningWaitlistSlotId(slot.id);
+    try {
+      await joinWaitlist({
+        courtId: slot.courtId,
+        startDatetime: slot.startDatetime,
+        endDatetime: slot.endDatetime
+      });
+
+      addToast({
+        type: "success",
+        title: "Đã tham gia hàng chờ",
+        message: `${slot.startTimeText} - ${slot.endTimeText}. Hệ thống sẽ thông báo khi khung giờ được mở lại.`
+      });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: "Không thể tham gia hàng chờ",
+        message: getErrorMessage(error)
+      });
+    } finally {
+      setJoiningWaitlistSlotId(null);
+    }
   };
 
   const handleBookingIntent = () => {
@@ -329,8 +365,11 @@ export function CourtDetailPage() {
           />
         ) : availability ? (
           <AvailabilitySlotPicker
+            canJoinWaitlist={canBook && Boolean(availability.policy.canJoinWaitlist)}
+            joiningWaitlistSlotId={joiningWaitlistSlotId}
             selectedSlotId={selectedSlotId}
             slots={availability.slots}
+            onJoinWaitlist={handleJoinWaitlist}
             onSelectSlot={handleSelectSlot}
           />
         ) : null}

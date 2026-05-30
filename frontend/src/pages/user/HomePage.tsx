@@ -85,6 +85,11 @@ export function HomePage() {
   const courtTypeOptions = useMemo(() => {
     return Array.from(new Set(courts.map((court) => court.courtType))).sort((first, second) => first.localeCompare(second, "vi"));
   }, [courts]);
+  const areaOptions = useMemo(() => {
+    return Array.from(
+      new Set(courts.map((court) => court.area).filter((area): area is string => Boolean(area)))
+    ).sort((first, second) => first.localeCompare(second, "vi"));
+  }, [courts]);
 
   const handleToggleFavorite = (courtId: string) => {
     setCourts((currentCourts) =>
@@ -169,6 +174,7 @@ export function HomePage() {
       </div>
 
       <CourtFilterDrawer
+        areas={areaOptions}
         courtTypes={courtTypeOptions}
         filters={filters}
         isOpen={isFilterOpen}

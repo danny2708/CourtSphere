@@ -70,6 +70,11 @@ const codeMessages: Record<string, string> = {
   ADVANCE_BOOKING_LIMIT_EXCEEDED: "Ngày đặt vượt quá số ngày được phép đặt trước.",
   MAX_BOOKINGS_PER_DAY_REACHED: "Bạn đã đạt giới hạn số lượt đặt sân trong ngày.",
   PRICING_RULE_NOT_FOUND: "Chưa có bảng giá cho khung giờ này.",
+  WAITLIST_ALREADY_EXISTS: "Bạn đã có trong hàng chờ của khung giờ này.",
+  WAITLIST_IN_PAST: "Không thể tham gia hàng chờ cho khung giờ đã qua.",
+  WAITLIST_NOT_ALLOWED: "Nhóm tài khoản hiện tại chưa được phép tham gia hàng chờ.",
+  WAITLIST_SLOT_AVAILABLE: "Khung giờ này đang còn trống, bạn có thể đặt trực tiếp.",
+  WAITLIST_TIME_NOT_ALIGNED: "Khung giờ không khớp với lịch hoạt động của sân.",
   VALIDATION_ERROR: "Vui lòng kiểm tra lại thông tin đã nhập."
 };
 

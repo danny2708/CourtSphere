@@ -11,6 +11,7 @@ import { AvailabilitySlotPicker } from "../../courts/components/AvailabilitySlot
 import { CourtPolicyPanel } from "../../courts/components/CourtPolicyPanel";
 import { getCourtAvailability } from "../../courts/services/availabilityService";
 import { getCourtById } from "../../courts/services/courtService";
+import { joinWaitlist } from "../../courts/services/waitlistService";
 import type { AvailabilitySlotViewModel, CourtAvailabilityViewModel } from "../../courts/types/availability.types";
 import type { CourtDetailViewModel } from "../../courts/types/court-detail.types";
 import { dateFromIsoOrDefault, toDateInputValue } from "../../courts/utils/dateUtils";
@@ -35,6 +36,7 @@ export function BookingCreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [joiningWaitlistSlotId, setJoiningWaitlistSlotId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [selectedDate, setSelectedDate] = useState(searchParams.get("date") ?? dateFromIsoOrDefault(initialStart));
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
@@ -124,6 +126,40 @@ export function BookingCreatePage() {
     }
 
     setSelectedSlotId(slot.id);
+  };
+
+  const handleJoinWaitlist = async (slot: AvailabilitySlotViewModel) => {
+    if (!availability?.policy.canJoinWaitlist) {
+      addToast({
+        type: "warning",
+        title: "Không thể tham gia hàng chờ",
+        message: "Nhóm tài khoản hiện tại chưa được phép tham gia hàng chờ."
+      });
+      return;
+    }
+
+    setJoiningWaitlistSlotId(slot.id);
+    try {
+      await joinWaitlist({
+        courtId: slot.courtId,
+        startDatetime: slot.startDatetime,
+        endDatetime: slot.endDatetime
+      });
+
+      addToast({
+        type: "success",
+        title: "Đã tham gia hàng chờ",
+        message: `${slot.startTimeText} - ${slot.endTimeText}. Hệ thống sẽ thông báo khi khung giờ được mở lại.`
+      });
+    } catch (waitlistError) {
+      addToast({
+        type: "error",
+        title: "Không thể tham gia hàng chờ",
+        message: getErrorMessage(waitlistError)
+      });
+    } finally {
+      setJoiningWaitlistSlotId(null);
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -217,8 +253,11 @@ export function BookingCreatePage() {
 
             {availability ? (
               <AvailabilitySlotPicker
+                canJoinWaitlist={court?.status === "ACTIVE" && Boolean(availability.policy.canJoinWaitlist)}
+                joiningWaitlistSlotId={joiningWaitlistSlotId}
                 selectedSlotId={selectedSlotId}
                 slots={availability.slots}
+                onJoinWaitlist={handleJoinWaitlist}
                 onSelectSlot={handleSelectSlot}
               />
             ) : null}

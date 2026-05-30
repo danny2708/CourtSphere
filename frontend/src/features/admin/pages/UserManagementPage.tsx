@@ -12,6 +12,7 @@ import {
 } from "../../../utils/status-label";
 import { getErrorMessage } from "../../../utils/format-error";
 import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
+import { AdminMultiSelectDialog } from "../components/AdminMultiSelectDialog";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
 import { AdminSelectDialog } from "../components/AdminSelectDialog";
@@ -124,6 +125,12 @@ export function UserManagementPage() {
     }
   }
 
+  function assignSelectedRoles(user: AdminUser, roleNames: AdminRoleName[]) {
+    return runAction(async () => {
+      await Promise.all(roleNames.map((roleName) => assignUserRole(user.id, roleName)));
+    });
+  }
+
   const columns: Array<AdminColumn<AdminUser>> = [
     {
       header: "User",
@@ -210,12 +217,13 @@ export function UserManagementPage() {
       {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(user) => user.id} rows={filteredUsers} /> : null}
 
       {dialog?.type === "assignRole" ? (
-        <AdminSelectDialog
+        <AdminMultiSelectDialog
+          emptyMessage="User này đã có toàn bộ role."
           label="Role cần gán"
-          options={roleOptions}
+          options={roleOptions.filter((option) => !dialog.user.roles.includes(option.value))}
           title={`Gán role cho ${dialog.user.fullName}`}
           onClose={() => setDialog(null)}
-          onConfirm={(roleName) => runAction(() => assignUserRole(dialog.user.id, roleName))}
+          onConfirm={(roleNames) => assignSelectedRoles(dialog.user, roleNames)}
         />
       ) : null}
       {dialog?.type === "removeRole" ? (
