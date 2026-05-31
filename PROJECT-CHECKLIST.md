@@ -791,6 +791,7 @@ Checklist:
 - [x] Báo cáo tỷ lệ no-show.
 - [x] Báo cáo user vi phạm nhiều.
 - [x] Filter theo date range.
+- [x] Added idempotent report demo seed script `backend/prisma/seed-reports-demo.ts` and `npm run seed:reports`.
 
 Acceptance criteria:
 
@@ -1111,6 +1112,7 @@ Acceptance criteria:
 - [x] Admin quan tri duoc du lieu cot loi: ADMIN credential verified; users/courts/payments/refunds/violations load real data.
 - [x] Admin cau hinh duoc nghiep vu dong: booking rules get/update verified.
 - [x] Admin xem duoc bao cao co ban: overview and reports pages/API load real data.
+- [x] Admin reports page renders KPI cards, revenue trend, booking trend, court usage ranking, rates summary, and violating users table.
 
 Verification notes:
 
@@ -1372,7 +1374,7 @@ Một module được coi là hoàn thành khi:
 | Waitlist | Codex | DONE | Runtime waitlist APIs, active duplicate constraint, priority notification, book-from-waitlist flow, docs, and tests verified |
 | Violations | Codex | DONE | Admin/manager violation APIs, waive/adjust audit, shared violation service, late cancellation handling, and verification completed |
 | Notifications | Codex | DONE | In-app notification APIs/service, lifecycle integrations, enum migration, and tests verified |
-| Reports | Codex | DONE | Admin reports APIs, aggregate service, contract, tests, and verification completed |
+| Reports | Codex | DONE | Admin reports APIs, aggregate service, contract, tests, frontend dashboard charts, and idempotent demo seed data verified |
 | Frontend foundation | Codex | DONE | React + TypeScript/Vite foundation with router, API client, auth store, protected/role routes, layout, states, theme, and verification completed |
 | UI design system | Codex | DONE | Theme tokens, header, search/filter bar, court cards/grid, badges, drawer, common states, and mobile bottom nav verified with API data |
 | Court listing/detail | Codex | DONE | Real API `/courts` and `/courts/:courtId`, search/filter/sort, detail view, navigation links, and verification completed |

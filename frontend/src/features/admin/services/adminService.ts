@@ -1,20 +1,25 @@
 import { apiRequest } from "../../../api/client";
 import type {
   AccountStatus,
+  AdminBookingReport,
   AdminBookingRules,
   AdminCourt,
   AdminCourtType,
+  AdminCourtUsageReport,
   AdminOperatingHour,
   AdminOverviewReport,
   AdminPayment,
   AdminPricingRule,
   AdminPriorityGroup,
   AdminPriorityPolicy,
+  AdminRatesReport,
   AdminRefund,
   AdminReportBundle,
+  AdminRevenueReport,
   AdminRoleName,
   AdminUser,
   AdminViolation,
+  AdminViolatingUsersReport,
   BookingPermissionStatus,
   CourtStatus,
   EntityStatus,
@@ -22,6 +27,12 @@ import type {
 } from "../types/admin.types";
 
 type RecordValue = string | number | boolean | null | undefined;
+
+type AdminTrendReportQuery = {
+  fromDate?: string;
+  toDate?: string;
+  groupBy?: "day" | "month";
+};
 
 function toQueryString(query: Record<string, RecordValue>): string {
   const params = new URLSearchParams();
@@ -106,11 +117,12 @@ export async function getAdminOverview(): Promise<AdminOverviewReport> {
   return pickObject<AdminOverviewReport>(response, ["overview"]) ?? {};
 }
 
-export async function getAdminReportsBundle(): Promise<AdminReportBundle> {
+export async function getAdminReportsBundle(options: { trend?: AdminTrendReportQuery } = {}): Promise<AdminReportBundle> {
+  const trendQuery = toQueryString(options.trend ?? {});
   const [overview, bookings, revenue, courtUsage, rates, violations] = await Promise.all([
     getRecord("/api/admin/reports/overview"),
-    getRecord("/api/admin/reports/bookings"),
-    getRecord("/api/admin/reports/revenue"),
+    getRecord(`/api/admin/reports/bookings${trendQuery}`),
+    getRecord(`/api/admin/reports/revenue${trendQuery}`),
     getRecord("/api/admin/reports/courts/usage"),
     getRecord("/api/admin/reports/rates"),
     getRecord("/api/admin/reports/violations")
@@ -118,11 +130,11 @@ export async function getAdminReportsBundle(): Promise<AdminReportBundle> {
 
   return {
     overview: pickObject<AdminOverviewReport>(overview, ["overview"]) ?? undefined,
-    bookings: bookings.report,
-    revenue: revenue.report,
-    courtUsage: courtUsage.report,
-    rates: rates.report,
-    violations: violations.report
+    bookings: bookings.report as AdminBookingReport | undefined,
+    revenue: revenue.report as AdminRevenueReport | undefined,
+    courtUsage: courtUsage.report as AdminCourtUsageReport | undefined,
+    rates: rates.report as AdminRatesReport | undefined,
+    violations: violations.report as AdminViolatingUsersReport | undefined
   };
 }
 

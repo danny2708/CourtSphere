@@ -9,6 +9,9 @@ coverage/
 backend/coverage/
 frontend/coverage/
 
+backend/seed-reports-demo.ts
+
+
 .env
 .env.*
 !.env.example
