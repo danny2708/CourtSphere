@@ -149,6 +149,16 @@ a {
     font-weight: 700;
   }
 
+  .header-date__time {
+    display: inline-flex;
+    align-items: center;
+    margin-left: var(--space-2);
+    padding-left: var(--space-2);
+    border-left: 1px solid rgba(255, 255, 255, 0.28);
+    font-variant-numeric: tabular-nums;
+    font-weight: 900;
+  }
+
 .top-nav {
   display: flex;
   align-items: center;
@@ -277,6 +287,10 @@ a {
   background: var(--color-primary-light);
   font-weight: 900;
   font-size: 15px;
+}
+
+.mobile-menu__date .header-date__time {
+  border-left-color: rgba(3, 105, 161, 0.22);
 }
 
 .mobile-menu__user {
@@ -952,6 +966,14 @@ a {
   color: var(--color-primary-dark);
 }
 
+.list-toolbar__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
 .sort-control select {
   min-height: 40px;
   padding: 0 34px 0 12px;
@@ -1332,6 +1354,114 @@ a {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
+}
+
+.court-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.court-type-card {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.court-type-card__button {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.court-type-card__button:hover .court-type-card__media img,
+.court-type-card__button:focus-visible .court-type-card__media img {
+  transform: scale(1.035);
+}
+
+.court-type-card__media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  min-height: 180px;
+  overflow: hidden;
+  background: var(--color-primary-light);
+}
+
+.court-type-card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 180ms ease;
+}
+
+.court-type-card__placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--color-primary-dark);
+  background:
+    linear-gradient(135deg, rgba(14, 165, 233, 0.18), rgba(34, 197, 94, 0.14)),
+    var(--color-primary-light);
+}
+
+.court-type-card__badge {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  box-shadow: var(--shadow-card);
+}
+
+.court-type-card__body {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.court-type-card__body > div {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.court-type-card__icon {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: var(--color-primary-dark);
+  background: var(--color-primary-light);
+}
+
+.court-type-card h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.court-type-card p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-weight: 800;
+}
+
+.court-type-card__sample {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .court-card {
@@ -3955,6 +4085,10 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .court-type-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .court-detail-hero {
     grid-template-columns: 1fr;
   }
@@ -4062,6 +4196,11 @@ a {
 
   .list-toolbar,
   .section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .list-toolbar__actions {
     align-items: stretch;
     flex-direction: column;
   }
@@ -4242,8 +4381,16 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .court-type-grid {
+    grid-template-columns: 1fr;
+  }
+
   .court-card__media {
     min-height: 210px;
+  }
+
+  .court-type-card__media {
+    min-height: 190px;
   }
 
   .filter-drawer__panel {

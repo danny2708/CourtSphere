@@ -5,6 +5,8 @@ import { Button } from "../common/Button";
 type SearchFilterBarProps = {
   value: string;
   resultCount?: number;
+  resultUnit?: string;
+  placeholder?: string;
   onSearchChange: (value: string) => void;
   onOpenFilter?: () => void;
   onOpenMap?: () => void;
@@ -13,7 +15,9 @@ type SearchFilterBarProps = {
 };
 
 export function SearchFilterBar({
+  placeholder = "Tìm kiếm sân...",
   resultCount,
+  resultUnit = "sân",
   onOpenFilter,
   onOpenMap,
   onSearchChange,
@@ -21,34 +25,46 @@ export function SearchFilterBar({
   onShowFavorites,
   value
 }: SearchFilterBarProps) {
+  const hasActions = Boolean(onOpenFilter || onOpenMap || onShowBooked || onShowFavorites);
+
   return (
     <section className="search-filter-bar" aria-label="Tìm kiếm và lọc sân">
       <label className="search-input">
         <Search aria-hidden="true" size={20} />
         <span className="sr-only">Tìm kiếm sân</span>
-        <input placeholder="Tìm kiếm sân..." type="search" value={value} onChange={(event) => onSearchChange(event.target.value)} />
+        <input placeholder={placeholder} type="search" value={value} onChange={(event) => onSearchChange(event.target.value)} />
       </label>
 
-      {typeof resultCount === "number" ? <span className="result-count">{resultCount} sân</span> : null}
+      {typeof resultCount === "number" ? <span className="result-count">{resultCount} {resultUnit}</span> : null}
 
-      <div className="search-actions">
-        <Button className="search-action-button" size="sm" variant="secondary" onClick={onOpenFilter}>
-          <Filter aria-hidden="true" size={16} />
-          Bộ lọc
-        </Button>
-        <Button className="search-action-button" size="sm" variant="ghost" onClick={onOpenMap}>
-          <Map aria-hidden="true" size={16} />
-          Bản đồ
-        </Button>
-        <Button className="search-action-button" size="sm" variant="ghost" onClick={onShowBooked}>
-          <CalendarCheck aria-hidden="true" size={16} />
-          Sân đã đặt
-        </Button>
-        <Button className="search-action-button" size="sm" variant="ghost" onClick={onShowFavorites}>
-          <Heart aria-hidden="true" size={16} />
-          Yêu thích
-        </Button>
-      </div>
+      {hasActions ? (
+        <div className="search-actions">
+          {onOpenFilter ? (
+            <Button className="search-action-button" size="sm" variant="secondary" onClick={onOpenFilter}>
+              <Filter aria-hidden="true" size={16} />
+              Bộ lọc
+            </Button>
+          ) : null}
+          {onOpenMap ? (
+            <Button className="search-action-button" size="sm" variant="ghost" onClick={onOpenMap}>
+              <Map aria-hidden="true" size={16} />
+              Bản đồ
+            </Button>
+          ) : null}
+          {onShowBooked ? (
+            <Button className="search-action-button" size="sm" variant="ghost" onClick={onShowBooked}>
+              <CalendarCheck aria-hidden="true" size={16} />
+              Sân đã đặt
+            </Button>
+          ) : null}
+          {onShowFavorites ? (
+            <Button className="search-action-button" size="sm" variant="ghost" onClick={onShowFavorites}>
+              <Heart aria-hidden="true" size={16} />
+              Yêu thích
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

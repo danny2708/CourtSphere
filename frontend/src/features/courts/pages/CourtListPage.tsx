@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownAZ, SlidersHorizontal } from "lucide-react";
+import { ArrowDownAZ, ArrowLeft, SlidersHorizontal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "../../../components/common/Button";
+import { EmptyState } from "../../../components/common/EmptyState";
 import { ErrorState } from "../../../components/common/ErrorState";
 import { LoadingState } from "../../../components/common/LoadingState";
 import { CourtGrid } from "../../../components/courts/CourtGrid";
@@ -11,6 +12,7 @@ import { SearchFilterBar } from "../../../components/layout/SearchFilterBar";
 import { buildCourtDetailPath } from "../../../routes/route-paths";
 import { useToastStore } from "../../../stores/toast.store";
 import type { CourtFilterState } from "../../../types/court.types";
+import { buildCourtTypeSummaries, CourtTypeSelection, filterCourtTypes } from "../components/CourtTypeSelection";
 import { listCourts } from "../services/courtService";
 import type { CourtDetailViewModel, CourtSortOption } from "../types/court-detail.types";
 import { defaultCourtFilters, filterCourts, sortCourts } from "../utils/courtFilters";
@@ -29,6 +31,7 @@ export function CourtListPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
+  const [selectedCourtType, setSelectedCourtType] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<CourtSortOption>("available_first");
 
   const loadCourts = async () => {
@@ -55,12 +58,15 @@ export function CourtListPage() {
     void loadCourts();
   }, []);
 
+  const courtTypeSummaries = useMemo(() => buildCourtTypeSummaries(courts), [courts]);
+  const visibleCourtTypes = useMemo(() => filterCourtTypes(courtTypeSummaries, searchKeyword), [courtTypeSummaries, searchKeyword]);
   const visibleCourts = useMemo(() => {
-    return sortCourts(filterCourts(courts, searchKeyword, filters), sortBy);
-  }, [courts, filters, searchKeyword, sortBy]);
+    const scopedFilters = selectedCourtType ? { ...filters, courtTypes: [selectedCourtType] } : filters;
+    return sortCourts(filterCourts(courts, searchKeyword, scopedFilters), sortBy);
+  }, [courts, filters, searchKeyword, selectedCourtType, sortBy]);
   const courtTypeOptions = useMemo(() => {
-    return Array.from(new Set(courts.map((court) => court.courtType))).sort((first, second) => first.localeCompare(second, "vi"));
-  }, [courts]);
+    return selectedCourtType ? [selectedCourtType] : courtTypeSummaries.map((courtType) => courtType.typeName);
+  }, [courtTypeSummaries, selectedCourtType]);
 
   const handleToggleFavorite = (courtId: string) => {
     setCourts((currentCourts) =>
@@ -70,6 +76,18 @@ export function CourtListPage() {
 
   const handleBook = (courtId: string) => {
     navigate(buildCourtDetailPath(courtId));
+  };
+
+  const handleSelectCourtType = (courtType: string) => {
+    setSelectedCourtType(courtType);
+    setSearchKeyword("");
+    setFilters(defaultCourtFilters);
+  };
+
+  const handleBackToCourtTypes = () => {
+    setSelectedCourtType(null);
+    setSearchKeyword("");
+    setFilters(defaultCourtFilters);
   };
 
   const handleShare = (courtId: string) => {
@@ -105,39 +123,55 @@ export function CourtListPage() {
       </div>
 
       <SearchFilterBar
-        resultCount={visibleCourts.length}
+        placeholder={selectedCourtType ? `Tìm sân ${selectedCourtType}...` : "Tìm loại sân..."}
+        resultCount={selectedCourtType ? visibleCourts.length : visibleCourtTypes.length}
+        resultUnit={selectedCourtType ? "sân" : "loại sân"}
         value={searchKeyword}
-        onOpenFilter={() => setIsFilterOpen(true)}
-        onOpenMap={() => addToast({ type: "info", title: "Bản đồ", message: "Map view sẽ được triển khai ở module sau." })}
+        onOpenFilter={selectedCourtType ? () => setIsFilterOpen(true) : undefined}
+        onOpenMap={selectedCourtType ? () => addToast({ type: "info", title: "Bản đồ", message: "Map view sẽ được triển khai ở module sau." }) : undefined}
         onSearchChange={setSearchKeyword}
-        onShowBooked={() => addToast({ type: "info", title: "Sân đã đặt", message: "Danh sách sân đã đặt sẽ dùng dữ liệu booking." })}
-        onShowFavorites={() => setFilters((currentFilters) => ({ ...currentFilters, favoritesOnly: !currentFilters.favoritesOnly }))}
+        onShowBooked={selectedCourtType ? () => addToast({ type: "info", title: "Sân đã đặt", message: "Danh sách sân đã đặt sẽ dùng dữ liệu booking." }) : undefined}
+        onShowFavorites={selectedCourtType ? () => setFilters((currentFilters) => ({ ...currentFilters, favoritesOnly: !currentFilters.favoritesOnly })) : undefined}
       />
 
       <div className="list-toolbar">
         <div className="list-toolbar__summary">
           <ArrowDownAZ aria-hidden="true" size={18} />
-          <span>{visibleCourts.length} kết quả</span>
+          <span>{selectedCourtType ? `${visibleCourts.length} sân ${selectedCourtType}` : `${visibleCourtTypes.length} loại sân`}</span>
         </div>
-        <label className="sort-control">
-          <span>Sắp xếp</span>
-          <select value={sortBy} onChange={(event) => setSortBy(event.target.value as CourtSortOption)}>
-            {sortOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {selectedCourtType ? (
+          <div className="list-toolbar__actions">
+            <Button variant="ghost" onClick={handleBackToCourtTypes}>
+              <ArrowLeft aria-hidden="true" size={18} />
+              Chọn loại sân khác
+            </Button>
+            <label className="sort-control">
+              <span>Sắp xếp</span>
+              <select value={sortBy} onChange={(event) => setSortBy(event.target.value as CourtSortOption)}>
+                {sortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        ) : null}
       </div>
 
-      <CourtGrid
-        courts={visibleCourts}
-        getCourtDetailPath={buildCourtDetailPath}
-        onBook={handleBook}
-        onShare={handleShare}
-        onToggleFavorite={handleToggleFavorite}
-      />
+      {selectedCourtType ? (
+        <CourtGrid
+          courts={visibleCourts}
+          getCourtDetailPath={buildCourtDetailPath}
+          onBook={handleBook}
+          onShare={handleShare}
+          onToggleFavorite={handleToggleFavorite}
+        />
+      ) : visibleCourtTypes.length ? (
+        <CourtTypeSelection courtTypes={visibleCourtTypes} onSelect={handleSelectCourtType} />
+      ) : (
+        <EmptyState title="Chưa có loại sân phù hợp" message="Không tìm thấy loại sân theo từ khóa hiện tại." />
+      )}
 
       <CourtFilterDrawer
         areas={areaOptions}

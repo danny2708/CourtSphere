@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CalendarCheck,
   CalendarDays,
@@ -37,6 +37,12 @@ const todayFormatter = new Intl.DateTimeFormat("vi-VN", {
   year: "numeric"
 });
 
+const timeFormatter = new Intl.DateTimeFormat("vi-VN", {
+  hour: "2-digit",
+  hour12: false,
+  minute: "2-digit"
+});
+
 function getPrimaryRoleLabel(roles: RoleName[]): string {
   if (roles.includes("ADMIN")) {
     return "Admin";
@@ -59,7 +65,9 @@ export function AppHeader() {
   const { isAuthenticated, logout, user } = useAuthStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
-  const todayText = todayFormatter.format(new Date());
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const todayText = todayFormatter.format(currentTime);
+  const timeText = timeFormatter.format(currentTime);
   const canAccessManager = hasAnyRole(user?.roles, ["FIELD_MANAGER", "MANAGER", "ADMIN"]);
   const canAccessAdmin = hasAnyRole(user?.roles, ["ADMIN"]);
   const navItems: HeaderNavItem[] = [
@@ -74,6 +82,14 @@ export function AppHeader() {
     { icon: Map, label: "Bản đồ", to: ROUTE_PATHS.map },
     ...(isAuthenticated ? [{ icon: UserRound, label: "Tài khoản", to: ROUTE_PATHS.account }] : [])
   ];
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => window.clearInterval(timerId);
+  }, []);
 
   const executeLogout = async () => {
     try {
@@ -106,9 +122,10 @@ export function AppHeader() {
           <span className="brand-text">CourtSphere</span>
         </Link>
 
-        <div className="header-date" aria-label={`Hôm nay ${todayText}`}>
+        <div className="header-date" aria-label={`Hôm nay ${todayText}, ${timeText}`}>
           <CalendarDays aria-hidden="true" size={16} />
           <span>{todayText}</span>
+          <span className="header-date__time">{timeText}</span>
         </div>
 
         <nav className="top-nav" aria-label="Điều hướng chính">
@@ -167,7 +184,10 @@ export function AppHeader() {
           <div className="mobile-menu__panel">
             <div className="mobile-menu__date">
               <CalendarDays aria-hidden="true" size={18} />
-              <span>{todayText}</span>
+              <span>
+                {todayText}
+                <span className="header-date__time">{timeText}</span>
+              </span>
             </div>
 
             {isAuthenticated && user ? (
