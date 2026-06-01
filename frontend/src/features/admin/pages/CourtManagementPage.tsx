@@ -71,7 +71,7 @@ export function CourtManagementPage() {
   const columns: Array<AdminColumn<AdminCourt>> = [
     { header: "Sân", key: "name", render: (court) => <strong>{court.courtName}</strong> },
     { header: "Loại", key: "type", render: (court) => court.courtType?.typeName ?? "Chưa có" },
-    { header: "Status", key: "status", render: (court) => <CourtStatusBadge status={court.status} /> },
+    { header: "Trạng thái", key: "status", render: (court) => <CourtStatusBadge status={court.status} /> },
     { header: "Mô tả", key: "description", render: (court) => court.description ?? "Chưa có" },
     {
       header: "Thao tác",
@@ -80,7 +80,7 @@ export function CourtManagementPage() {
         <AdminRowActions
           actions={[
             { label: "Sửa", onSelect: () => setDialog({ type: "edit", court }), tone: "primary" },
-            { label: "Cập nhật status", onSelect: () => setDialog({ type: "status", court }) }
+            { label: "Cập nhật trạng thái", onSelect: () => setDialog({ type: "status", court }) }
           ]}
         />
       )
@@ -89,7 +89,7 @@ export function CourtManagementPage() {
   const advancedFilters: Array<AdminAdvancedFilter<AdminCourt>> = [
     {
       key: "status",
-      label: "Status",
+      label: "Trạng thái",
       options: courtStatusOptions,
       getValue: (court) => court.status
     },
@@ -104,7 +104,7 @@ export function CourtManagementPage() {
   return (
     <div className="admin-page">
       <AdminNavigation />
-      <AdminPageHeader title="Courts" description="Quản lý sân, loại sân và trạng thái vận hành." actions={<Button onClick={() => setDialog({ type: "create" })}>Tạo sân</Button>} />
+      <AdminPageHeader title="Sân" description="Quản lý sân, loại sân và trạng thái vận hành." actions={<Button onClick={() => setDialog({ type: "create" })}>Tạo sân</Button>} />
       {isLoading ? <LoadingState message="Đang tải sân..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được sân" onAction={() => setReloadKey((value) => value + 1)} /> : null}
       {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(court) => court.id} rows={courts} /> : null}
@@ -113,7 +113,7 @@ export function CourtManagementPage() {
         <AdminTextFormDialog
           fields={[
             { key: "courtName", label: "Tên sân", required: true },
-            { key: "courtTypeId", label: `Court type ID (${courtTypes.map((type) => `${type.typeName}: ${type.id}`).join(" | ")})`, required: true },
+            { key: "courtTypeId", label: `Mã loại sân (${courtTypes.map((type) => `${type.typeName}: ${type.id}`).join(" | ")})`, required: true },
             { key: "description", label: "Mô tả" },
             { key: "imageUrl", label: "Image URL", type: "url" }
           ]}

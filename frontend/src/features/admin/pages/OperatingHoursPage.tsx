@@ -100,7 +100,7 @@ export function OperatingHoursPage({ variant = "admin" }: OperatingHoursPageProp
   async function runAction(action: () => Promise<unknown>) {
     try {
       await action();
-      addToast({ message: "Operating hours đã được cập nhật.", title: "Thành công", type: "success" });
+      addToast({ message: "Giờ mở sân đã được cập nhật.", title: "Thành công", type: "success" });
       setDialog(null);
       setReloadKey((value) => value + 1);
     } catch (actionError) {
@@ -115,7 +115,7 @@ export function OperatingHoursPage({ variant = "admin" }: OperatingHoursPageProp
     { header: "Mở cửa", key: "open", render: (item) => item.openTime },
     { header: "Đóng cửa", key: "close", render: (item) => item.closeTime },
     { header: "Slot", key: "slot", render: (item) => `${item.slotDurationMinutes} phút/slot` },
-    { header: "Status", key: "status", render: (item) => <Badge tone={item.status === "ACTIVE" ? "success" : "neutral"}>{getStatusLabel(entityStatusLabel, item.status)}</Badge> },
+    { header: "Trạng thái", key: "status", render: (item) => <Badge tone={item.status === "ACTIVE" ? "success" : "neutral"}>{getStatusLabel(entityStatusLabel, item.status)}</Badge> },
     {
       header: "Thao tác",
       key: "actions",
@@ -123,7 +123,7 @@ export function OperatingHoursPage({ variant = "admin" }: OperatingHoursPageProp
         <AdminRowActions
           actions={[
             { label: "Sửa giờ", onSelect: () => setDialog({ type: "edit", item }), tone: "primary" },
-            { label: "Cập nhật status", onSelect: () => setDialog({ type: "status", item }) }
+            { label: "Cập nhật trạng thái", onSelect: () => setDialog({ type: "status", item }) }
           ]}
         />
       )
@@ -138,7 +138,7 @@ export function OperatingHoursPage({ variant = "admin" }: OperatingHoursPageProp
     },
     {
       key: "status",
-      label: "Status",
+      label: "Trạng thái",
       options: statusOptions,
       getValue: (item) => item.status
     }
@@ -148,7 +148,7 @@ export function OperatingHoursPage({ variant = "admin" }: OperatingHoursPageProp
     <div className="admin-page">
       <Navigation />
       <AdminPageHeader
-        title={variant === "manager" ? "Giờ mở sân" : "Operating hours"}
+        title={variant === "manager" ? "Giờ mở sân" : "Giờ mở sân"}
         description="Quản lý giờ mở cửa, giờ đóng cửa và độ dài slot theo từng sân."
         actions={<Button disabled={!selectedCourtId} onClick={() => setDialog({ type: "create" })}>Tạo khung giờ</Button>}
       />
@@ -163,7 +163,7 @@ export function OperatingHoursPage({ variant = "admin" }: OperatingHoursPageProp
       {dialog?.type === "create" ? (
         <AdminTextFormDialog
           fields={operatingHourFields}
-          title="Tạo operating hour"
+          title="Tạo khung giờ hoạt động"
           onClose={() => setDialog(null)}
           onSubmit={(values) =>
             runAction(() => createOperatingHour(selectedCourtId, {
@@ -196,7 +196,7 @@ export function OperatingHoursPage({ variant = "admin" }: OperatingHoursPageProp
           defaultValue={dialog.item.status}
           label="Trạng thái"
           options={statusOptions}
-          title="Cập nhật trạng thái operating hour"
+          title="Cập nhật trạng thái khung giờ"
           onClose={() => setDialog(null)}
           onConfirm={(status) => runAction(() => updateOperatingHourStatus(dialog.item.id, status))}
         />

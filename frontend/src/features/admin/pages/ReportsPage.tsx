@@ -338,7 +338,7 @@ function RatesSummary({ report }: { report: AdminRatesReport | undefined }) {
     },
     {
       count: `${report?.counts?.noShowBookingItems ?? 0}/${report?.counts?.totalBookingItems ?? 0}`,
-      label: "No-show",
+      label: "Vắng mặt",
       value: report?.noShowRate ?? 0
     },
     {
@@ -527,7 +527,7 @@ export function ReportsPage() {
             <AdminStatCard label="Lượt sân" value={reports.overview?.totalBookingItems ?? 0} />
             <AdminStatCard label="Doanh thu ròng" value={formatMoney(netRevenue)} />
             <AdminStatCard label="Đã hoàn tiền" value={formatMoney(reports.overview?.totalRefundAmount)} />
-            <AdminStatCard label="No-show" value={reports.overview?.totalNoShow ?? 0} />
+            <AdminStatCard label="Vắng mặt" value={reports.overview?.totalNoShow ?? 0} />
             <AdminStatCard label="Vi phạm" value={reports.overview?.violationCount ?? 0} />
           </div>
 

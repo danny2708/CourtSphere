@@ -30,12 +30,12 @@ const summaryItems = [
   {
     icon: ShieldCheck,
     label: "Xác nhận",
-    value: "Payment success"
+    value: "Thanh toán thành công"
   },
   {
     icon: Clock,
     label: "Check-in",
-    value: "Manager/Admin"
+    value: "Quản lý/Quản trị"
   }
 ] as const;
 
@@ -132,10 +132,10 @@ export function HomePage() {
   return (
     <section className="page-stack">
       <div className="page-hero">
-        <p className="eyebrow">CourtSphere marketplace</p>
+        <p className="eyebrow">Chợ sân CourtSphere</p>
         <h1>Sân thể thao sẵn sàng cho lịch học và hoạt động đội nhóm</h1>
         <p>
-          Xin chào {user?.fullName ?? "bạn"}. Danh sách sân, trạng thái và giá đang được tải từ dữ liệu vận hành trong database.
+          Xin chào {user?.fullName ?? "bạn"}. Danh sách sân, trạng thái và giá đang được tải từ dữ liệu vận hành trong cơ sở dữ liệu.
         </p>
       </div>
 
@@ -159,9 +159,9 @@ export function HomePage() {
         resultUnit={selectedCourtType ? "sân" : "loại sân"}
         value={searchKeyword}
         onOpenFilter={selectedCourtType ? () => setIsFilterOpen(true) : undefined}
-        onOpenMap={selectedCourtType ? () => addToast({ type: "info", title: "Bản đồ", message: "Map view sẽ được triển khai ở module sau." }) : undefined}
+        onOpenMap={selectedCourtType ? () => addToast({ type: "info", title: "Bản đồ", message: "Chế độ xem bản đồ sẽ được triển khai ở module sau." }) : undefined}
         onSearchChange={setSearchKeyword}
-        onShowBooked={selectedCourtType ? () => addToast({ type: "info", title: "Sân đã đặt", message: "Danh sách sân đã đặt sẽ dùng dữ liệu booking." }) : undefined}
+        onShowBooked={selectedCourtType ? () => addToast({ type: "info", title: "Sân đã đặt", message: "Danh sách sân đã đặt sẽ dùng dữ liệu đặt sân." }) : undefined}
         onShowFavorites={selectedCourtType ? () => setFilters((currentFilters) => ({ ...currentFilters, favoritesOnly: !currentFilters.favoritesOnly })) : undefined}
       />
 

@@ -37,59 +37,59 @@ type ActionVisual = {
 function getActionVisual(action: AdminRowAction): ActionVisual {
   const label = action.label.toLowerCase();
 
-  if (label.includes("xóa") || label.includes("delete")) {
+  if (label.includes("xóa")) {
     return { color: "red", Icon: Trash2 };
   }
 
-  if (label.includes("hủy") || label.includes("cancel")) {
+  if (label.includes("hủy")) {
     return { color: "red", Icon: XCircle };
   }
 
-  if (label.includes("gỡ") || label.includes("remove")) {
+  if (label.includes("gỡ")) {
     return { color: "red", Icon: ShieldMinus };
   }
 
-  if (label.includes("xem lịch") || label.includes("history")) {
+  if (label.includes("xem lịch")) {
     return { color: "amber", Icon: Clock3 };
   }
 
-  if (label.includes("xem") || label.includes("detail")) {
+  if (label.includes("xem")) {
     return { color: "green", Icon: Eye };
   }
 
-  if (label.includes("retry")) {
+  if (label.includes("xử lý lại")) {
     return { color: "amber", Icon: RotateCcw };
   }
 
-  if (label.includes("waive")) {
+  if (label.includes("miễn")) {
     return { color: "green", Icon: BadgeCheck };
   }
 
-  if (label.includes("adjust")) {
+  if (label.includes("điều chỉnh")) {
     return { color: "amber", Icon: SlidersHorizontal };
   }
 
-  if (label.includes("phiên bản") || label.includes("version")) {
+  if (label.includes("phiên bản")) {
     return { color: "red", Icon: ListOrdered };
   }
 
-  if (label.includes("role") && (label.includes("gán") || label.includes("assign"))) {
+  if (label.includes("vai trò") && label.includes("gán")) {
     return { color: "blue", Icon: ShieldPlus };
   }
 
-  if (label.includes("booking")) {
+  if (label.includes("đặt sân") || label.includes("quyền")) {
     return { color: "green", Icon: CalendarCheck };
   }
 
-  if (label.includes("priority")) {
+  if (label.includes("ưu tiên")) {
     return { color: "purple", Icon: Trophy };
   }
 
-  if (label.includes("status") || label.includes("account")) {
+  if (label.includes("trạng thái") || label.includes("tài khoản")) {
     return { color: "amber", Icon: Settings };
   }
 
-  if (label.includes("sửa") || label.includes("cập nhật") || label.includes("edit") || label.includes("update")) {
+  if (label.includes("sửa") || label.includes("cập nhật")) {
     return { color: "blue", Icon: Edit3 };
   }
 

@@ -45,14 +45,14 @@ const timeFormatter = new Intl.DateTimeFormat("vi-VN", {
 
 function getPrimaryRoleLabel(roles: RoleName[]): string {
   if (roles.includes("ADMIN")) {
-    return "Admin";
+    return "Quản trị";
   }
 
   if (roles.includes("FIELD_MANAGER") || roles.includes("MANAGER")) {
     return "Quản lý";
   }
 
-  return "User";
+  return "Người dùng";
 }
 
 function hasAnyRole(roles: RoleName[] | undefined, allowedRoles: RoleName[]): boolean {
@@ -75,7 +75,7 @@ export function AppHeader() {
     { icon: Search, label: "Khám phá", to: ROUTE_PATHS.courts },
     ...(isAuthenticated ? [{ icon: CalendarCheck, label: "Đơn của tôi", to: ROUTE_PATHS.myBookings }] : []),
     ...(canAccessManager ? [{ icon: UserRound, label: "Quản lý", to: ROUTE_PATHS.managerHome }] : []),
-    ...(canAccessAdmin ? [{ icon: ShieldCheck, label: "Admin", to: ROUTE_PATHS.adminHome }] : [])
+    ...(canAccessAdmin ? [{ icon: ShieldCheck, label: "Quản trị", to: ROUTE_PATHS.adminHome }] : [])
   ];
   const mobileNavItems: HeaderNavItem[] = [
     ...navItems,

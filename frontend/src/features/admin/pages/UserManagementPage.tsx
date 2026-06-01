@@ -42,10 +42,16 @@ type DialogState =
   | { type: "priority"; user: AdminUser }
   | null;
 
+const roleLabel: Record<AdminRoleName, string> = {
+  ADMIN: "Quản trị viên",
+  FIELD_MANAGER: "Quản lý sân",
+  USER: "Người dùng"
+};
+
 const roleOptions: Array<{ label: string; value: AdminRoleName }> = [
-  { label: "USER", value: "USER" },
-  { label: "FIELD_MANAGER", value: "FIELD_MANAGER" },
-  { label: "ADMIN", value: "ADMIN" }
+  { label: roleLabel.USER, value: "USER" },
+  { label: roleLabel.FIELD_MANAGER, value: "FIELD_MANAGER" },
+  { label: roleLabel.ADMIN, value: "ADMIN" }
 ];
 
 const accountStatusOptions: Array<{ label: string; value: AccountStatus }> = [
@@ -104,7 +110,7 @@ export function UserManagementPage() {
   async function runAction(action: () => Promise<unknown>) {
     try {
       await action();
-      addToast({ message: "Dữ liệu user đã được tải lại.", title: "Thao tác thành công", type: "success" });
+      addToast({ message: "Dữ liệu người dùng đã được tải lại.", title: "Thao tác thành công", type: "success" });
       setDialog(null);
       setReloadKey((value) => value + 1);
     } catch (actionError) {
@@ -120,7 +126,7 @@ export function UserManagementPage() {
 
   const columns: Array<AdminColumn<AdminUser>> = [
     {
-      header: "User",
+      header: "Người dùng",
       key: "user",
       render: (user) => (
         <div>
@@ -144,20 +150,20 @@ export function UserManagementPage() {
       )
     },
     {
-      header: "Roles",
+      header: "Vai trò",
       key: "roles",
       render: (user) => (
         <div className="admin-badge-row">
           {user.roles.map((role) => (
             <Badge key={role} tone={role === "ADMIN" ? "danger" : role === "FIELD_MANAGER" ? "primary" : "neutral"}>
-              {role}
+              {roleLabel[role]}
             </Badge>
           ))}
         </div>
       )
     },
     {
-      header: "Priority",
+      header: "Nhóm ưu tiên",
       key: "priority",
       render: (user) => user.priorityGroup?.name ?? user.priorityGroup?.groupName ?? user.priorityGroup?.code ?? "Chưa có"
     },
@@ -167,11 +173,11 @@ export function UserManagementPage() {
       render: (user) => (
         <AdminRowActions
           actions={[
-            { label: "Gán role", onSelect: () => setDialog({ type: "assignRole", user }), tone: "primary" },
-            { label: "Gỡ role", onSelect: () => setDialog({ type: "removeRole", user }) },
-            { label: "Account", onSelect: () => setDialog({ type: "accountStatus", user }) },
-            { label: "Booking", onSelect: () => setDialog({ type: "bookingPermission", user }) },
-            { label: "Priority", onSelect: () => setDialog({ type: "priority", user }) }
+            { label: "Gán vai trò", onSelect: () => setDialog({ type: "assignRole", user }), tone: "primary" },
+            { label: "Gỡ vai trò", onSelect: () => setDialog({ type: "removeRole", user }) },
+            { label: "Trạng thái tài khoản", onSelect: () => setDialog({ type: "accountStatus", user }) },
+            { label: "Quyền đặt sân", onSelect: () => setDialog({ type: "bookingPermission", user }) },
+            { label: "Nhóm ưu tiên", onSelect: () => setDialog({ type: "priority", user }) }
           ]}
         />
       )
@@ -180,25 +186,25 @@ export function UserManagementPage() {
   const advancedFilters: Array<AdminAdvancedFilter<AdminUser>> = [
     {
       key: "accountStatus",
-      label: "Account status",
+      label: "Trạng thái tài khoản",
       options: accountStatusOptions,
       getValue: (user) => user.accountStatus
     },
     {
       key: "bookingPermissionStatus",
-      label: "Booking permission",
+      label: "Quyền đặt sân",
       options: bookingPermissionOptions,
       getValue: (user) => user.bookingPermissionStatus
     },
     {
       key: "role",
-      label: "Role",
+      label: "Vai trò",
       options: roleOptions,
       getValue: (user) => user.roles
     },
     {
       key: "priorityGroup",
-      label: "Priority group",
+      label: "Nhóm ưu tiên",
       options: priorityGroups.map((group) => ({ label: `${group.groupCode} - ${group.groupName}`, value: group.id })),
       getValue: (user) => user.priorityGroup?.id
     }
@@ -208,30 +214,30 @@ export function UserManagementPage() {
     <div className="admin-page">
       <AdminNavigation />
       <AdminPageHeader
-        title="User management"
-        description="Quản lý tài khoản, role, quyền đặt sân và priority group."
+        title="Quản lý người dùng"
+        description="Quản lý tài khoản, vai trò, quyền đặt sân và nhóm ưu tiên."
         actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>}
       />
 
-      {isLoading ? <LoadingState message="Đang tải users..." /> : null}
-      {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được users" onAction={() => setReloadKey((value) => value + 1)} /> : null}
+      {isLoading ? <LoadingState message="Đang tải người dùng..." /> : null}
+      {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được người dùng" onAction={() => setReloadKey((value) => value + 1)} /> : null}
       {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(user) => user.id} rows={users} /> : null}
 
       {dialog?.type === "assignRole" ? (
         <AdminMultiSelectDialog
-          emptyMessage="User này đã có toàn bộ role."
-          label="Role cần gán"
+          emptyMessage="Người dùng này đã có toàn bộ vai trò."
+          label="Vai trò cần gán"
           options={roleOptions.filter((option) => !dialog.user.roles.includes(option.value))}
-          title={`Gán role cho ${dialog.user.fullName}`}
+          title={`Gán vai trò cho ${dialog.user.fullName}`}
           onClose={() => setDialog(null)}
           onConfirm={(roleNames) => assignSelectedRoles(dialog.user, roleNames)}
         />
       ) : null}
       {dialog?.type === "removeRole" ? (
         <AdminSelectDialog
-          label="Role cần gỡ"
-          options={dialog.user.roles.map((role) => ({ label: role, value: role }))}
-          title={`Gỡ role của ${dialog.user.fullName}`}
+          label="Vai trò cần gỡ"
+          options={dialog.user.roles.map((role) => ({ label: roleLabel[role], value: role }))}
+          title={`Gỡ vai trò của ${dialog.user.fullName}`}
           onClose={() => setDialog(null)}
           onConfirm={(roleName) => runAction(() => removeUserRole(dialog.user.id, roleName))}
         />
@@ -242,7 +248,7 @@ export function UserManagementPage() {
           label="Trạng thái tài khoản"
           options={accountStatusOptions}
           reasonRequired
-          title={`Cập nhật account ${dialog.user.fullName}`}
+          title={`Cập nhật tài khoản ${dialog.user.fullName}`}
           onClose={() => setDialog(null)}
           onConfirm={(status, reason) => runAction(() => updateUserAccountStatus(dialog.user.id, status, reason))}
         />
@@ -260,10 +266,10 @@ export function UserManagementPage() {
       ) : null}
       {dialog?.type === "priority" ? (
         <AdminSelectDialog
-          label="Priority group"
+          label="Nhóm ưu tiên"
           options={priorityGroups.map((group) => ({ label: `${group.groupCode} - ${group.groupName}`, value: group.id }))}
           reasonRequired
-          title={`Cập nhật priority ${dialog.user.fullName}`}
+          title={`Cập nhật nhóm ưu tiên ${dialog.user.fullName}`}
           onClose={() => setDialog(null)}
           onConfirm={(priorityGroupId, reason) => runAction(() => updateUserPriorityGroup(dialog.user.id, priorityGroupId, reason))}
         />

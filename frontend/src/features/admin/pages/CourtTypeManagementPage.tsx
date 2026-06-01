@@ -65,7 +65,7 @@ export function CourtTypeManagementPage() {
   const columns: Array<AdminColumn<AdminCourtType>> = [
     { header: "Tên loại", key: "name", render: (type) => <strong>{type.typeName}</strong> },
     { header: "Mô tả", key: "description", render: (type) => type.description ?? "Chưa có" },
-    { header: "Status", key: "status", render: (type) => <Badge tone={type.status === "ACTIVE" ? "success" : "neutral"}>{getStatusLabel(entityStatusLabel, type.status)}</Badge> },
+    { header: "Trạng thái", key: "status", render: (type) => <Badge tone={type.status === "ACTIVE" ? "success" : "neutral"}>{getStatusLabel(entityStatusLabel, type.status)}</Badge> },
     {
       header: "Thao tác",
       key: "actions",
@@ -73,7 +73,7 @@ export function CourtTypeManagementPage() {
         <AdminRowActions
           actions={[
             { label: "Sửa", onSelect: () => setDialog({ type: "edit", courtType: type }), tone: "primary" },
-            { label: "Cập nhật status", onSelect: () => setDialog({ type: "status", courtType: type }) }
+            { label: "Cập nhật trạng thái", onSelect: () => setDialog({ type: "status", courtType: type }) }
           ]}
         />
       )
@@ -82,7 +82,7 @@ export function CourtTypeManagementPage() {
   const advancedFilters: Array<AdminAdvancedFilter<AdminCourtType>> = [
     {
       key: "status",
-      label: "Status",
+      label: "Trạng thái",
       options: entityStatusOptions,
       getValue: (type) => type.status
     }
@@ -91,7 +91,7 @@ export function CourtTypeManagementPage() {
   return (
     <div className="admin-page">
       <AdminNavigation />
-      <AdminPageHeader title="Court types" description="Quản lý danh mục loại sân." actions={<Button onClick={() => setDialog({ type: "create" })}>Tạo loại sân</Button>} />
+      <AdminPageHeader title="Loại sân" description="Quản lý danh mục loại sân." actions={<Button onClick={() => setDialog({ type: "create" })}>Tạo loại sân</Button>} />
       {isLoading ? <LoadingState message="Đang tải loại sân..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được loại sân" onAction={() => setReloadKey((value) => value + 1)} /> : null}
       {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(type) => type.id} rows={courtTypes} /> : null}

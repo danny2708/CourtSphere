@@ -196,7 +196,7 @@ export function AdminDataTable<TRow>({ advancedFilters = [], columns, emptyMessa
         <div className="dialog-backdrop" role="presentation" onMouseDown={() => setAdvancedOpen(false)}>
           <div className="dialog-panel admin-filter-dialog" role="dialog" onMouseDown={(event) => event.stopPropagation()}>
             <div>
-              <p className="eyebrow">Admin</p>
+              <p className="eyebrow">Quản trị</p>
               <h2>Tìm kiếm nâng cao</h2>
             </div>
             <div className="admin-filter-dialog__grid">

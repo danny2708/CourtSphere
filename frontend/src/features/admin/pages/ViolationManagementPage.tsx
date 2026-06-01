@@ -50,22 +50,22 @@ export function ViolationManagementPage() {
   async function runAction(action: () => Promise<unknown>) {
     try {
       await action();
-      addToast({ message: "Violation đã được cập nhật.", title: "Thành công", type: "success" });
+      addToast({ message: "Vi phạm đã được cập nhật.", title: "Thành công", type: "success" });
       setDialog(null);
       setReloadKey((value) => value + 1);
     } catch (actionError) {
-      addToast({ message: getErrorMessage(actionError), title: "Không thể xử lý violation", type: "error" });
+      addToast({ message: getErrorMessage(actionError), title: "Không thể xử lý vi phạm", type: "error" });
     }
   }
 
   const columns: Array<AdminColumn<AdminViolation>> = [
-    { header: "User", key: "user", render: (violation) => violation.user?.email ?? "Chưa có" },
-    { header: "Booking", key: "booking", render: (violation) => violation.bookingItem?.bookingOrder?.bookingCode ?? "Chưa có" },
-    { header: "Type", key: "type", render: (violation) => getStatusLabel(violationTypeLabel, violation.violationType) },
-    { header: "Points", key: "points", render: (violation) => violation.penaltyPoints },
-    { header: "Recorded", key: "recorded", render: (violation) => formatDateTime(violation.recordedAt) },
+    { header: "Người dùng", key: "user", render: (violation) => violation.user?.email ?? "Chưa có" },
+    { header: "Đơn đặt sân", key: "booking", render: (violation) => violation.bookingItem?.bookingOrder?.bookingCode ?? "Chưa có" },
+    { header: "Loại vi phạm", key: "type", render: (violation) => getStatusLabel(violationTypeLabel, violation.violationType) },
+    { header: "Điểm phạt", key: "points", render: (violation) => violation.penaltyPoints },
+    { header: "Ngày ghi nhận", key: "recorded", render: (violation) => formatDateTime(violation.recordedAt) },
     {
-      header: "Status",
+      header: "Trạng thái",
       key: "status",
       render: (violation) => <Badge tone={violation.isWaived ? "neutral" : "danger"}>{violation.isWaived ? "Đã miễn" : "Đang tính điểm"}</Badge>
     },
@@ -77,11 +77,11 @@ export function ViolationManagementPage() {
           actions={[
             {
               disabled: violation.isWaived,
-              label: "Waive",
+              label: "Miễn vi phạm",
               onSelect: () => setDialog({ type: "waive", violation }),
               tone: "primary"
             },
-            { label: "Adjust points", onSelect: () => setDialog({ type: "adjust", violation }) }
+            { label: "Điều chỉnh điểm", onSelect: () => setDialog({ type: "adjust", violation }) }
           ]}
         />
       )
@@ -93,7 +93,7 @@ export function ViolationManagementPage() {
   const advancedFilters: Array<AdminAdvancedFilter<AdminViolation>> = [
     {
       key: "violationType",
-      label: "Violation type",
+      label: "Loại vi phạm",
       options: violationTypeOptions,
       getValue: (violation) => violation.violationType
     },
@@ -111,26 +111,26 @@ export function ViolationManagementPage() {
   return (
     <div className="admin-page">
       <AdminNavigation />
-      <AdminPageHeader title="Violation management" description="Theo dõi vi phạm, miễn vi phạm và điều chỉnh điểm có audit." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
-      {isLoading ? <LoadingState message="Đang tải violations..." /> : null}
-      {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được violations" onAction={() => setReloadKey((value) => value + 1)} /> : null}
+      <AdminPageHeader title="Quản lý vi phạm" description="Theo dõi vi phạm, miễn vi phạm và điều chỉnh điểm có nhật ký kiểm toán." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
+      {isLoading ? <LoadingState message="Đang tải vi phạm..." /> : null}
+      {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được vi phạm" onAction={() => setReloadKey((value) => value + 1)} /> : null}
       {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(violation) => violation.id} rows={violations} /> : null}
       {dialog?.type === "waive" ? (
         <AdminConfirmDialog
-          message="Miễn vi phạm sẽ trừ điểm penalty khỏi user và ghi audit log."
+          message="Miễn vi phạm sẽ trừ điểm phạt khỏi người dùng và ghi nhật ký kiểm toán."
           reasonRequired
-          title="Waive violation"
+          title="Miễn vi phạm"
           onClose={() => setDialog(null)}
           onConfirm={(reason) => runAction(() => waiveViolation(dialog.violation.id, reason))}
         />
       ) : null}
       {dialog?.type === "adjust" ? (
         <AdminTextFormDialog
-          fields={[{ key: "penaltyPoints", label: "Penalty points", required: true, type: "number" }]}
+          fields={[{ key: "penaltyPoints", label: "Điểm phạt", required: true, type: "number" }]}
           initialValues={{ penaltyPoints: dialog.violation.penaltyPoints }}
-          title="Adjust violation points"
+          title="Điều chỉnh điểm vi phạm"
           onClose={() => setDialog(null)}
-          onSubmit={(values) => runAction(() => adjustViolationPoints(dialog.violation.id, Number(values.penaltyPoints), "Adjusted from admin UI"))}
+          onSubmit={(values) => runAction(() => adjustViolationPoints(dialog.violation.id, Number(values.penaltyPoints), "Điều chỉnh từ giao diện quản trị"))}
         />
       ) : null}
     </div>

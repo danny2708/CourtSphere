@@ -52,7 +52,7 @@ export function PriorityGroupManagementPage() {
         groupName: values.groupName,
         priorityLevel: Number(values.priorityLevel)
       });
-      addToast({ message: "Priority group đã được cập nhật.", title: "Thành công", type: "success" });
+      addToast({ message: "Nhóm ưu tiên đã được cập nhật.", title: "Thành công", type: "success" });
       setActiveGroup(null);
       setReloadKey((value) => value + 1);
     } catch (saveError) {
@@ -61,13 +61,13 @@ export function PriorityGroupManagementPage() {
   }
 
   const columns: Array<AdminColumn<AdminPriorityGroup>> = [
-    { header: "Code", key: "code", render: (group) => <strong>{group.groupCode}</strong> },
-    { header: "Name", key: "name", render: (group) => group.groupName },
-    { header: "Priority", key: "priority", render: (group) => group.priorityLevel },
-    { header: "Advance days", key: "days", render: (group) => group.advanceBookingDays },
-    { header: "Users", key: "users", render: (group) => group.userCount ?? 0 },
+    { header: "Mã nhóm", key: "code", render: (group) => <strong>{group.groupCode}</strong> },
+    { header: "Tên nhóm", key: "name", render: (group) => group.groupName },
+    { header: "Mức ưu tiên", key: "priority", render: (group) => group.priorityLevel },
+    { header: "Số ngày đặt trước", key: "days", render: (group) => group.advanceBookingDays },
+    { header: "Người dùng", key: "users", render: (group) => group.userCount ?? 0 },
     {
-      header: "Status",
+      header: "Trạng thái",
       key: "status",
       render: (group) => <Badge tone={group.status === "ACTIVE" ? "success" : "neutral"}>{getStatusLabel(entityStatusLabel, group.status ?? "ACTIVE")}</Badge>
     },
@@ -86,7 +86,7 @@ export function PriorityGroupManagementPage() {
   const advancedFilters: Array<AdminAdvancedFilter<AdminPriorityGroup>> = [
     {
       key: "status",
-      label: "Status",
+      label: "Trạng thái",
       options: [
         { label: entityStatusLabel.ACTIVE, value: "ACTIVE" },
         { label: entityStatusLabel.INACTIVE, value: "INACTIVE" }
@@ -98,20 +98,20 @@ export function PriorityGroupManagementPage() {
   return (
     <div className="admin-page">
       <AdminNavigation />
-      <AdminPageHeader title="Priority groups" description="Cấu hình nhóm ưu tiên và số ngày được đặt trước." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
-      {isLoading ? <LoadingState message="Đang tải priority groups..." /> : null}
-      {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được priority groups" onAction={() => setReloadKey((value) => value + 1)} /> : null}
+      <AdminPageHeader title="Nhóm ưu tiên" description="Cấu hình nhóm ưu tiên và số ngày được đặt trước." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
+      {isLoading ? <LoadingState message="Đang tải nhóm ưu tiên..." /> : null}
+      {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được nhóm ưu tiên" onAction={() => setReloadKey((value) => value + 1)} /> : null}
       {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(group) => group.id} rows={groups} /> : null}
       {activeGroup ? (
         <AdminTextFormDialog
           fields={[
             { key: "groupName", label: "Tên nhóm", required: true },
-            { key: "priorityLevel", label: "Priority level", required: true, type: "number" },
+            { key: "priorityLevel", label: "Mức ưu tiên", required: true, type: "number" },
             { key: "advanceBookingDays", label: "Số ngày đặt trước", required: true, type: "number" },
             { key: "description", label: "Mô tả" }
           ]}
           initialValues={activeGroup}
-          title="Cập nhật priority group"
+          title="Cập nhật nhóm ưu tiên"
           onClose={() => setActiveGroup(null)}
           onSubmit={handleSave}
         />
