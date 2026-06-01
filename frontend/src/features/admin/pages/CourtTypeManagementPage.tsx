@@ -7,7 +7,7 @@ import { LoadingState } from "../../../components/common/LoadingState";
 import { useToastStore } from "../../../stores/toast.store";
 import { getErrorMessage } from "../../../utils/format-error";
 import { entityStatusLabel, getStatusLabel } from "../../../utils/status-label";
-import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
+import { AdminDataTable, type AdminAdvancedFilter, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
 import { AdminRowActions } from "../components/AdminRowActions";
@@ -79,6 +79,14 @@ export function CourtTypeManagementPage() {
       )
     }
   ];
+  const advancedFilters: Array<AdminAdvancedFilter<AdminCourtType>> = [
+    {
+      key: "status",
+      label: "Status",
+      options: entityStatusOptions,
+      getValue: (type) => type.status
+    }
+  ];
 
   return (
     <div className="admin-page">
@@ -86,7 +94,7 @@ export function CourtTypeManagementPage() {
       <AdminPageHeader title="Court types" description="Quản lý danh mục loại sân." actions={<Button onClick={() => setDialog({ type: "create" })}>Tạo loại sân</Button>} />
       {isLoading ? <LoadingState message="Đang tải loại sân..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được loại sân" onAction={() => setReloadKey((value) => value + 1)} /> : null}
-      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(type) => type.id} rows={courtTypes} /> : null}
+      {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(type) => type.id} rows={courtTypes} /> : null}
 
       {dialog?.type === "create" || dialog?.type === "edit" ? (
         <AdminTextFormDialog

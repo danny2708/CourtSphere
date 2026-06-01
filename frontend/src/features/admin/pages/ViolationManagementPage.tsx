@@ -8,7 +8,7 @@ import { useToastStore } from "../../../stores/toast.store";
 import { getErrorMessage } from "../../../utils/format-error";
 import { getStatusLabel, violationTypeLabel } from "../../../utils/status-label";
 import { AdminConfirmDialog } from "../components/AdminConfirmDialog";
-import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
+import { AdminDataTable, type AdminAdvancedFilter, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
 import { AdminRowActions } from "../components/AdminRowActions";
@@ -87,6 +87,26 @@ export function ViolationManagementPage() {
       )
     }
   ];
+  const violationTypeOptions = [...new Set(violations.map((violation) => violation.violationType))]
+    .sort((left, right) => left.localeCompare(right))
+    .map((violationType) => ({ label: getStatusLabel(violationTypeLabel, violationType), value: violationType }));
+  const advancedFilters: Array<AdminAdvancedFilter<AdminViolation>> = [
+    {
+      key: "violationType",
+      label: "Violation type",
+      options: violationTypeOptions,
+      getValue: (violation) => violation.violationType
+    },
+    {
+      key: "isWaived",
+      label: "Trạng thái điểm",
+      options: [
+        { label: "Đang tính điểm", value: "false" },
+        { label: "Đã miễn", value: "true" }
+      ],
+      getValue: (violation) => violation.isWaived
+    }
+  ];
 
   return (
     <div className="admin-page">
@@ -94,7 +114,7 @@ export function ViolationManagementPage() {
       <AdminPageHeader title="Violation management" description="Theo dõi vi phạm, miễn vi phạm và điều chỉnh điểm có audit." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
       {isLoading ? <LoadingState message="Đang tải violations..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được violations" onAction={() => setReloadKey((value) => value + 1)} /> : null}
-      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(violation) => violation.id} rows={violations} /> : null}
+      {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(violation) => violation.id} rows={violations} /> : null}
       {dialog?.type === "waive" ? (
         <AdminConfirmDialog
           message="Miễn vi phạm sẽ trừ điểm penalty khỏi user và ghi audit log."

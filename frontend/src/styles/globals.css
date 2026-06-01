@@ -3363,7 +3363,8 @@ a {
   padding-right: 4px;
 }
 
-.admin-filter-dialog__grid .admin-filter-field input {
+.admin-filter-dialog__grid .admin-filter-field input,
+.admin-filter-dialog__grid .admin-filter-field select {
   width: 100%;
   min-width: 0;
 }

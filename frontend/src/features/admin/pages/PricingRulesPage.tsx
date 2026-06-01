@@ -7,7 +7,7 @@ import { LoadingState } from "../../../components/common/LoadingState";
 import { useToastStore } from "../../../stores/toast.store";
 import { getErrorMessage } from "../../../utils/format-error";
 import { entityStatusLabel, getStatusLabel } from "../../../utils/status-label";
-import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
+import { AdminDataTable, type AdminAdvancedFilter, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
 import { AdminRowActions } from "../components/AdminRowActions";
@@ -23,6 +23,16 @@ const statusOptions: Array<{ label: string; value: EntityStatus }> = [
   { label: entityStatusLabel.ACTIVE, value: "ACTIVE" },
   { label: entityStatusLabel.INACTIVE, value: "INACTIVE" }
 ];
+
+const weekdayLabels: Record<number, string> = {
+  1: "Thứ 2",
+  2: "Thứ 3",
+  3: "Thứ 4",
+  4: "Thứ 5",
+  5: "Thứ 6",
+  6: "Thứ 7",
+  7: "Chủ nhật"
+};
 
 export function PricingRulesPage() {
   const { addToast } = useToastStore();
@@ -100,6 +110,28 @@ export function PricingRulesPage() {
       )
     }
   ];
+  const applicableDayOptions = [...new Set(
+    pricingRules.map((rule) => rule.applicableDay).filter((day): day is number => day !== null && day !== undefined)
+  )]
+    .sort((left, right) => left - right)
+    .map((day) => ({ label: weekdayLabels[day] ?? String(day), value: String(day) }));
+  const advancedFilters: Array<AdminAdvancedFilter<AdminPricingRule>> = [
+    {
+      key: "status",
+      label: "Status",
+      options: statusOptions,
+      getValue: (rule) => rule.status
+    },
+    {
+      key: "applicableDay",
+      label: "Ngày áp dụng",
+      options: [
+        { label: "Tất cả ngày", value: "ALL_DAYS" },
+        ...applicableDayOptions
+      ],
+      getValue: (rule) => rule.applicableDay === null || rule.applicableDay === undefined ? "ALL_DAYS" : String(rule.applicableDay)
+    }
+  ];
 
   return (
     <div className="admin-page">
@@ -112,7 +144,7 @@ export function PricingRulesPage() {
       </div>
       {isLoading ? <LoadingState message="Đang tải bảng giá..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được bảng giá" onAction={() => setReloadKey((value) => value + 1)} /> : null}
-      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(rule) => rule.id} rows={pricingRules} /> : null}
+      {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(rule) => rule.id} rows={pricingRules} /> : null}
       {dialog?.type === "create" ? (
         <AdminTextFormDialog
           fields={[

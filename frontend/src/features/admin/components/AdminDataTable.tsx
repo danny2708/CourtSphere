@@ -10,7 +10,17 @@ export type AdminColumn<TRow> = {
   render: (row: TRow) => ReactNode;
 };
 
+type AdminFilterValue = string | number | boolean | null | undefined;
+
+export type AdminAdvancedFilter<TRow> = {
+  key: string;
+  label: string;
+  options: Array<{ label: string; value: string }>;
+  getValue: (row: TRow) => AdminFilterValue | AdminFilterValue[];
+};
+
 type AdminDataTableProps<TRow> = {
+  advancedFilters?: Array<AdminAdvancedFilter<TRow>>;
   columns: Array<AdminColumn<TRow>>;
   emptyMessage?: string;
   getRowKey: (row: TRow) => string;
@@ -21,17 +31,6 @@ type FlatRow = Record<string, string>;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value) && !(value instanceof Date);
-}
-
-function labelFromPath(path: string): string {
-  return path
-    .replace(/\[(\d+)\]/g, " $1")
-    .replace(/\./g, " ")
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/_/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/^./, (value) => value.toUpperCase());
 }
 
 function stringifyValue(value: unknown): string {
@@ -87,30 +86,19 @@ function flattenRow(row: unknown): FlatRow {
   return output;
 }
 
-export function AdminDataTable<TRow>({ columns, emptyMessage, getRowKey, rows }: AdminDataTableProps<TRow>) {
+function normalizeFilterValue(value: AdminFilterValue): string {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+export function AdminDataTable<TRow>({ advancedFilters = [], columns, emptyMessage, getRowKey, rows }: AdminDataTableProps<TRow>) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [fieldFilters, setFieldFilters] = useState<Record<string, string>>({});
   const [keyword, setKeyword] = useState("");
   const flattenedRows = useMemo(() => rows.map((row) => ({ row, values: flattenRow(row) })), [rows]);
-  const filterFields = useMemo(() => {
-    const fieldMap = new Map<string, string>();
-
-    flattenedRows.forEach(({ values }) => {
-      Object.entries(values).forEach(([key, value]) => {
-        if (value.trim()) {
-          fieldMap.set(key, labelFromPath(key));
-        }
-      });
-    });
-
-    return [...fieldMap.entries()]
-      .map(([key, label]) => ({ key, label }))
-      .sort((left, right) => left.label.localeCompare(right.label));
-  }, [flattenedRows]);
   const filteredRows = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
-    const activeFieldFilters = Object.entries(fieldFilters)
-      .map(([key, value]) => [key, value.trim().toLowerCase()] as const)
+    const activeFieldFilters = advancedFilters
+      .map((filter) => [filter, fieldFilters[filter.key]?.trim()] as const)
       .filter(([, value]) => value);
 
     if (!normalizedKeyword && activeFieldFilters.length === 0) {
@@ -118,19 +106,23 @@ export function AdminDataTable<TRow>({ columns, emptyMessage, getRowKey, rows }:
     }
 
     return flattenedRows
-      .filter(({ values }) => {
+      .filter(({ row, values }) => {
         const matchesKeyword = normalizedKeyword
           ? Object.values(values).some((value) => value.toLowerCase().includes(normalizedKeyword))
           : true;
-        const matchesFields = activeFieldFilters.every(([key, value]) =>
-          (values[key] ?? "").toLowerCase().includes(value)
-        );
+        const matchesFields = activeFieldFilters.every(([filter, selectedValue]) => {
+          const rawValue = filter.getValue(row);
+          const rowValues = Array.isArray(rawValue) ? rawValue : [rawValue];
+
+          return rowValues.map(normalizeFilterValue).includes(selectedValue);
+        });
 
         return matchesKeyword && matchesFields;
       })
       .map(({ row }) => row);
-  }, [fieldFilters, flattenedRows, keyword, rows]);
+  }, [advancedFilters, fieldFilters, flattenedRows, keyword, rows]);
   const hasActiveFilters = Boolean(keyword.trim() || Object.values(fieldFilters).some((value) => value.trim()));
+  const hasAdvancedFilters = advancedFilters.length > 0;
 
   function updateFieldFilter(key: string, value: string) {
     setFieldFilters((current) => ({
@@ -166,10 +158,12 @@ export function AdminDataTable<TRow>({ columns, emptyMessage, getRowKey, rows }:
               Xóa lọc
             </Button>
           ) : null}
-          <Button size="md" variant="secondary" onClick={() => setAdvancedOpen(true)}>
-            <SlidersHorizontal aria-hidden="true" size={18} />
-            Tìm kiếm nâng cao
-          </Button>
+          {hasAdvancedFilters ? (
+            <Button size="md" variant="secondary" onClick={() => setAdvancedOpen(true)}>
+              <SlidersHorizontal aria-hidden="true" size={18} />
+              Tìm kiếm nâng cao
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -198,7 +192,7 @@ export function AdminDataTable<TRow>({ columns, emptyMessage, getRowKey, rows }:
         </div>
       )}
 
-      {advancedOpen ? (
+      {advancedOpen && hasAdvancedFilters ? (
         <div className="dialog-backdrop" role="presentation" onMouseDown={() => setAdvancedOpen(false)}>
           <div className="dialog-panel admin-filter-dialog" role="dialog" onMouseDown={(event) => event.stopPropagation()}>
             <div>
@@ -206,14 +200,20 @@ export function AdminDataTable<TRow>({ columns, emptyMessage, getRowKey, rows }:
               <h2>Tìm kiếm nâng cao</h2>
             </div>
             <div className="admin-filter-dialog__grid">
-              {filterFields.map((field) => (
+              {advancedFilters.map((field) => (
                 <label className="admin-filter-field" key={field.key}>
                   <span>{field.label}</span>
-                  <input
-                    placeholder={field.label}
+                  <select
                     value={fieldFilters[field.key] ?? ""}
                     onChange={(event) => updateFieldFilter(field.key, event.target.value)}
-                  />
+                  >
+                    <option value="">Tất cả</option>
+                    {field.options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
               ))}
             </div>

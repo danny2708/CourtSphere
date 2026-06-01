@@ -7,7 +7,7 @@ import { LoadingState } from "../../../components/common/LoadingState";
 import { useToastStore } from "../../../stores/toast.store";
 import { entityStatusLabel, getStatusLabel } from "../../../utils/status-label";
 import { getErrorMessage } from "../../../utils/format-error";
-import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
+import { AdminDataTable, type AdminAdvancedFilter, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
 import { AdminRowActions } from "../components/AdminRowActions";
@@ -83,6 +83,17 @@ export function PriorityGroupManagementPage() {
       )
     }
   ];
+  const advancedFilters: Array<AdminAdvancedFilter<AdminPriorityGroup>> = [
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { label: entityStatusLabel.ACTIVE, value: "ACTIVE" },
+        { label: entityStatusLabel.INACTIVE, value: "INACTIVE" }
+      ],
+      getValue: (group) => group.status ?? "ACTIVE"
+    }
+  ];
 
   return (
     <div className="admin-page">
@@ -90,7 +101,7 @@ export function PriorityGroupManagementPage() {
       <AdminPageHeader title="Priority groups" description="Cấu hình nhóm ưu tiên và số ngày được đặt trước." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
       {isLoading ? <LoadingState message="Đang tải priority groups..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được priority groups" onAction={() => setReloadKey((value) => value + 1)} /> : null}
-      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(group) => group.id} rows={groups} /> : null}
+      {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(group) => group.id} rows={groups} /> : null}
       {activeGroup ? (
         <AdminTextFormDialog
           fields={[

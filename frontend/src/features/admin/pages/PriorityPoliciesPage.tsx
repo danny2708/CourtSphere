@@ -7,7 +7,7 @@ import { LoadingState } from "../../../components/common/LoadingState";
 import { useToastStore } from "../../../stores/toast.store";
 import { getErrorMessage } from "../../../utils/format-error";
 import { entityStatusLabel, getStatusLabel } from "../../../utils/status-label";
-import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
+import { AdminDataTable, type AdminAdvancedFilter, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
 import { AdminRowActions } from "../components/AdminRowActions";
@@ -82,6 +82,32 @@ export function PriorityPoliciesPage() {
       )
     }
   ];
+  const priorityGroupOptions = [...new Map(
+    policies
+      .map((policy) => {
+        const id = policy.priorityGroup?.id ?? policy.priorityGroupId;
+        const label = policy.priorityGroup?.groupName ?? policy.priorityGroup?.groupCode ?? policy.priorityGroupId;
+
+        return [id, { label, value: id }] as const;
+      })
+  ).values()];
+  const advancedFilters: Array<AdminAdvancedFilter<AdminPriorityPolicy>> = [
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { label: entityStatusLabel.ACTIVE, value: "ACTIVE" },
+        { label: entityStatusLabel.INACTIVE, value: "INACTIVE" }
+      ],
+      getValue: (policy) => policy.status ?? "ACTIVE"
+    },
+    {
+      key: "priorityGroup",
+      label: "Priority group",
+      options: priorityGroupOptions,
+      getValue: (policy) => policy.priorityGroup?.id ?? policy.priorityGroupId
+    }
+  ];
 
   return (
     <div className="admin-page">
@@ -89,7 +115,7 @@ export function PriorityPoliciesPage() {
       <AdminPageHeader title="Priority policies" description="Cấu hình quota và khả năng đặt trước theo nhóm ưu tiên." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
       {isLoading ? <LoadingState message="Đang tải priority policies..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được priority policies" onAction={() => setReloadKey((value) => value + 1)} /> : null}
-      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(policy) => policy.id} rows={policies} /> : null}
+      {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(policy) => policy.id} rows={policies} /> : null}
       {activePolicy ? (
         <AdminTextFormDialog
           fields={[

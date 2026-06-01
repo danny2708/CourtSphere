@@ -7,7 +7,7 @@ import { LoadingState } from "../../../components/common/LoadingState";
 import { useToastStore } from "../../../stores/toast.store";
 import { getErrorMessage } from "../../../utils/format-error";
 import { getStatusLabel, refundStatusLabel } from "../../../utils/status-label";
-import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
+import { AdminDataTable, type AdminAdvancedFilter, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
 import { AdminRowActions } from "../components/AdminRowActions";
@@ -22,6 +22,15 @@ const retryOptions: Array<{ label: string; value: RetryResult }> = [
   { label: "Hoàn tiền thành công", value: "SUCCESS" },
   { label: "Hoàn tiền thất bại", value: "FAILED" },
   { label: "Cần xử lý thủ công", value: "MANUAL_REVIEW" }
+];
+
+const refundStatusOptions: Array<{ label: string; value: RefundStatus }> = [
+  { label: refundStatusLabel.REQUESTED, value: "REQUESTED" },
+  { label: refundStatusLabel.PROCESSING, value: "PROCESSING" },
+  { label: refundStatusLabel.SUCCESS, value: "SUCCESS" },
+  { label: refundStatusLabel.FAILED, value: "FAILED" },
+  { label: refundStatusLabel.MANUAL_REVIEW, value: "MANUAL_REVIEW" },
+  { label: refundStatusLabel.REJECTED, value: "REJECTED" }
 ];
 
 export function RefundManagementPage() {
@@ -91,6 +100,14 @@ export function RefundManagementPage() {
       )
     }
   ];
+  const advancedFilters: Array<AdminAdvancedFilter<AdminRefund>> = [
+    {
+      key: "refundStatus",
+      label: "Refund status",
+      options: refundStatusOptions,
+      getValue: (refund) => refund.refundStatus
+    }
+  ];
 
   return (
     <div className="admin-page">
@@ -98,7 +115,7 @@ export function RefundManagementPage() {
       <AdminPageHeader title="Refund management" description="Theo dõi và retry các refund sandbox." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
       {isLoading ? <LoadingState message="Đang tải refunds..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được refunds" onAction={() => setReloadKey((value) => value + 1)} /> : null}
-      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(refund) => refund.id} rows={refunds} /> : null}
+      {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(refund) => refund.id} rows={refunds} /> : null}
       {activeRefund ? (
         <AdminSelectDialog
           label="Kết quả retry"

@@ -7,7 +7,7 @@ import { LoadingState } from "../../../components/common/LoadingState";
 import { useToastStore } from "../../../stores/toast.store";
 import { courtStatusLabel } from "../../../utils/status-label";
 import { getErrorMessage } from "../../../utils/format-error";
-import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
+import { AdminDataTable, type AdminAdvancedFilter, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
 import { AdminRowActions } from "../components/AdminRowActions";
@@ -86,6 +86,20 @@ export function CourtManagementPage() {
       )
     }
   ];
+  const advancedFilters: Array<AdminAdvancedFilter<AdminCourt>> = [
+    {
+      key: "status",
+      label: "Status",
+      options: courtStatusOptions,
+      getValue: (court) => court.status
+    },
+    {
+      key: "courtType",
+      label: "Loại sân",
+      options: courtTypes.map((type) => ({ label: type.typeName, value: type.id })),
+      getValue: (court) => court.courtType?.id
+    }
+  ];
 
   return (
     <div className="admin-page">
@@ -93,7 +107,7 @@ export function CourtManagementPage() {
       <AdminPageHeader title="Courts" description="Quản lý sân, loại sân và trạng thái vận hành." actions={<Button onClick={() => setDialog({ type: "create" })}>Tạo sân</Button>} />
       {isLoading ? <LoadingState message="Đang tải sân..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được sân" onAction={() => setReloadKey((value) => value + 1)} /> : null}
-      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(court) => court.id} rows={courts} /> : null}
+      {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(court) => court.id} rows={courts} /> : null}
 
       {dialog?.type === "create" || dialog?.type === "edit" ? (
         <AdminTextFormDialog

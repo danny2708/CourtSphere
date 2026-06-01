@@ -7,7 +7,7 @@ import { LoadingState } from "../../../components/common/LoadingState";
 import { useToastStore } from "../../../stores/toast.store";
 import { getErrorMessage } from "../../../utils/format-error";
 import { entityStatusLabel, getStatusLabel } from "../../../utils/status-label";
-import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
+import { AdminDataTable, type AdminAdvancedFilter, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
 import { AdminRowActions } from "../components/AdminRowActions";
@@ -129,6 +129,20 @@ export function OperatingHoursPage({ variant = "admin" }: OperatingHoursPageProp
       )
     }
   ];
+  const advancedFilters: Array<AdminAdvancedFilter<AdminOperatingHour>> = [
+    {
+      key: "weekday",
+      label: "Thứ trong tuần",
+      options: Object.entries(weekdayLabels).map(([value, label]) => ({ label, value })),
+      getValue: (item) => item.weekday
+    },
+    {
+      key: "status",
+      label: "Status",
+      options: statusOptions,
+      getValue: (item) => item.status
+    }
+  ];
 
   return (
     <div className="admin-page">
@@ -145,7 +159,7 @@ export function OperatingHoursPage({ variant = "admin" }: OperatingHoursPageProp
       </div>
       {isLoading ? <LoadingState message="Đang tải giờ hoạt động..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được giờ hoạt động" onAction={() => setReloadKey((value) => value + 1)} /> : null}
-      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(item) => item.id} rows={hours} /> : null}
+      {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(item) => item.id} rows={hours} /> : null}
       {dialog?.type === "create" ? (
         <AdminTextFormDialog
           fields={operatingHourFields}

@@ -11,7 +11,7 @@ import {
   getStatusLabel
 } from "../../../utils/status-label";
 import { getErrorMessage } from "../../../utils/format-error";
-import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
+import { AdminDataTable, type AdminAdvancedFilter, type AdminColumn } from "../components/AdminDataTable";
 import { AdminMultiSelectDialog } from "../components/AdminMultiSelectDialog";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
@@ -177,6 +177,32 @@ export function UserManagementPage() {
       )
     }
   ];
+  const advancedFilters: Array<AdminAdvancedFilter<AdminUser>> = [
+    {
+      key: "accountStatus",
+      label: "Account status",
+      options: accountStatusOptions,
+      getValue: (user) => user.accountStatus
+    },
+    {
+      key: "bookingPermissionStatus",
+      label: "Booking permission",
+      options: bookingPermissionOptions,
+      getValue: (user) => user.bookingPermissionStatus
+    },
+    {
+      key: "role",
+      label: "Role",
+      options: roleOptions,
+      getValue: (user) => user.roles
+    },
+    {
+      key: "priorityGroup",
+      label: "Priority group",
+      options: priorityGroups.map((group) => ({ label: `${group.groupCode} - ${group.groupName}`, value: group.id })),
+      getValue: (user) => user.priorityGroup?.id
+    }
+  ];
 
   return (
     <div className="admin-page">
@@ -189,7 +215,7 @@ export function UserManagementPage() {
 
       {isLoading ? <LoadingState message="Đang tải users..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được users" onAction={() => setReloadKey((value) => value + 1)} /> : null}
-      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(user) => user.id} rows={users} /> : null}
+      {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(user) => user.id} rows={users} /> : null}
 
       {dialog?.type === "assignRole" ? (
         <AdminMultiSelectDialog
