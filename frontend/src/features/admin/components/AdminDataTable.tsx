@@ -12,12 +12,24 @@ export type AdminColumn<TRow> = {
 
 type AdminFilterValue = string | number | boolean | null | undefined;
 
-export type AdminAdvancedFilter<TRow> = {
+type AdminSelectAdvancedFilter<TRow> = {
   key: string;
   label: string;
+  type?: "select";
   options: Array<{ label: string; value: string }>;
   getValue: (row: TRow) => AdminFilterValue | AdminFilterValue[];
 };
+
+type AdminNumberRangeAdvancedFilter<TRow> = {
+  key: string;
+  label: string;
+  type: "numberRange";
+  minPlaceholder?: string;
+  maxPlaceholder?: string;
+  getValue: (row: TRow) => number | null | undefined;
+};
+
+export type AdminAdvancedFilter<TRow> = AdminSelectAdvancedFilter<TRow> | AdminNumberRangeAdvancedFilter<TRow>;
 
 type AdminDataTableProps<TRow> = {
   advancedFilters?: Array<AdminAdvancedFilter<TRow>>;
@@ -51,9 +63,7 @@ function stringifyValue(value: unknown): string {
 
 function flattenValue(value: unknown, path: string, output: FlatRow): void {
   if (Array.isArray(value)) {
-    const primitiveValues = value
-      .map((item) => stringifyValue(item))
-      .filter(Boolean);
+    const primitiveValues = value.map((item) => stringifyValue(item)).filter(Boolean);
 
     if (primitiveValues.length > 0 && path) {
       output[path] = primitiveValues.join(" ");
@@ -90,6 +100,10 @@ function normalizeFilterValue(value: AdminFilterValue): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
+function rangeFilterKey(key: string, edge: "min" | "max"): string {
+  return `${key}.${edge}`;
+}
+
 export function AdminDataTable<TRow>({ advancedFilters = [], columns, emptyMessage, getRowKey, rows }: AdminDataTableProps<TRow>) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [fieldFilters, setFieldFilters] = useState<Record<string, string>>({});
@@ -97,20 +111,48 @@ export function AdminDataTable<TRow>({ advancedFilters = [], columns, emptyMessa
   const flattenedRows = useMemo(() => rows.map((row) => ({ row, values: flattenRow(row) })), [rows]);
   const filteredRows = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
-    const activeFieldFilters = advancedFilters
-      .map((filter) => [filter, fieldFilters[filter.key]?.trim()] as const)
-      .filter(([, value]) => value);
+    const hasFieldFilters = advancedFilters.some((filter) => {
+      if (filter.type === "numberRange") {
+        return Boolean(fieldFilters[rangeFilterKey(filter.key, "min")]?.trim() || fieldFilters[rangeFilterKey(filter.key, "max")]?.trim());
+      }
 
-    if (!normalizedKeyword && activeFieldFilters.length === 0) {
+      return Boolean(fieldFilters[filter.key]?.trim());
+    });
+
+    if (!normalizedKeyword && !hasFieldFilters) {
       return rows;
     }
 
     return flattenedRows
       .filter(({ row, values }) => {
-        const matchesKeyword = normalizedKeyword
-          ? Object.values(values).some((value) => value.toLowerCase().includes(normalizedKeyword))
-          : true;
-        const matchesFields = activeFieldFilters.every(([filter, selectedValue]) => {
+        const matchesKeyword = normalizedKeyword ? Object.values(values).some((value) => value.toLowerCase().includes(normalizedKeyword)) : true;
+        const matchesFields = advancedFilters.every((filter) => {
+          if (filter.type === "numberRange") {
+            const minRaw = fieldFilters[rangeFilterKey(filter.key, "min")]?.trim();
+            const maxRaw = fieldFilters[rangeFilterKey(filter.key, "max")]?.trim();
+
+            if (!minRaw && !maxRaw) {
+              return true;
+            }
+
+            const rowValue = filter.getValue(row);
+            const amount = typeof rowValue === "number" ? rowValue : Number(rowValue);
+            const min = minRaw ? Number(minRaw) : null;
+            const max = maxRaw ? Number(maxRaw) : null;
+
+            if (Number.isNaN(amount) || (min !== null && Number.isNaN(min)) || (max !== null && Number.isNaN(max))) {
+              return false;
+            }
+
+            return (min === null || amount >= min) && (max === null || amount <= max);
+          }
+
+          const selectedValue = fieldFilters[filter.key]?.trim();
+
+          if (!selectedValue) {
+            return true;
+          }
+
           const rawValue = filter.getValue(row);
           const rowValues = Array.isArray(rawValue) ? rawValue : [rawValue];
 
@@ -145,11 +187,7 @@ export function AdminDataTable<TRow>({ advancedFilters = [], columns, emptyMessa
       <div className="admin-table-filter-card">
         <label className="admin-table-search">
           <Search aria-hidden="true" size={20} />
-          <input
-            placeholder="Tìm kiếm"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-          />
+          <input placeholder="Tìm kiếm" value={keyword} onChange={(event) => setKeyword(event.target.value)} />
         </label>
         <div className="admin-table-filter-actions">
           {hasActiveFilters ? (
@@ -200,22 +238,43 @@ export function AdminDataTable<TRow>({ advancedFilters = [], columns, emptyMessa
               <h2>Tìm kiếm nâng cao</h2>
             </div>
             <div className="admin-filter-dialog__grid">
-              {advancedFilters.map((field) => (
-                <label className="admin-filter-field" key={field.key}>
-                  <span>{field.label}</span>
-                  <select
-                    value={fieldFilters[field.key] ?? ""}
-                    onChange={(event) => updateFieldFilter(field.key, event.target.value)}
-                  >
-                    <option value="">Tất cả</option>
-                    {field.options.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ))}
+              {advancedFilters.map((field) =>
+                field.type === "numberRange" ? (
+                  <div className="admin-filter-field admin-filter-field--range" key={field.key}>
+                    <span>{field.label}</span>
+                    <div className="admin-filter-range">
+                      <input
+                        inputMode="numeric"
+                        min="0"
+                        placeholder={field.minPlaceholder ?? "Tối thiểu"}
+                        type="number"
+                        value={fieldFilters[rangeFilterKey(field.key, "min")] ?? ""}
+                        onChange={(event) => updateFieldFilter(rangeFilterKey(field.key, "min"), event.target.value)}
+                      />
+                      <input
+                        inputMode="numeric"
+                        min="0"
+                        placeholder={field.maxPlaceholder ?? "Tối đa"}
+                        type="number"
+                        value={fieldFilters[rangeFilterKey(field.key, "max")] ?? ""}
+                        onChange={(event) => updateFieldFilter(rangeFilterKey(field.key, "max"), event.target.value)}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <label className="admin-filter-field" key={field.key}>
+                    <span>{field.label}</span>
+                    <select value={fieldFilters[field.key] ?? ""} onChange={(event) => updateFieldFilter(field.key, event.target.value)}>
+                      <option value="">Tất cả</option>
+                      {field.options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )
+              )}
             </div>
             <div className="dialog-actions">
               <Button variant="ghost" onClick={resetFilters}>

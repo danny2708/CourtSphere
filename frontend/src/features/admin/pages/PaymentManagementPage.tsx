@@ -4,8 +4,8 @@ import { Badge } from "../../../components/common/Badge";
 import { Button } from "../../../components/common/Button";
 import { ErrorState } from "../../../components/common/ErrorState";
 import { LoadingState } from "../../../components/common/LoadingState";
-import { paymentStatusLabel, getStatusLabel } from "../../../utils/status-label";
 import { getErrorMessage } from "../../../utils/format-error";
+import { getStatusLabel, paymentStatusLabel } from "../../../utils/status-label";
 import { AdminDataTable, type AdminAdvancedFilter, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
@@ -30,9 +30,11 @@ export function PaymentManagementPage() {
 
   useEffect(() => {
     let isMounted = true;
+
     async function loadPayments() {
       setIsLoading(true);
       setError(null);
+
       try {
         const data = await listPayments();
         if (isMounted) setPayments(data);
@@ -42,7 +44,9 @@ export function PaymentManagementPage() {
         if (isMounted) setIsLoading(false);
       }
     }
+
     void loadPayments();
+
     return () => {
       isMounted = false;
     };
@@ -59,9 +63,7 @@ export function PaymentManagementPage() {
       render: (payment) => <Badge tone={payment.paymentStatus === "SUCCESS" ? "success" : "warning"}>{getStatusLabel(paymentStatusLabel, payment.paymentStatus)}</Badge>
     }
   ];
-  const paymentMethodOptions = [...new Set(payments.map((payment) => payment.paymentMethod).filter((method): method is string => Boolean(method)))]
-    .sort((left, right) => left.localeCompare(right))
-    .map((method) => ({ label: method, value: method }));
+
   const advancedFilters: Array<AdminAdvancedFilter<AdminPayment>> = [
     {
       key: "paymentStatus",
@@ -70,19 +72,27 @@ export function PaymentManagementPage() {
       getValue: (payment) => payment.paymentStatus
     },
     {
-      key: "paymentMethod",
-      label: "Phương thức thanh toán",
-      options: paymentMethodOptions,
-      getValue: (payment) => payment.paymentMethod
+      key: "amount",
+      label: "Khoảng tiền",
+      type: "numberRange",
+      minPlaceholder: "Từ",
+      maxPlaceholder: "Đến",
+      getValue: (payment) => payment.amount
     }
   ];
 
   return (
     <div className="admin-page">
       <AdminNavigation />
-      <AdminPageHeader title="Quản lý thanh toán" description="Theo dõi giao dịch thanh toán thử nghiệm." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
+      <AdminPageHeader
+        title="Quản lý thanh toán"
+        description="Theo dõi giao dịch thanh toán thử nghiệm."
+        actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>}
+      />
       {isLoading ? <LoadingState message="Đang tải thanh toán..." /> : null}
-      {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được thanh toán" onAction={() => setReloadKey((value) => value + 1)} /> : null}
+      {error && !isLoading ? (
+        <ErrorState actionLabel="Tải lại" message={error} title="Không tải được thanh toán" onAction={() => setReloadKey((value) => value + 1)} />
+      ) : null}
       {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(payment) => payment.id} rows={payments} /> : null}
     </div>
   );
