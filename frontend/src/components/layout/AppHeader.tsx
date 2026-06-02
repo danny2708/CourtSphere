@@ -118,7 +118,6 @@ export function AppHeader() {
     <header className="app-header">
       <div className="app-header__inner">
         <Link className="brand-link" to={ROUTE_PATHS.home} aria-label="CourtSphere">
-          <span className="brand-mark">CS</span>
           <span className="brand-text">CourtSphere</span>
         </Link>
 
