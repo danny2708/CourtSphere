@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Clock, CreditCard, ShieldCheck } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { Button } from "../../components/common/Button";
@@ -15,29 +14,6 @@ import { buildCourtDetailPath, ROUTE_PATHS } from "../../routes/route-paths";
 import { useAuthStore } from "../../stores/auth.store";
 import { useToastStore } from "../../stores/toast.store";
 import type { CourtFilterState } from "../../types/court.types";
-
-const summaryItems = [
-  {
-    icon: CalendarDays,
-    label: "Giữ chỗ",
-    value: "PENDING_PAYMENT"
-  },
-  {
-    icon: CreditCard,
-    label: "Thanh toán",
-    value: "100%"
-  },
-  {
-    icon: ShieldCheck,
-    label: "Xác nhận",
-    value: "Thanh toán thành công"
-  },
-  {
-    icon: Clock,
-    label: "Check-in",
-    value: "Quản lý/Quản trị"
-  }
-] as const;
 
 export function HomePage() {
   const { addToast } = useToastStore();
@@ -139,19 +115,7 @@ export function HomePage() {
         </p>
       </div>
 
-      <div className="summary-grid">
-        {summaryItems.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <article className="summary-card" key={item.label}>
-              <Icon aria-hidden="true" size={22} />
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </article>
-          );
-        })}
-      </div>
+      
 
       <SearchFilterBar
         placeholder={selectedCourtType ? `Tìm sân ${selectedCourtType}...` : "Tìm loại sân..."}

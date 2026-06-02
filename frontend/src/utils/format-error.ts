@@ -75,6 +75,8 @@ const codeMessages: Record<string, string> = {
   WAITLIST_NOT_ALLOWED: "Nhóm tài khoản hiện tại chưa được phép tham gia hàng chờ.",
   WAITLIST_SLOT_AVAILABLE: "Khung giờ này đang còn trống, bạn có thể đặt trực tiếp.",
   WAITLIST_TIME_NOT_ALIGNED: "Khung giờ không khớp với lịch hoạt động của sân.",
+  WAITLIST_CANCEL_NOT_ALLOWED: "Lượt hàng chờ này không còn ở trạng thái có thể hủy.",
+  WAITLIST_ENTRY_NOT_FOUND: "Không tìm thấy lượt hàng chờ.",
   VALIDATION_ERROR: "Vui lòng kiểm tra lại thông tin đã nhập."
 };
 

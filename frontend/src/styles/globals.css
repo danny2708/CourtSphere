@@ -2583,9 +2583,15 @@ a {
 .momo-payment-panel,
 .booking-facts,
 .booking-item-card,
-.my-booking-card {
+.my-booking-card,
+.my-waitlist-card {
   display: grid;
   gap: 14px;
+}
+
+.my-booking-card,
+.my-waitlist-card {
+  grid-template-rows: auto 1fr auto;
 }
 
 .booking-summary-card dl,
@@ -2675,6 +2681,45 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.my-waitlist-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.my-waitlist-card__header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.my-waitlist-card__meta {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.my-waitlist-card__meta span {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.my-waitlist-card__meta svg {
+  flex: 0 0 auto;
+  color: var(--color-primary-dark);
+}
+
+.my-waitlist-card__actions {
+  display: flex;
+  align-self: end;
+  justify-content: flex-end;
 }
 
 .booking-tabs {
@@ -4334,6 +4379,7 @@ a {
 
   .booking-item-card__header,
   .my-booking-card__header,
+  .my-waitlist-card__header,
   .booking-detail-header,
   .dialog-actions {
     align-items: stretch;
@@ -4341,10 +4387,15 @@ a {
   }
 
   .my-booking-card__actions .ui-button,
+  .my-waitlist-card__actions .ui-button,
   .detail-actions-stack .ui-button,
   .manager-card-actions .ui-button,
   .dialog-actions .ui-button {
     width: 100%;
+  }
+
+  .my-waitlist-card__actions {
+    justify-content: stretch;
   }
 
   .manager-booking-card__header {
