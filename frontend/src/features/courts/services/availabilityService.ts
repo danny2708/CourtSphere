@@ -43,6 +43,10 @@ function formatPrice(priceAmount: number | undefined): string | undefined {
   return priceAmount === undefined ? undefined : currencyFormatter.format(priceAmount);
 }
 
+function hasSlotStarted(startDatetime: string, now = new Date()): boolean {
+  return new Date(startDatetime).getTime() <= now.getTime();
+}
+
 function toReasonText(reason: string | undefined, status: BackendAvailabilitySlotStatus): string | undefined {
   if (!reason) {
     if (status === "BOOKED" || status === "CONFIRMED" || status === "IN_USE") {
@@ -97,7 +101,8 @@ function normalizeSlotStatus(status: BackendAvailabilitySlotStatus): Availabilit
 }
 
 function mapApiSlot(courtId: string, slot: AvailabilityApiSlot): AvailabilitySlotViewModel {
-  const normalizedStatus = normalizeSlotStatus(slot.status);
+  const slotHasStarted = hasSlotStarted(slot.startDatetime);
+  const normalizedStatus = slotHasStarted ? "UNAVAILABLE" : normalizeSlotStatus(slot.status);
 
   return {
     id: `${courtId}-${slot.startDatetime}`,
@@ -107,10 +112,10 @@ function mapApiSlot(courtId: string, slot: AvailabilityApiSlot): AvailabilitySlo
     startTimeText: formatTime(slot.startDatetime),
     endTimeText: formatTime(slot.endDatetime),
     status: normalizedStatus,
-    isAvailable: normalizedStatus === "AVAILABLE",
+    isAvailable: !slotHasStarted && normalizedStatus === "AVAILABLE",
     priceAmount: slot.priceAmount,
     priceText: formatPrice(slot.priceAmount),
-    reasonText: toReasonText(slot.unavailableReason, slot.status)
+    reasonText: slotHasStarted ? "Khung giờ đã bắt đầu, không thể đặt lịch." : toReasonText(slot.unavailableReason, slot.status)
   };
 }
 

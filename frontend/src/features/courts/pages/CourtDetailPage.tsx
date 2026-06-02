@@ -78,6 +78,10 @@ function getWeekDates(weekStartDate: string): string[] {
   return Array.from({ length: 7 }, (_, index) => toDateInputValue(addDays(weekStart, index)));
 }
 
+function hasSlotStarted(slot: AvailabilitySlotViewModel): boolean {
+  return new Date(slot.startDatetime).getTime() <= Date.now();
+}
+
 export function CourtDetailPage() {
   const navigate = useNavigate();
   const { courtId } = useParams<{ courtId: string }>();
@@ -220,7 +224,8 @@ export function CourtDetailPage() {
   }
 
   const canBook = court.status === "ACTIVE";
-  const canContinueBooking = canBook && selectedSlots.length > 0;
+  const hasStartedSelectedSlot = selectedSlots.some(hasSlotStarted);
+  const canContinueBooking = canBook && selectedSlots.length > 0 && !hasStartedSelectedSlot;
   const selectedTotalAmount = selectedSlots.reduce((sum, slot) => sum + (slot.priceAmount ?? 0), 0);
   const selectedSlotsText = selectedSlots.length
     ? selectedSlots
@@ -229,6 +234,15 @@ export function CourtDetailPage() {
     : "Chưa chọn khung giờ";
 
   const handleSelectSlot = (slot: AvailabilitySlotViewModel) => {
+    if (hasSlotStarted(slot)) {
+      addToast({
+        type: "warning",
+        title: "Khung giờ đã bắt đầu",
+        message: "Không thể đặt lịch cho khung giờ đã bắt đầu hoặc đã qua."
+      });
+      return;
+    }
+
     if (!slot.isAvailable) {
       addToast({
         type: "warning",
@@ -301,6 +315,18 @@ export function CourtDetailPage() {
       title: "Chuẩn bị đặt lịch",
       message: "Chuyển sang bước tạo giữ chỗ."
     });
+    if (selectedSlots.some(hasSlotStarted)) {
+      addToast({
+        type: "warning",
+        title: "Khung giờ đã bắt đầu",
+        message: "Có khung giờ đã bắt đầu hoặc đã qua. Vui lòng tải lại lịch và chọn khung giờ khác."
+      });
+      setSelectedSlotIds((currentIds) =>
+        currentIds.filter((slotId) => !selectedSlots.some((slot) => slot.id === slotId && hasSlotStarted(slot)))
+      );
+      return;
+    }
+
     const selectionId = saveBookingSelection(court.id, selectedSlots);
     navigate(buildBookingCreateSelectionPath({ courtId: court.id, selectionId }));
   };

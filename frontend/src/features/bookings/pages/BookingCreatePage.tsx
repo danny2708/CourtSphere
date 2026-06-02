@@ -23,6 +23,10 @@ import { createBooking } from "../services/bookingService";
 import { createBookingFormSchema } from "../schemas/bookingSchemas";
 import { readBookingSelection } from "../utils/bookingSelectionStorage";
 
+function hasSlotStarted(slot: AvailabilitySlotViewModel): boolean {
+  return new Date(slot.startDatetime).getTime() <= Date.now();
+}
+
 export function BookingCreatePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -131,8 +135,18 @@ export function BookingCreatePage() {
   );
   const hasStoredSelection = selectedSlotsFromSelection.length > 0;
   const selectedSlotsForSummary = selectedSlotsFromSelection.length > 0 ? selectedSlotsFromSelection : selectedSlot ? [selectedSlot] : [];
+  const hasStartedSelectedSlot = selectedSlotsForSummary.some(hasSlotStarted);
 
   const handleSelectSlot = (slot: AvailabilitySlotViewModel) => {
+    if (hasSlotStarted(slot)) {
+      addToast({
+        type: "warning",
+        title: "Khung giờ đã bắt đầu",
+        message: "Không thể đặt lịch cho khung giờ đã bắt đầu hoặc đã qua."
+      });
+      return;
+    }
+
     if (!slot.isAvailable) {
       addToast({
         type: "warning",
@@ -198,6 +212,15 @@ export function BookingCreatePage() {
 
     if (court.status !== "ACTIVE") {
       setError("Chỉ sân đang hoạt động mới có thể đặt lịch.");
+      return;
+    }
+
+    if (selectedSlots.some(hasSlotStarted)) {
+      setSelectedSlotsFromSelection((currentSlots) => currentSlots.filter((slot) => !hasSlotStarted(slot)));
+      setSelectedSlotId((currentSlotId) =>
+        selectedSlot && currentSlotId === selectedSlot.id && hasSlotStarted(selectedSlot) ? null : currentSlotId
+      );
+      setError("Khung giờ đã bắt đầu hoặc đã qua. Vui lòng chọn khung giờ khác.");
       return;
     }
 
@@ -270,6 +293,11 @@ export function BookingCreatePage() {
             </div>
 
             {error ? <p className="form-alert" role="alert">{error}</p> : null}
+            {!error && hasStartedSelectedSlot ? (
+              <p className="form-alert" role="alert">
+                Khung giờ đã bắt đầu hoặc đã qua. Vui lòng chọn khung giờ khác.
+              </p>
+            ) : null}
             {!hasStoredSelection ? (
               <>
                 <AvailabilityDatePicker
@@ -302,7 +330,11 @@ export function BookingCreatePage() {
               />
             </label>
 
-            <Button disabled={isSubmitting || selectedSlotsForSummary.length === 0 || court?.status !== "ACTIVE"} size="lg" type="submit">
+            <Button
+              disabled={isSubmitting || selectedSlotsForSummary.length === 0 || hasStartedSelectedSlot || court?.status !== "ACTIVE"}
+              size="lg"
+              type="submit"
+            >
               <CalendarClock aria-hidden="true" size={18} />
               {isSubmitting ? "Đang tạo giữ chỗ..." : "Tạo giữ chỗ"}
             </Button>
