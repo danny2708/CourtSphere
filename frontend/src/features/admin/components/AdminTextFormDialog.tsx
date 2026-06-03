@@ -6,7 +6,10 @@ export type AdminTextField = {
   key: string;
   label: string;
   required?: boolean;
-  type?: "number" | "text" | "time" | "url";
+  type?: "file" | "number" | "select" | "text" | "time" | "url";
+  accept?: string;
+  options?: Array<{ label: string; value: string }>;
+  placeholder?: string;
 };
 
 type AdminTextFormDialogProps = {
@@ -14,12 +17,13 @@ type AdminTextFormDialogProps = {
   initialValues?: Record<string, string | number | null | undefined>;
   title: string;
   onClose: () => void;
-  onSubmit: (values: Record<string, string>) => Promise<void> | void;
+  onSubmit: (values: Record<string, string>, files: Record<string, File | null>) => Promise<void> | void;
 };
 
 export function AdminTextFormDialog({ fields, initialValues = {}, onClose, onSubmit, title }: AdminTextFormDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [files, setFiles] = useState<Record<string, File | null>>({});
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.map((field) => [field.key, initialValues[field.key]?.toString() ?? ""]))
   );
@@ -27,7 +31,17 @@ export function AdminTextFormDialog({ fields, initialValues = {}, onClose, onSub
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const missingField = fields.find((field) => field.required && values[field.key].trim().length === 0);
+    const missingField = fields.find((field) => {
+      if (!field.required) {
+        return false;
+      }
+
+      if (field.type === "file") {
+        return !files[field.key];
+      }
+
+      return values[field.key].trim().length === 0;
+    });
     if (missingField) {
       setError(`Vui lòng nhập ${missingField.label}.`);
       return;
@@ -36,7 +50,7 @@ export function AdminTextFormDialog({ fields, initialValues = {}, onClose, onSub
     setError(null);
     setIsSubmitting(true);
     try {
-      await onSubmit(values);
+      await onSubmit(values, files);
     } finally {
       setIsSubmitting(false);
     }
@@ -49,11 +63,33 @@ export function AdminTextFormDialog({ fields, initialValues = {}, onClose, onSub
         {fields.map((field) => (
           <label className="form-field" key={field.key}>
             <span>{field.label}</span>
-            <input
-              type={field.type ?? "text"}
-              value={values[field.key]}
-              onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
-            />
+            {field.type === "file" ? (
+              <input
+                accept={field.accept}
+                type="file"
+                onChange={(event) =>
+                  setFiles((current) => ({ ...current, [field.key]: event.target.files?.[0] ?? null }))
+                }
+              />
+            ) : field.type === "select" ? (
+              <select
+                value={values[field.key]}
+                onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
+              >
+                <option value="">{field.placeholder ?? `Chọn ${field.label}`}</option>
+                {field.options?.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type={field.type ?? "text"}
+                value={values[field.key]}
+                onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
+              />
+            )}
           </label>
         ))}
         {error ? <div className="form-error">{error}</div> : null}

@@ -190,6 +190,19 @@ export function updateCourtStatus(id: string, status: CourtStatus, reason: strin
   return apiRequest(`/api/admin/courts/${id}/status`, { auth: true, body: { reason, status }, method: "PATCH" });
 }
 
+export async function uploadCourtImage(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.set("image", file);
+
+  const response = await apiRequest<{ file: { url: string } }>("/api/admin/uploads/images", {
+    auth: true,
+    body: formData,
+    method: "POST"
+  });
+
+  return response.file.url;
+}
+
 export async function listOperatingHours(courtId: string): Promise<AdminOperatingHour[]> {
   const response = await getRecord(`/api/admin/courts/${courtId}/operating-hours`);
   return pickArray<AdminOperatingHour>(response, ["operatingHours"]);

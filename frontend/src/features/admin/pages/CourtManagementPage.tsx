@@ -13,7 +13,14 @@ import { AdminPageHeader } from "../components/AdminPageHeader";
 import { AdminRowActions } from "../components/AdminRowActions";
 import { AdminSelectDialog } from "../components/AdminSelectDialog";
 import { AdminTextFormDialog } from "../components/AdminTextFormDialog";
-import { createCourt, listAdminCourts, listCourtTypes, updateCourt, updateCourtStatus } from "../services/adminService";
+import {
+  createCourt,
+  listAdminCourts,
+  listCourtTypes,
+  updateCourt,
+  updateCourtStatus,
+  uploadCourtImage
+} from "../services/adminService";
 import type { AdminCourt, AdminCourtType, CourtStatus } from "../types/admin.types";
 
 type DialogState = { type: "create" } | { type: "edit"; court: AdminCourt } | { type: "status"; court: AdminCourt } | null;
@@ -113,28 +120,44 @@ export function CourtManagementPage() {
         <AdminTextFormDialog
           fields={[
             { key: "courtName", label: "Tên sân", required: true },
-            { key: "courtTypeId", label: `Mã loại sân (${courtTypes.map((type) => `${type.typeName}: ${type.id}`).join(" | ")})`, required: true },
+            {
+              key: "courtTypeId",
+              label: "Loại sân",
+              required: true,
+              type: "select",
+              placeholder: "Chọn loại sân",
+              options: courtTypes.map((type) => ({ label: type.typeName, value: type.id }))
+            },
             { key: "description", label: "Mô tả" },
-            { key: "imageUrl", label: "Image URL", type: "url" }
+            { key: "imageFile", label: "Ảnh sân", type: "file", accept: "image/png,image/jpeg,image/webp,image/gif" }
           ]}
           initialValues={
             dialog.type === "edit"
               ? {
                   courtName: dialog.court.courtName,
                   courtTypeId: dialog.court.courtType?.id ?? "",
-                  description: dialog.court.description,
-                  imageUrl: dialog.court.imageUrl
+                  description: dialog.court.description
                 }
               : undefined
           }
           title={dialog.type === "create" ? "Tạo sân" : "Sửa sân"}
           onClose={() => setDialog(null)}
-          onSubmit={(values) =>
-            runAction(() =>
-              dialog.type === "create"
-                ? createCourt({ courtName: values.courtName, courtTypeId: values.courtTypeId, description: values.description, imageUrl: values.imageUrl })
-                : updateCourt(dialog.court.id, { courtName: values.courtName, courtTypeId: values.courtTypeId, description: values.description, imageUrl: values.imageUrl })
-            )
+          onSubmit={(values, files) =>
+            runAction(async () => {
+              const uploadedImageUrl = files.imageFile ? await uploadCourtImage(files.imageFile) : undefined;
+              const payload = {
+                courtName: values.courtName,
+                courtTypeId: values.courtTypeId,
+                description: values.description,
+                ...(uploadedImageUrl ? { imageUrl: uploadedImageUrl } : {})
+              };
+
+              if (dialog.type === "create") {
+                return createCourt(payload);
+              }
+
+              return updateCourt(dialog.court.id, payload);
+            })
           }
         />
       ) : null}
