@@ -18,7 +18,7 @@ import { ROUTE_PATHS } from "../../routes/route-paths";
 import { NotificationBell } from "../../features/notifications/components/NotificationBell";
 import { useAuthStore } from "../../stores/auth.store";
 import { useToastStore } from "../../stores/toast.store";
-import type { RoleName } from "../../types/auth.types";
+import type { AuthUser, RoleName } from "../../types/auth.types";
 import { cn } from "../../utils/cn";
 import { getErrorMessage } from "../../utils/format-error";
 import { Button } from "../common/Button";
@@ -53,6 +53,24 @@ function getPrimaryRoleLabel(roles: RoleName[]): string {
   }
 
   return "Người dùng";
+}
+
+function getUserGroupLabel(user: AuthUser): string {
+  const groupCode = user.priorityGroup?.code?.toUpperCase();
+
+  if (groupCode === "STAFF") {
+    return "Cán bộ";
+  }
+
+  if (groupCode === "STUDENT") {
+    return "Sinh viên";
+  }
+
+  if (groupCode === "EXTERNAL") {
+    return "Người ngoài";
+  }
+
+  return user.priorityGroup?.name ?? getPrimaryRoleLabel(user.roles);
 }
 
 function hasAnyRole(roles: RoleName[] | undefined, allowedRoles: RoleName[]): boolean {
@@ -146,7 +164,7 @@ export function AppHeader() {
               <div className="user-chip" title={user.email}>
                 {user.roles.includes("ADMIN") ? <ShieldCheck aria-hidden="true" size={16} /> : <UserRound aria-hidden="true" size={16} />}
                 <span className="user-chip__name">{user.fullName}</span>
-                <span className="user-chip__role">{getPrimaryRoleLabel(user.roles)}</span>
+                <span className="user-chip__role">{getUserGroupLabel(user)}</span>
               </div>
               <NotificationBell />
               <Button className="header-icon-button" size="sm" variant="icon" onClick={handleLogoutClick} aria-label="Đăng xuất">
@@ -194,7 +212,7 @@ export function AppHeader() {
                 {user.roles.includes("ADMIN") ? <ShieldCheck aria-hidden="true" size={18} /> : <UserRound aria-hidden="true" size={18} />}
                 <div>
                   <strong>{user.fullName}</strong>
-                  <span>{getPrimaryRoleLabel(user.roles)}</span>
+                  <span>{getUserGroupLabel(user)}</span>
                 </div>
               </div>
             ) : null}
