@@ -107,6 +107,11 @@ export class CourtsController {
     res.status(200).json({ operatingHour });
   };
 
+  deleteOperatingHour = async (req: Request, res: Response): Promise<void> => {
+    const operatingHour = await this.service.deleteOperatingHour(routeParam(req, "id"));
+    res.status(200).json({ operatingHour });
+  };
+
   listPricingRules = async (req: Request, res: Response): Promise<void> => {
     const pricingRules = await this.service.listPricingRules(routeParam(req, "courtId"));
     res.status(200).json({ pricingRules });
@@ -134,6 +139,11 @@ export class CourtsController {
       routeParam(req, "id"),
       req.body as UpdateEntityStatusInput
     );
+    res.status(200).json({ pricingRule });
+  };
+
+  deletePricingRule = async (req: Request, res: Response): Promise<void> => {
+    const pricingRule = await this.service.deletePricingRule(routeParam(req, "id"));
     res.status(200).json({ pricingRule });
   };
 }

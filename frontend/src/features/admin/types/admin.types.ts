@@ -54,6 +54,8 @@ export type AdminCourt = {
   imageUrl?: string | null;
   status: CourtStatus;
   courtType?: AdminCourtType | null;
+  operatingHours?: AdminOperatingHour[];
+  pricingRules?: AdminPricingRule[];
 };
 
 export type AdminOperatingHour = {
@@ -70,7 +72,8 @@ export type AdminPricingRule = {
   startTime: string;
   endTime: string;
   applicableDay?: number | null;
-  priceAmount: number;
+  priceAmount: number | string;
+  priorityOrder?: number;
   priorityGroupId?: string | null;
   priorityGroup?: AdminPriorityGroup | null;
   effectiveFrom?: string | null;

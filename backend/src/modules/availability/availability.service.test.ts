@@ -143,6 +143,93 @@ describe("AvailabilityService", () => {
     });
   });
 
+  it("prefers day-specific and narrower peak-hour pricing rules", async () => {
+    const { service } = createService({
+      court: buildCourt({
+        pricingRules: [
+          {
+            priorityGroupId: null,
+            applicableDay: null,
+            startTime: "08:00",
+            endTime: "12:00",
+            priceAmount: "50000.00",
+            effectiveFrom: null,
+            effectiveTo: null
+          },
+          {
+            priorityGroupId: null,
+            applicableDay: 3,
+            startTime: "08:00",
+            endTime: "12:00",
+            priceAmount: "70000.00",
+            effectiveFrom: null,
+            effectiveTo: null
+          },
+          {
+            priorityGroupId: null,
+            applicableDay: 3,
+            startTime: "09:00",
+            endTime: "10:00",
+            priceAmount: "90000.00",
+            effectiveFrom: null,
+            effectiveTo: null
+          }
+        ]
+      })
+    });
+
+    const availability = await service.getCourtAvailability(courtId, userId, {
+      date: "2026-05-20"
+    });
+
+    expect(availability.slots.map((slot) => slot.priceAmount)).toEqual([
+      70000,
+      90000,
+      70000,
+      70000
+    ]);
+  });
+
+  it("uses pricing rule priority order before automatic specificity", async () => {
+    const { service } = createService({
+      court: buildCourt({
+        pricingRules: [
+          {
+            priorityGroupId: null,
+            priorityOrder: 1,
+            applicableDay: null,
+            startTime: "08:00",
+            endTime: "12:00",
+            priceAmount: "50000.00",
+            effectiveFrom: null,
+            effectiveTo: null
+          },
+          {
+            priorityGroupId: null,
+            priorityOrder: 2,
+            applicableDay: 3,
+            startTime: "09:00",
+            endTime: "10:00",
+            priceAmount: "90000.00",
+            effectiveFrom: null,
+            effectiveTo: null
+          }
+        ]
+      })
+    });
+
+    const availability = await service.getCourtAvailability(courtId, userId, {
+      date: "2026-05-20"
+    });
+
+    expect(availability.slots.map((slot) => slot.priceAmount)).toEqual([
+      50000,
+      50000,
+      50000,
+      50000
+    ]);
+  });
+
   it("marks booked slots, active holds, and ignores expired holds", async () => {
     const { service } = createService({
       bookingItems: [

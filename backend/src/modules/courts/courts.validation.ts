@@ -83,8 +83,9 @@ export const updateOperatingHourSchema = operatingHourBaseSchema
 const pricingRuleBaseSchema = z.object({
   startTime: timeSchema,
   endTime: timeSchema,
-  applicableDay: z.coerce.number().int().min(1).max(7).optional(),
+  applicableDay: z.coerce.number().int().min(1).max(7).nullable().optional(),
   priceAmount: z.coerce.number().min(0).transform((value) => value.toFixed(2)),
+  priorityOrder: z.coerce.number().int().min(1).optional(),
   priorityGroupId: z.string().uuid().optional(),
   effectiveFrom: z.coerce.date().optional(),
   effectiveTo: z.coerce.date().optional()

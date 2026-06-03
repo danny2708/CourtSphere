@@ -246,6 +246,7 @@ model PricingRule {
   endTime         String       @map("end_time")
   applicableDay   Int?         @map("applicable_day")
   priceAmount     Decimal      @map("price_amount") @db.Decimal(12, 2)
+  priorityOrder   Int          @default(1000) @map("priority_order")
   effectiveFrom   DateTime?    @map("effective_from")
   effectiveTo     DateTime?    @map("effective_to")
   status          EntityStatus @default(ACTIVE)
@@ -259,6 +260,7 @@ model PricingRule {
   @@index([courtId])
   @@index([createdByUserId])
   @@index([priorityGroupId])
+  @@index([courtId, priorityOrder])
   @@map("pricing_rules")
 }
 

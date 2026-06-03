@@ -178,12 +178,14 @@ export async function listAdminCourts(query: Record<string, RecordValue> = {}): 
   return pickArray<AdminCourt>(response, ["courts"]);
 }
 
-export function createCourt(payload: { courtName: string; courtTypeId: string; description?: string; imageUrl?: string }) {
-  return apiRequest("/api/admin/courts", { auth: true, body: payload, method: "POST" });
+export async function createCourt(payload: { courtName: string; courtTypeId: string; description?: string; imageUrl?: string }): Promise<AdminCourt> {
+  const response = await apiRequest<{ court: AdminCourt }>("/api/admin/courts", { auth: true, body: payload, method: "POST" });
+  return response.court;
 }
 
-export function updateCourt(id: string, payload: Partial<{ courtName: string; courtTypeId: string; description: string; imageUrl: string }>) {
-  return apiRequest(`/api/admin/courts/${id}`, { auth: true, body: payload, method: "PUT" });
+export async function updateCourt(id: string, payload: Partial<{ courtName: string; courtTypeId: string; description: string; imageUrl: string }>): Promise<AdminCourt> {
+  const response = await apiRequest<{ court: AdminCourt }>(`/api/admin/courts/${id}`, { auth: true, body: payload, method: "PUT" });
+  return response.court;
 }
 
 export function updateCourtStatus(id: string, status: CourtStatus, reason: string) {
@@ -220,6 +222,10 @@ export function updateOperatingHourStatus(id: string, status: EntityStatus) {
   return apiRequest(`/api/admin/operating-hours/${id}/status`, { auth: true, body: { status }, method: "PATCH" });
 }
 
+export function deleteOperatingHour(id: string) {
+  return apiRequest(`/api/admin/operating-hours/${id}`, { auth: true, method: "DELETE" });
+}
+
 export async function listPricingRules(courtId: string): Promise<AdminPricingRule[]> {
   const response = await getRecord(`/api/admin/courts/${courtId}/pricing-rules`);
   return pickArray<AdminPricingRule>(response, ["pricingRules"]);
@@ -235,6 +241,10 @@ export function updatePricingRule(id: string, payload: Partial<Omit<AdminPricing
 
 export function updatePricingRuleStatus(id: string, status: EntityStatus) {
   return apiRequest(`/api/admin/pricing-rules/${id}/status`, { auth: true, body: { status }, method: "PATCH" });
+}
+
+export function deletePricingRule(id: string) {
+  return apiRequest(`/api/admin/pricing-rules/${id}`, { auth: true, method: "DELETE" });
 }
 
 export async function getBookingRules(): Promise<AdminBookingRules | null> {

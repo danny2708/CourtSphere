@@ -96,7 +96,7 @@ export function PricingRulesPage() {
   const columns: Array<AdminColumn<AdminPricingRule>> = [
     { header: "Khung giờ", key: "time", render: (rule) => `${rule.startTime} - ${rule.endTime}` },
     { header: "Ngày", key: "day", render: (rule) => rule.applicableDay ?? "Tất cả" },
-    { header: "Giá", key: "price", render: (rule) => formatMoney(rule.priceAmount) },
+    { header: "Giá", key: "price", render: (rule) => formatMoney(Number(rule.priceAmount)) },
     { header: "Trạng thái", key: "status", render: (rule) => <Badge tone={rule.status === "ACTIVE" ? "success" : "neutral"}>{getStatusLabel(entityStatusLabel, rule.status)}</Badge> },
     {
       header: "Thao tác",

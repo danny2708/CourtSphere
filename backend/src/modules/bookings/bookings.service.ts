@@ -17,6 +17,7 @@ import {
   bookingConflictService,
   type BookingConflictService
 } from "../availability/booking-conflict.service";
+import { selectMostSpecificPricingRule } from "../courts/pricing-rule-selection";
 import {
   notificationsService,
   type NotificationsService
@@ -965,11 +966,10 @@ export class BookingsService {
       );
     });
 
-    const userSpecificRule = matchingRules.find(
-      (rule) => rule.priorityGroupId === input.userPriorityGroupId
-    );
-    const defaultRule = matchingRules.find((rule) => rule.priorityGroupId === null);
-    const selectedRule = userSpecificRule ?? defaultRule;
+    const selectedRule = selectMostSpecificPricingRule(matchingRules, {
+      userPriorityGroupId: input.userPriorityGroupId,
+      weekday: input.weekday
+    });
 
     if (!selectedRule) {
       throw new AppError(400, "No pricing rule covers the requested slot", "PRICING_RULE_NOT_FOUND");

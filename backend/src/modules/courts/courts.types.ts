@@ -43,8 +43,9 @@ export type UpdateOperatingHourInput = Partial<CreateOperatingHourInput>;
 export type CreatePricingRuleInput = {
   startTime: string;
   endTime: string;
-  applicableDay?: number;
+  applicableDay?: number | null;
   priceAmount: string;
+  priorityOrder?: number;
   priorityGroupId?: string;
   effectiveFrom?: Date;
   effectiveTo?: Date;

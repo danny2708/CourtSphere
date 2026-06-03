@@ -31,6 +31,7 @@ import {
   bookingConflictService,
   type BookingConflictService
 } from "./booking-conflict.service";
+import { selectMostSpecificPricingRule } from "../courts/pricing-rule-selection";
 
 const courtInclude = {
   courtType: true,
@@ -367,8 +368,7 @@ export class AvailabilityService {
       );
     });
 
-    const userSpecificRule = matchingRules.find((rule) => rule.priorityGroupId === userPriorityGroupId);
-    const selectedRule = userSpecificRule ?? matchingRules.find((rule) => rule.priorityGroupId === null);
+    const selectedRule = selectMostSpecificPricingRule(matchingRules, { userPriorityGroupId, weekday });
 
     return selectedRule ? Number(selectedRule.priceAmount.toString()) : undefined;
   }

@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { AppLayout } from "./components/layout/AppLayout";
 import { ForbiddenState } from "./components/common/ForbiddenState";
@@ -20,7 +20,6 @@ import { CourtManagementPage } from "./features/admin/pages/CourtManagementPage"
 import { CourtTypeManagementPage } from "./features/admin/pages/CourtTypeManagementPage";
 import { OperatingHoursPage } from "./features/admin/pages/OperatingHoursPage";
 import { PaymentManagementPage } from "./features/admin/pages/PaymentManagementPage";
-import { PricingRulesPage } from "./features/admin/pages/PricingRulesPage";
 import { PriorityGroupManagementPage } from "./features/admin/pages/PriorityGroupManagementPage";
 import { PriorityPoliciesPage } from "./features/admin/pages/PriorityPoliciesPage";
 import { RefundManagementPage } from "./features/admin/pages/RefundManagementPage";
@@ -81,8 +80,8 @@ export default function App() {
               <Route path={ROUTE_PATHS.adminPriorityGroups} element={<PriorityGroupManagementPage />} />
               <Route path={ROUTE_PATHS.adminCourtTypes} element={<CourtTypeManagementPage />} />
               <Route path={ROUTE_PATHS.adminCourts} element={<CourtManagementPage />} />
-              <Route path={ROUTE_PATHS.adminOperatingHours} element={<OperatingHoursPage />} />
-              <Route path={ROUTE_PATHS.adminPricingRules} element={<PricingRulesPage />} />
+              <Route path={ROUTE_PATHS.adminOperatingHours} element={<Navigate replace to={ROUTE_PATHS.adminCourts} />} />
+              <Route path={ROUTE_PATHS.adminPricingRules} element={<Navigate replace to={ROUTE_PATHS.adminCourts} />} />
               <Route path={ROUTE_PATHS.adminBookingRules} element={<BookingRulesPage />} />
               <Route path={ROUTE_PATHS.adminPriorityPolicies} element={<PriorityPoliciesPage />} />
               <Route path={ROUTE_PATHS.adminPayments} element={<PaymentManagementPage />} />

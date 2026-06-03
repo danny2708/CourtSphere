@@ -23,7 +23,16 @@ import type {
 } from "./courts.types";
 
 const courtInclude = {
-  courtType: true
+  courtType: true,
+  operatingHours: {
+    orderBy: [{ weekday: "asc" as const }]
+  },
+  pricingRules: {
+    include: {
+      priorityGroup: true
+    },
+    orderBy: [{ priorityOrder: "asc" as const }, { applicableDay: "asc" as const }, { startTime: "asc" as const }]
+  }
 } satisfies Prisma.CourtInclude;
 
 const courtDetailInclude = {
@@ -35,7 +44,7 @@ const courtDetailInclude = {
     include: {
       priorityGroup: true
     },
-    orderBy: [{ startTime: "asc" as const }]
+    orderBy: [{ priorityOrder: "asc" as const }, { applicableDay: "asc" as const }, { startTime: "asc" as const }]
   }
 } satisfies Prisma.CourtInclude;
 
@@ -64,6 +73,8 @@ function toCourtDto(court: CourtWithType | CourtDetail) {
     imageUrl: court.imageUrl,
     status: court.status,
     courtType: toCourtTypeDto(court.courtType),
+    operatingHours: court.operatingHours.map(toOperatingHourDto),
+    pricingRules: court.pricingRules.map(toPricingRuleDto),
     createdAt: court.createdAt,
     updatedAt: court.updatedAt
   };
@@ -109,6 +120,7 @@ function toPricingRuleDto(pricingRule: PricingRule | PricingRuleWithPriorityGrou
     endTime: pricingRule.endTime,
     applicableDay: pricingRule.applicableDay,
     priceAmount: pricingRule.priceAmount.toString(),
+    priorityOrder: pricingRule.priorityOrder,
     priorityGroup,
     effectiveFrom: pricingRule.effectiveFrom,
     effectiveTo: pricingRule.effectiveTo,
@@ -360,13 +372,29 @@ export class CourtsService {
     }
   }
 
+  async deleteOperatingHour(id: string) {
+    try {
+      const operatingHour = await this.db.operatingHour.delete({
+        where: { operatingHourId: id }
+      });
+
+      return toOperatingHourDto(operatingHour);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        throw new AppError(404, "Operating hour not found", "OPERATING_HOUR_NOT_FOUND");
+      }
+
+      throw error;
+    }
+  }
+
   async listPricingRules(courtId: string) {
     await this.assertCourtExists(courtId);
 
     const pricingRules = await this.db.pricingRule.findMany({
       where: { courtId },
       include: { priorityGroup: true },
-      orderBy: [{ startTime: "asc" }]
+      orderBy: [{ priorityOrder: "asc" }, { applicableDay: "asc" }, { startTime: "asc" }]
     });
 
     return pricingRules.map(toPricingRuleDto);
@@ -376,11 +404,13 @@ export class CourtsService {
     try {
       await this.assertCourtExists(courtId);
 
+      const priorityOrder = input.priorityOrder ?? await this.getNextPricingRulePriorityOrder(courtId);
       const pricingRule = await this.db.pricingRule.create({
         data: {
           ...input,
           courtId,
-          createdByUserId: actorUserId
+          createdByUserId: actorUserId,
+          priorityOrder
         },
         include: { priorityGroup: true }
       });
@@ -427,6 +457,23 @@ export class CourtsService {
     }
   }
 
+  async deletePricingRule(id: string) {
+    try {
+      const pricingRule = await this.db.pricingRule.delete({
+        where: { pricingRuleId: id },
+        include: { priorityGroup: true }
+      });
+
+      return toPricingRuleDto(pricingRule);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        throw new AppError(404, "Pricing rule not found", "PRICING_RULE_NOT_FOUND");
+      }
+
+      throw error;
+    }
+  }
+
   private async assertCourtExists(courtId: string): Promise<void> {
     const court = await this.db.court.findUnique({
       where: { courtId },
@@ -436,6 +483,16 @@ export class CourtsService {
     if (!court) {
       throw new AppError(404, "Court not found", "COURT_NOT_FOUND");
     }
+  }
+
+  private async getNextPricingRulePriorityOrder(courtId: string): Promise<number> {
+    const latestRule = await this.db.pricingRule.findFirst({
+      where: { courtId },
+      orderBy: { priorityOrder: "desc" },
+      select: { priorityOrder: true }
+    });
+
+    return (latestRule?.priorityOrder ?? 0) + 1;
   }
 }
 

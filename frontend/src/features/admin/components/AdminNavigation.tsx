@@ -1,8 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
-  BadgeDollarSign,
   BarChart3,
-  CalendarClock,
   ClipboardList,
   CreditCard,
   FileWarning,
@@ -24,8 +22,6 @@ const navItems = [
   { icon: Trophy, label: "Nhóm ưu tiên", to: ROUTE_PATHS.adminPriorityGroups },
   { icon: MapPinned, label: "Loại sân", to: ROUTE_PATHS.adminCourtTypes },
   { icon: MapPinned, label: "Sân", to: ROUTE_PATHS.adminCourts },
-  { icon: CalendarClock, label: "Giờ mở", to: ROUTE_PATHS.adminOperatingHours },
-  { icon: BadgeDollarSign, label: "Bảng giá", to: ROUTE_PATHS.adminPricingRules },
   { icon: SlidersHorizontal, label: "Quy tắc", to: ROUTE_PATHS.adminBookingRules },
   { icon: ClipboardList, label: "Chính sách", to: ROUTE_PATHS.adminPriorityPolicies },
   { icon: CreditCard, label: "Thanh toán", to: ROUTE_PATHS.adminPayments },
