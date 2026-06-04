@@ -1355,35 +1355,35 @@ Một module được coi là hoàn thành khi:
 
 ## 13. Tracking nhanh theo module
 
-| Module | Owner | Status | Notes |
-|---|---|---|---|
-| Backend foundation | Codex | DONE | Express + TypeScript foundation verified: build/typecheck/lint/test/health |
-| Database & Prisma | Codex | DONE | Refactored to booking_orders/booking_items; booking_items overlap constraint verified in PostgreSQL |
-| Auth | Codex | DONE | Auth APIs/JWT/password hashing verified; DB manual flow pending local PostgreSQL |
-| RBAC & Users | Codex | DONE | Admin user/role APIs, RBAC tests, and audit logs implemented |
-| Courts & Court Types | Codex | DONE | Court type/court APIs, filters, status updates, and status history implemented |
-| Operating Hours & Pricing | Codex | DONE | Admin CRUD APIs implemented; booking-impact warnings deferred until booking/availability modules |
-| Booking Rules & Priority | Codex | DONE | Admin config APIs, audit logs, and shared rules repository implemented |
-| Availability | Codex | DONE | Hold-aware slot generation now reads booking_items, conflict detection, pricing, and policy response implemented |
-| Booking | Codex | DONE | BookingOrder/BookingItem hold creation, combo all-or-nothing validation, user APIs, cancellation/refund request, and histories implemented |
-| Payment | Codex | DONE | Mock payment tied to booking_orders, callback idempotency, status query, admin list, and order/item confirmation implemented |
-| Refund | Codex | DONE | Sandbox refund processor tied to booking_orders with optional booking_items, admin APIs, retry audit logs, and manager/admin cancellation implemented |
-| DB refactor sync | Codex | DONE | Backend synced to new booking_orders/booking_items database design and re-verified |
-| Manager operations | Codex | DONE | Booking item schedule, manager/admin check-in, late override, no-show violation, and in-use exception close implemented |
-| Jobs | Codex | DONE | Internal run-once jobs for payment hold expiry, check-in expiry, auto-complete, waitlist expiry, idempotent updates, and histories verified |
-| Waitlist | Codex | DONE | Runtime waitlist APIs, active duplicate constraint, priority notification, book-from-waitlist flow, docs, and tests verified |
-| Violations | Codex | DONE | Admin/manager violation APIs, waive/adjust audit, shared violation service, late cancellation handling, and verification completed |
-| Notifications | Codex | DONE | In-app notification APIs/service, lifecycle integrations, enum migration, and tests verified |
-| Reports | Codex | DONE | Admin reports APIs, aggregate service, contract, tests, frontend dashboard charts, and idempotent demo seed data verified |
-| Frontend foundation | Codex | DONE | React + TypeScript/Vite foundation with router, API client, auth store, protected/role routes, layout, states, theme, and verification completed |
-| UI design system | Codex | DONE | Theme tokens, header, search/filter bar, court cards/grid, badges, drawer, common states, and mobile bottom nav verified with API data |
-| Court listing/detail | Codex | DONE | Real API `/courts` and `/courts/:courtId`, search/filter/sort, detail view, navigation links, and verification completed |
-| Frontend auth pages | Codex | DONE | Login/register forms, Zod validation, auth service/store actions, logout, current user display, role redirect helper, and backend USER auth flow verified |
-| User pages | Codex | DONE | Real court detail/availability and browser booking/payment/my-bookings/detail E2E verified against backend |
-| Manager pages | Codex | DONE | Real FIELD_MANAGER login, today schedule, check-in, complete, no-show, court status pages and RBAC verified |
-| Admin pages | Codex | DONE | Real ADMIN login, dashboard/users/courts/rules/payments/refunds/violations/reports and RBAC verified |
-| Tests |  | TODO |  |
-| Documentation |  | TODO |  |
+| Module | Status | Notes |
+|---|---|---|
+| Backend foundation | DONE | Express + TypeScript foundation verified: build/typecheck/lint/test/health |
+| Database & Prisma | DONE | Refactored to booking_orders/booking_items; booking_items overlap constraint verified in PostgreSQL |
+| Auth | DONE | Auth APIs/JWT/password hashing verified; DB manual flow pending local PostgreSQL |
+| RBAC & Users | DONE | Admin user/role APIs, RBAC tests, and audit logs implemented |
+| Courts & Court Types | DONE | Court type/court APIs, filters, status updates, and status history implemented |
+| Operating Hours & Pricing | DONE | Admin CRUD APIs implemented; booking-impact warnings deferred until booking/availability modules |
+| Booking Rules & Priority | DONE | Admin config APIs, audit logs, and shared rules repository implemented |
+| Availability | DONE | Hold-aware slot generation now reads booking_items, conflict detection, pricing, and policy response implemented |
+| Booking | DONE | BookingOrder/BookingItem hold creation, combo all-or-nothing validation, user APIs, cancellation/refund request, and histories implemented |
+| Payment | DONE | Mock payment tied to booking_orders, callback idempotency, status query, admin list, and order/item confirmation implemented |
+| Refund | DONE | Sandbox refund processor tied to booking_orders with optional booking_items, admin APIs, retry audit logs, and manager/admin cancellation implemented |
+| DB refactor sync | DONE | Backend synced to new booking_orders/booking_items database design and re-verified |
+| Manager operations | DONE | Booking item schedule, manager/admin check-in, late override, no-show violation, and in-use exception close implemented |
+| Jobs | DONE | Internal run-once jobs for payment hold expiry, check-in expiry, auto-complete, waitlist expiry, idempotent updates, and histories verified |
+| Waitlist | DONE | Runtime waitlist APIs, active duplicate constraint, priority notification, book-from-waitlist flow, docs, and tests verified |
+| Violations | DONE | Admin/manager violation APIs, waive/adjust audit, shared violation service, late cancellation handling, and verification completed |
+| Notifications | DONE | In-app notification APIs/service, lifecycle integrations, enum migration, and tests verified |
+| Reports | DONE | Admin reports APIs, aggregate service, contract, tests, frontend dashboard charts, and idempotent demo seed data verified |
+| Frontend foundation | DONE | React + TypeScript/Vite foundation with router, API client, auth store, protected/role routes, layout, states, theme, and verification completed |
+| UI design system | DONE | Theme tokens, header, search/filter bar, court cards/grid, badges, drawer, common states, and mobile bottom nav verified with API data |
+| Court listing/detail | DONE | Real API `/courts` and `/courts/:courtId`, search/filter/sort, detail view, navigation links, and verification completed |
+| Frontend auth pages | DONE | Login/register forms, Zod validation, auth service/store actions, logout, current user display, role redirect helper, and backend USER auth flow verified |
+| User pages | DONE | Real court detail/availability and browser booking/payment/my-bookings/detail E2E verified against backend |
+| Manager pages | DONE | Real FIELD_MANAGER login, today schedule, check-in, complete, no-show, court status pages and RBAC verified |
+| Admin pages | DONE | Real ADMIN login, dashboard/users/courts/rules/payments/refunds/violations/reports and RBAC verified |
+| Tests | TODO |  |
+| Documentation | TODO |  |
 
 ---
 ---
