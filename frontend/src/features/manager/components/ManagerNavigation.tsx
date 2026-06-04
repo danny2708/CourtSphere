@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { CalendarCheck, CalendarClock, ClipboardCheck, History, MapPinned, Timer, UserX } from "lucide-react";
+import { CalendarCheck, ClipboardCheck, History, MapPinned, Timer, UserX } from "lucide-react";
 
 import { ROUTE_PATHS } from "../../../routes/route-paths";
 
@@ -9,13 +9,12 @@ const managerNavItems = [
   { icon: Timer, label: "Đang sử dụng", to: ROUTE_PATHS.managerInUse },
   { icon: UserX, label: "No-show", to: ROUTE_PATHS.managerNoShow },
   { icon: MapPinned, label: "Trạng thái sân", to: ROUTE_PATHS.managerCourts },
-  { icon: CalendarClock, label: "Giờ mở", to: ROUTE_PATHS.managerOperatingHours },
   { icon: History, label: "Lịch sử", to: ROUTE_PATHS.managerHistory }
 ];
 
 export function ManagerNavigation() {
   return (
-    <nav className="manager-nav" aria-label="Điều hướng quản lý sân">
+    <nav className="manager-nav" aria-label="?i?u h??ng qu?n l? s?n">
       {managerNavItems.map((item) => {
         const Icon = item.icon;
 

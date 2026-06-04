@@ -188,6 +188,15 @@ export async function updateCourt(id: string, payload: Partial<{ courtName: stri
   return response.court;
 }
 
+export async function updateCourtManagers(id: string, managerUserIds: string[]): Promise<AdminCourt> {
+  const response = await apiRequest<{ court: AdminCourt }>(`/api/admin/courts/${id}/managers`, {
+    auth: true,
+    body: { managerUserIds },
+    method: "PUT"
+  });
+  return response.court;
+}
+
 export function updateCourtStatus(id: string, status: CourtStatus, reason: string) {
   return apiRequest(`/api/admin/courts/${id}/status`, { auth: true, body: { reason, status }, method: "PATCH" });
 }

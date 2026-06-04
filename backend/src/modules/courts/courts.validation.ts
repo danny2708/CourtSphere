@@ -16,6 +16,7 @@ export const courtIdParamSchema = z.object({
 export const listCourtsQuerySchema = z.object({
   keyword: z.string().trim().min(1).max(100).optional(),
   courtTypeId: z.string().uuid().optional(),
+  managedOnly: z.coerce.boolean().optional(),
   status: z.enum(CourtStatus).optional()
 });
 
@@ -48,6 +49,10 @@ export const updateCourtSchema = createCourtSchema.partial().refine(
 export const updateCourtStatusSchema = z.object({
   status: z.enum(CourtStatus),
   reason: z.string().trim().max(500).optional()
+});
+
+export const updateCourtManagersSchema = z.object({
+  managerUserIds: z.array(z.string().uuid()).max(50)
 });
 
 const operatingHourBaseSchema = z.object({

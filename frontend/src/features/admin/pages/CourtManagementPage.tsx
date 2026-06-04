@@ -12,8 +12,10 @@ import { getErrorMessage } from "../../../utils/format-error";
 import { AdminDataTable, type AdminAdvancedFilter, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
+import { AdminMultiSelectDialog } from "../components/AdminMultiSelectDialog";
 import { AdminRowActions } from "../components/AdminRowActions";
 import { AdminSelectDialog } from "../components/AdminSelectDialog";
+import { ManagerNavigation } from "../../manager/components/ManagerNavigation";
 import {
   createCourt,
   createOperatingHour,
@@ -21,8 +23,10 @@ import {
   deleteOperatingHour,
   deletePricingRule,
   listAdminCourts,
+  listAdminUsers,
   listCourtTypes,
   updateCourt,
+  updateCourtManagers,
   updateCourtStatus,
   updateOperatingHour,
   updateOperatingHourStatus,
@@ -30,10 +34,19 @@ import {
   updatePricingRuleStatus,
   uploadCourtImage
 } from "../services/adminService";
-import type { AdminCourt, AdminCourtType, AdminOperatingHour, AdminPricingRule, CourtStatus, EntityStatus } from "../types/admin.types";
+import type { AdminCourt, AdminCourtType, AdminOperatingHour, AdminPricingRule, AdminUser, CourtStatus, EntityStatus } from "../types/admin.types";
 import { formatMoney } from "../utils/adminFormat";
 
-type DialogState = { type: "create" } | { type: "edit"; court: AdminCourt } | { type: "status"; court: AdminCourt } | null;
+type CourtManagementPageProps = {
+  variant?: "admin" | "manager";
+};
+
+type DialogState =
+  | { type: "create" }
+  | { type: "edit"; court: AdminCourt }
+  | { type: "status"; court: AdminCourt }
+  | { type: "managers"; court: AdminCourt }
+  | null;
 
 type CourtFormValues = {
   courtName: string;
@@ -66,6 +79,7 @@ type CourtFormSubmitInput = {
   deletedOperatingHourIds: string[];
   deletedPricingRuleIds: string[];
   imageFile: File | null;
+  managerUserIds?: string[];
   operatingHours: OperatingHourDraft[];
   pricingRules: PricingRuleDraft[];
   values: CourtFormValues;
@@ -290,6 +304,10 @@ function summarizePricingRules(court: AdminCourt): string[] {
   return lines;
 }
 
+function summarizeAssignedManagers(court: AdminCourt): string[] {
+  return (court.assignedManagers ?? []).map((manager) => `${manager.fullName} (${manager.email})`);
+}
+
 function renderSummaryLines(lines: string[]) {
   if (lines.length === 0) {
     return <span className="admin-muted">Chưa có</span>;
@@ -304,9 +322,10 @@ function renderSummaryLines(lines: string[]) {
   );
 }
 
-function CourtFormDialog({ court, courtTypes, onClose, onSubmit, title }: {
+function CourtFormDialog({ court, courtTypes, managerUsers = [], onClose, onSubmit, title }: {
   court?: AdminCourt;
   courtTypes: AdminCourtType[];
+  managerUsers?: AdminUser[];
   onClose: () => void;
   onSubmit: (input: CourtFormSubmitInput) => Promise<void>;
   title: string;
@@ -322,6 +341,9 @@ function CourtFormDialog({ court, courtTypes, onClose, onSubmit, title }: {
   );
   const [pricingRules, setPricingRules] = useState<PricingRuleDraft[]>(() =>
     (court?.pricingRules ?? []).map(toPricingRuleDraft).sort(comparePricingRuleDrafts)
+  );
+  const [managerUserIds, setManagerUserIds] = useState<string[]>(() =>
+    (court?.assignedManagers ?? []).map((manager) => manager.id)
   );
   const [values, setValues] = useState<CourtFormValues>(() => ({
     courtName: court?.courtName ?? "",
@@ -378,6 +400,14 @@ function CourtFormDialog({ court, courtTypes, onClose, onSubmit, title }: {
     });
   }
 
+  function toggleManagerUser(managerUserId: string) {
+    setManagerUserIds((current) =>
+      current.includes(managerUserId)
+        ? current.filter((currentManagerUserId) => currentManagerUserId !== managerUserId)
+        : [...current, managerUserId]
+    );
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -394,6 +424,7 @@ function CourtFormDialog({ court, courtTypes, onClose, onSubmit, title }: {
         deletedOperatingHourIds,
         deletedPricingRuleIds,
         imageFile,
+        managerUserIds,
         operatingHours: operatingHours.filter((row) => !isOperatingHourEmpty(row)),
         pricingRules: pricingRules.filter((row) => !isPricingRuleEmpty(row)),
         values
@@ -408,7 +439,7 @@ function CourtFormDialog({ court, courtTypes, onClose, onSubmit, title }: {
       <form className="dialog-panel court-config-dialog" onSubmit={handleSubmit}>
         <div>
           <h2>{title}</h2>
-          <p>Thiết lập thông tin sân, giờ mở và mức giá theo từng khung giờ.</p>
+          <p>Thiết lập thông tin sân, giờ mở và mức giá theo khung giờ</p>
         </div>
 
         <div className="court-config-grid">
@@ -436,6 +467,23 @@ function CourtFormDialog({ court, courtTypes, onClose, onSubmit, title }: {
             <input accept="image/png,image/jpeg,image/webp,image/gif" type="file" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} />
           </label>
         </div>
+
+        {managerUsers.length > 0 ? (
+          <fieldset className="admin-multi-select">
+            <legend>Quản lý sân</legend>
+            {managerUsers.map((manager) => (
+              <label className="admin-multi-select__option" key={manager.id}>
+                <input
+                  checked={managerUserIds.includes(manager.id)}
+                  disabled={isSubmitting}
+                  type="checkbox"
+                  onChange={() => toggleManagerUser(manager.id)}
+                />
+                <span>{manager.fullName} ({manager.email})</span>
+              </label>
+            ))}
+          </fieldset>
+        ) : null}
 
         <section className="court-config-section">
           <div className="court-config-section__header">
@@ -677,10 +725,11 @@ async function syncPricingRules(courtId: string, rows: PricingRuleDraft[], delet
   }
 }
 
-export function CourtManagementPage() {
+export function CourtManagementPage({ variant = "admin" }: CourtManagementPageProps) {
   const { addToast } = useToastStore();
   const [courtTypes, setCourtTypes] = useState<AdminCourtType[]>([]);
   const [courts, setCourts] = useState<AdminCourt[]>([]);
+  const [fieldManagers, setFieldManagers] = useState<AdminUser[]>([]);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -692,10 +741,15 @@ export function CourtManagementPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const [loadedCourts, loadedTypes] = await Promise.all([listAdminCourts(), listCourtTypes()]);
+        const [loadedCourts, loadedTypes, loadedUsers] = await Promise.all([
+          listAdminCourts(variant === "manager" ? { managedOnly: true } : {}),
+          listCourtTypes(),
+          variant === "admin" ? listAdminUsers() : Promise.resolve([])
+        ]);
         if (isMounted) {
           setCourts(loadedCourts);
           setCourtTypes(loadedTypes);
+          setFieldManagers(loadedUsers.filter((user) => user.roles.includes("FIELD_MANAGER")));
         }
       } catch (loadError) {
         if (isMounted) setError(getErrorMessage(loadError));
@@ -707,7 +761,7 @@ export function CourtManagementPage() {
     return () => {
       isMounted = false;
     };
-  }, [reloadKey]);
+  }, [reloadKey, variant]);
 
   async function runAction(action: () => Promise<unknown>) {
     try {
@@ -734,6 +788,9 @@ export function CourtManagementPage() {
         const createdCourt = await createCourt(payload);
         await syncOperatingHours(createdCourt.id, input.operatingHours, input.deletedOperatingHourIds);
         await syncPricingRules(createdCourt.id, input.pricingRules, input.deletedPricingRuleIds);
+        if (input.managerUserIds) {
+          await updateCourtManagers(createdCourt.id, input.managerUserIds);
+        }
         return;
       }
 
@@ -741,11 +798,23 @@ export function CourtManagementPage() {
         await updateCourt(dialog.court.id, payload);
         await syncOperatingHours(dialog.court.id, input.operatingHours, input.deletedOperatingHourIds);
         await syncPricingRules(dialog.court.id, input.pricingRules, input.deletedPricingRuleIds);
+        if (input.managerUserIds) {
+          await updateCourtManagers(dialog.court.id, input.managerUserIds);
+        }
       }
     });
   }
 
   const columns: Array<AdminColumn<AdminCourt>> = [
+    ...(variant === "admin"
+      ? [
+          {
+            header: "Quản lý sân",
+            key: "managers",
+            render: (court) => renderSummaryLines(summarizeAssignedManagers(court))
+          } satisfies AdminColumn<AdminCourt>
+        ]
+      : []),
     { header: "Sân", key: "name", render: (court) => <strong>{court.courtName}</strong> },
     { header: "Loại", key: "type", render: (court) => court.courtType?.typeName ?? "Chưa có" },
     { header: "Trạng thái", key: "status", render: (court) => <CourtStatusBadge status={court.status} /> },
@@ -758,13 +827,19 @@ export function CourtManagementPage() {
       render: (court) => (
         <AdminRowActions
           actions={[
-            { label: "Sửa thông tin, giá và giờ", onSelect: () => setDialog({ type: "edit", court }), tone: "primary" },
+            ...(variant === "admin"
+              ? [{ label: "Gán quản lý sân", onSelect: () => setDialog({ type: "managers", court }) }]
+              : []),
+            ...(variant === "admin"
+              ? [{ label: "Sửa thông tin, giá và giờ", onSelect: () => setDialog({ type: "edit", court }), tone: "primary" as const }]
+              : []),
             { label: "Cập nhật trạng thái", onSelect: () => setDialog({ type: "status", court }) }
           ]}
         />
       )
     }
   ];
+
   const advancedFilters: Array<AdminAdvancedFilter<AdminCourt>> = [
     {
       key: "status",
@@ -780,10 +855,17 @@ export function CourtManagementPage() {
     }
   ];
 
+  const Navigation = variant === "manager" ? ManagerNavigation : AdminNavigation;
+
   return (
     <div className="admin-page">
-      <AdminNavigation />
-      <AdminPageHeader title="Sân" description="Quản lý thông tin sân, giờ mở và giá theo từng khung giờ." actions={<Button onClick={() => setDialog({ type: "create" })}>Tạo sân</Button>} />
+      <Navigation />
+      <AdminPageHeader
+        title={variant === "manager" ? "Giờ mở sân" : "Sân"}
+        description="Quản lý thông tin sân, giờ mở sân và giá theo khung giờ"
+        actions={variant === "admin" ? <Button onClick={() => setDialog({ type: "create" })}>Tạo sân</Button> : undefined}
+      />
+
       {isLoading ? <LoadingState message="Đang tải sân..." /> : null}
       {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được sân" onAction={() => setReloadKey((value) => value + 1)} /> : null}
       {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(court) => court.id} rows={courts} /> : null}
@@ -792,11 +874,29 @@ export function CourtManagementPage() {
         <CourtFormDialog
           court={dialog.type === "edit" ? dialog.court : undefined}
           courtTypes={courtTypes}
+          managerUsers={variant === "admin" ? fieldManagers : []}
           title={dialog.type === "create" ? "Tạo sân" : "Sửa sân"}
           onClose={() => setDialog(null)}
           onSubmit={submitCourtForm}
         />
       ) : null}
+
+      {dialog?.type === "managers" ? (
+        <AdminMultiSelectDialog
+          allowEmpty
+          defaultValues={(dialog.court.assignedManagers ?? []).map((manager) => manager.id)}
+          emptyMessage="Chưa có tài khoản quản lý sân."
+          label="Quản lý sân"
+          options={fieldManagers.map((manager) => ({
+            label: `${manager.fullName} (${manager.email})`,
+            value: manager.id
+          }))}
+          title="Gán quản lý sân"
+          onClose={() => setDialog(null)}
+          onConfirm={(managerUserIds) => runAction(() => updateCourtManagers(dialog.court.id, managerUserIds))}
+        />
+      ) : null}
+
       {dialog?.type === "status" ? (
         <AdminSelectDialog
           defaultValue={dialog.court.status}

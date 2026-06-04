@@ -152,10 +152,18 @@ export class ManagerService {
     private readonly violations: ViolationsService = violationsService
   ) {}
 
-  async getTodaySchedule(query: ManagerTodayScheduleQuery) {
+  async getTodaySchedule(query: ManagerTodayScheduleQuery, audit?: AuditContext) {
     const now = this.nowProvider();
     const dayStart = startOfVietnamDay(now);
     const dayEnd = addDays(dayStart, 1);
+    const assignedCourtIds = await this.getAssignedCourtIdsForManager(audit);
+
+    if (query.courtId) {
+      await this.assertCanManageCourt(this.db, query.courtId, audit);
+    } else if (assignedCourtIds && assignedCourtIds.length === 0) {
+      return [];
+    }
+
     const items = await this.db.bookingItem.findMany({
       where: {
         startDatetime: {
@@ -163,6 +171,7 @@ export class ManagerService {
           lt: dayEnd
         },
         ...(query.courtId ? { courtId: query.courtId } : {}),
+        ...(!query.courtId && assignedCourtIds ? { courtId: { in: assignedCourtIds } } : {}),
         ...(query.status ? { bookingStatus: query.status } : {})
       },
       include: managerBookingItemInclude,
@@ -181,6 +190,7 @@ export class ManagerService {
           const item = await this.getBookingItemOrThrow(tx, bookingItemId);
           const bookingRule = await new RulesRepository(tx).getBookingRuleForPolicy();
 
+          await this.assertCanManageCourt(tx, item.courtId, audit);
           this.assertCanCheckIn(item, now, bookingRule.lateCheckinMinutes);
 
           await tx.bookingItem.update({
@@ -224,6 +234,7 @@ export class ManagerService {
         async (tx) => {
           const item = await this.getBookingItemOrThrow(tx, bookingItemId);
 
+          await this.assertCanManageCourt(tx, item.courtId, audit);
           this.assertBookingItemStatus(
             item.bookingStatus,
             BookingStatus.CHECKIN_EXPIRED,
@@ -283,6 +294,7 @@ export class ManagerService {
         async (tx) => {
           const item = await this.getBookingItemOrThrow(tx, bookingItemId);
 
+          await this.assertCanManageCourt(tx, item.courtId, audit);
           this.assertBookingItemStatus(
             item.bookingStatus,
             BookingStatus.CHECKIN_EXPIRED,
@@ -367,6 +379,7 @@ export class ManagerService {
         async (tx) => {
           const item = await this.getBookingItemOrThrow(tx, bookingItemId);
 
+          await this.assertCanManageCourt(tx, item.courtId, audit);
           this.assertBookingItemStatus(
             item.bookingStatus,
             BookingStatus.IN_USE,
@@ -426,6 +439,51 @@ export class ManagerService {
       actionByUserId,
       state: this.state
     });
+  }
+
+  private isFieldManagerOnly(audit?: AuditContext): audit is AuditContext {
+    return Boolean(audit?.roles.includes("FIELD_MANAGER") && !audit.roles.includes("ADMIN"));
+  }
+
+  private async getAssignedCourtIdsForManager(audit?: AuditContext): Promise<string[] | null> {
+    if (!this.isFieldManagerOnly(audit)) {
+      return null;
+    }
+
+    const assignments = await this.db.courtManagerAssignment.findMany({
+      where: { userId: audit.actorUserId },
+      select: { courtId: true }
+    });
+
+    return assignments.map((assignment) => assignment.courtId);
+  }
+
+  private async assertCanManageCourt(
+    db: ManagerDbClient,
+    courtId: string,
+    audit?: AuditContext
+  ): Promise<void> {
+    if (!this.isFieldManagerOnly(audit)) {
+      return;
+    }
+
+    const assignment = await db.courtManagerAssignment.findUnique({
+      where: {
+        courtId_userId: {
+          courtId,
+          userId: audit.actorUserId
+        }
+      },
+      select: { courtId: true }
+    });
+
+    if (!assignment) {
+      throw new AppError(
+        403,
+        "Field manager is not assigned to this court",
+        "COURT_MANAGER_ASSIGNMENT_REQUIRED"
+      );
+    }
   }
 
   private async getBookingItemOrThrow(

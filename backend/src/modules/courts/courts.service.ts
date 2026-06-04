@@ -9,12 +9,14 @@ import {
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../middlewares/error.middleware";
 import type {
+  ActorContext,
   CreateCourtInput,
   CreateCourtTypeInput,
   CreateOperatingHourInput,
   CreatePricingRuleInput,
   ListCourtsQuery,
   UpdateCourtInput,
+  UpdateCourtManagersInput,
   UpdateCourtStatusInput,
   UpdateCourtTypeInput,
   UpdateEntityStatusInput,
@@ -24,6 +26,19 @@ import type {
 
 const courtInclude = {
   courtType: true,
+  managerAssignments: {
+    include: {
+      user: {
+        select: {
+          userId: true,
+          fullName: true,
+          email: true,
+          accountStatus: true
+        }
+      }
+    },
+    orderBy: { assignedAt: "asc" as const }
+  },
   operatingHours: {
     orderBy: [{ weekday: "asc" as const }]
   },
@@ -37,6 +52,19 @@ const courtInclude = {
 
 const courtDetailInclude = {
   courtType: true,
+  managerAssignments: {
+    include: {
+      user: {
+        select: {
+          userId: true,
+          fullName: true,
+          email: true,
+          accountStatus: true
+        }
+      }
+    },
+    orderBy: { assignedAt: "asc" as const }
+  },
   operatingHours: {
     orderBy: [{ weekday: "asc" as const }]
   },
@@ -53,6 +81,7 @@ type CourtDetail = Prisma.CourtGetPayload<{ include: typeof courtDetailInclude }
 type PricingRuleWithPriorityGroup = Prisma.PricingRuleGetPayload<{
   include: { priorityGroup: true };
 }>;
+type CourtDbClient = PrismaClient | Prisma.TransactionClient;
 
 function toCourtTypeDto(courtType: CourtType) {
   return {
@@ -73,6 +102,13 @@ function toCourtDto(court: CourtWithType | CourtDetail) {
     imageUrl: court.imageUrl,
     status: court.status,
     courtType: toCourtTypeDto(court.courtType),
+    assignedManagers: court.managerAssignments.map((assignment) => ({
+      id: assignment.user.userId,
+      fullName: assignment.user.fullName,
+      email: assignment.user.email,
+      accountStatus: assignment.user.accountStatus,
+      assignedAt: assignment.assignedAt
+    })),
     operatingHours: court.operatingHours.map(toOperatingHourDto),
     pricingRules: court.pricingRules.map(toPricingRuleDto),
     createdAt: court.createdAt,
@@ -201,10 +237,13 @@ export class CourtsService {
     }
   }
 
-  async listCourts(query: ListCourtsQuery) {
+  async listCourts(query: ListCourtsQuery, actor?: ActorContext) {
     const where: Prisma.CourtWhereInput = {
       ...(query.courtTypeId ? { courtTypeId: query.courtTypeId } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...(query.managedOnly && this.isFieldManagerOnly(actor)
+        ? { managerAssignments: { some: { userId: actor.actorUserId } } }
+        : {}),
       ...(query.keyword
         ? {
             OR: [
@@ -260,8 +299,10 @@ export class CourtsService {
     }
   }
 
-  async updateCourt(id: string, input: UpdateCourtInput) {
+  async updateCourt(id: string, input: UpdateCourtInput, actor?: ActorContext) {
     try {
+      await this.assertCanManageCourt(id, actor);
+
       const court = await this.db.court.update({
         where: { courtId: id },
         data: input,
@@ -278,7 +319,7 @@ export class CourtsService {
     }
   }
 
-  async updateCourtStatus(id: string, actorUserId: string, input: UpdateCourtStatusInput) {
+  async updateCourtStatus(id: string, actor: ActorContext, input: UpdateCourtStatusInput) {
     return this.db.$transaction(async (tx) => {
       const currentCourt = await tx.court.findUnique({
         where: { courtId: id }
@@ -287,6 +328,8 @@ export class CourtsService {
       if (!currentCourt) {
         throw new AppError(404, "Court not found", "COURT_NOT_FOUND");
       }
+
+      await this.assertCanManageCourt(id, actor, tx);
 
       const updatedCourt = await tx.court.update({
         where: { courtId: id },
@@ -298,7 +341,7 @@ export class CourtsService {
         await tx.courtStatusHistory.create({
           data: {
             courtId: id,
-            updatedByUserId: actorUserId,
+            updatedByUserId: actor.actorUserId,
             oldStatus: currentCourt.status,
             newStatus: input.status,
             reason: input.reason
@@ -310,8 +353,68 @@ export class CourtsService {
     });
   }
 
-  async listOperatingHours(courtId: string) {
+  async updateCourtManagers(courtId: string, actorUserId: string, input: UpdateCourtManagersInput) {
+    const managerUserIds = [...new Set(input.managerUserIds)];
+
+    return this.db.$transaction(async (tx) => {
+      const court = await tx.court.findUnique({
+        where: { courtId },
+        select: { courtId: true }
+      });
+
+      if (!court) {
+        throw new AppError(404, "Court not found", "COURT_NOT_FOUND");
+      }
+
+      if (managerUserIds.length > 0) {
+        const managers = await tx.user.findMany({
+          where: {
+            userId: { in: managerUserIds },
+            userRoles: {
+              some: {
+                role: { roleName: "FIELD_MANAGER" }
+              }
+            }
+          },
+          select: { userId: true }
+        });
+        const validManagerIds = new Set(managers.map((manager) => manager.userId));
+        const invalidManagerIds = managerUserIds.filter((managerUserId) => !validManagerIds.has(managerUserId));
+
+        if (invalidManagerIds.length > 0) {
+          throw new AppError(
+            400,
+            "All assigned users must have FIELD_MANAGER role",
+            "INVALID_COURT_MANAGER_ASSIGNMENT"
+          );
+        }
+      }
+
+      await tx.courtManagerAssignment.deleteMany({ where: { courtId } });
+
+      if (managerUserIds.length > 0) {
+        await tx.courtManagerAssignment.createMany({
+          data: managerUserIds.map((managerUserId) => ({
+            courtId,
+            userId: managerUserId,
+            assignedByUserId: actorUserId
+          })),
+          skipDuplicates: true
+        });
+      }
+
+      const updatedCourt = await tx.court.findUniqueOrThrow({
+        where: { courtId },
+        include: courtInclude
+      });
+
+      return toCourtDto(updatedCourt);
+    });
+  }
+
+  async listOperatingHours(courtId: string, actor?: ActorContext) {
     await this.assertCourtExists(courtId);
+    await this.assertCanManageCourt(courtId, actor);
 
     const operatingHours = await this.db.operatingHour.findMany({
       where: { courtId },
@@ -321,9 +424,10 @@ export class CourtsService {
     return operatingHours.map(toOperatingHourDto);
   }
 
-  async createOperatingHour(courtId: string, input: CreateOperatingHourInput) {
+  async createOperatingHour(courtId: string, input: CreateOperatingHourInput, actor?: ActorContext) {
     try {
       await this.assertCourtExists(courtId);
+      await this.assertCanManageCourt(courtId, actor);
 
       const operatingHour = await this.db.operatingHour.create({
         data: {
@@ -338,8 +442,10 @@ export class CourtsService {
     }
   }
 
-  async updateOperatingHour(id: string, input: UpdateOperatingHourInput) {
+  async updateOperatingHour(id: string, input: UpdateOperatingHourInput, actor?: ActorContext) {
     try {
+      await this.assertCanManageOperatingHour(id, actor);
+
       const operatingHour = await this.db.operatingHour.update({
         where: { operatingHourId: id },
         data: input
@@ -355,8 +461,10 @@ export class CourtsService {
     }
   }
 
-  async updateOperatingHourStatus(id: string, input: UpdateEntityStatusInput) {
+  async updateOperatingHourStatus(id: string, input: UpdateEntityStatusInput, actor?: ActorContext) {
     try {
+      await this.assertCanManageOperatingHour(id, actor);
+
       const operatingHour = await this.db.operatingHour.update({
         where: { operatingHourId: id },
         data: { status: input.status }
@@ -372,8 +480,10 @@ export class CourtsService {
     }
   }
 
-  async deleteOperatingHour(id: string) {
+  async deleteOperatingHour(id: string, actor?: ActorContext) {
     try {
+      await this.assertCanManageOperatingHour(id, actor);
+
       const operatingHour = await this.db.operatingHour.delete({
         where: { operatingHourId: id }
       });
@@ -388,8 +498,9 @@ export class CourtsService {
     }
   }
 
-  async listPricingRules(courtId: string) {
+  async listPricingRules(courtId: string, actor?: ActorContext) {
     await this.assertCourtExists(courtId);
+    await this.assertCanManageCourt(courtId, actor);
 
     const pricingRules = await this.db.pricingRule.findMany({
       where: { courtId },
@@ -400,16 +511,17 @@ export class CourtsService {
     return pricingRules.map(toPricingRuleDto);
   }
 
-  async createPricingRule(courtId: string, actorUserId: string, input: CreatePricingRuleInput) {
+  async createPricingRule(courtId: string, actor: ActorContext, input: CreatePricingRuleInput) {
     try {
       await this.assertCourtExists(courtId);
+      await this.assertCanManageCourt(courtId, actor);
 
       const priorityOrder = input.priorityOrder ?? await this.getNextPricingRulePriorityOrder(courtId);
       const pricingRule = await this.db.pricingRule.create({
         data: {
           ...input,
           courtId,
-          createdByUserId: actorUserId,
+          createdByUserId: actor.actorUserId,
           priorityOrder
         },
         include: { priorityGroup: true }
@@ -421,8 +533,10 @@ export class CourtsService {
     }
   }
 
-  async updatePricingRule(id: string, input: UpdatePricingRuleInput) {
+  async updatePricingRule(id: string, input: UpdatePricingRuleInput, actor?: ActorContext) {
     try {
+      await this.assertCanManagePricingRule(id, actor);
+
       const pricingRule = await this.db.pricingRule.update({
         where: { pricingRuleId: id },
         data: input,
@@ -439,8 +553,10 @@ export class CourtsService {
     }
   }
 
-  async updatePricingRuleStatus(id: string, input: UpdateEntityStatusInput) {
+  async updatePricingRuleStatus(id: string, input: UpdateEntityStatusInput, actor?: ActorContext) {
     try {
+      await this.assertCanManagePricingRule(id, actor);
+
       const pricingRule = await this.db.pricingRule.update({
         where: { pricingRuleId: id },
         data: { status: input.status },
@@ -457,8 +573,10 @@ export class CourtsService {
     }
   }
 
-  async deletePricingRule(id: string) {
+  async deletePricingRule(id: string, actor?: ActorContext) {
     try {
+      await this.assertCanManagePricingRule(id, actor);
+
       const pricingRule = await this.db.pricingRule.delete({
         where: { pricingRuleId: id },
         include: { priorityGroup: true }
@@ -472,6 +590,76 @@ export class CourtsService {
 
       throw error;
     }
+  }
+
+  private isAdmin(actor?: ActorContext): boolean {
+    return actor?.roles.includes("ADMIN") ?? false;
+  }
+
+  private isFieldManagerOnly(actor?: ActorContext): actor is ActorContext {
+    return Boolean(actor?.roles.includes("FIELD_MANAGER") && !this.isAdmin(actor));
+  }
+
+  private async assertCanManageCourt(
+    courtId: string,
+    actor?: ActorContext,
+    db: CourtDbClient = this.db
+  ): Promise<void> {
+    if (!this.isFieldManagerOnly(actor)) {
+      return;
+    }
+
+    const assignment = await db.courtManagerAssignment.findUnique({
+      where: {
+        courtId_userId: {
+          courtId,
+          userId: actor.actorUserId
+        }
+      },
+      select: { courtId: true }
+    });
+
+    if (!assignment) {
+      throw new AppError(
+        403,
+        "Field manager is not assigned to this court",
+        "COURT_MANAGER_ASSIGNMENT_REQUIRED"
+      );
+    }
+  }
+
+  private async assertCanManageOperatingHour(id: string, actor?: ActorContext): Promise<void> {
+    if (!this.isFieldManagerOnly(actor)) {
+      return;
+    }
+
+    const operatingHour = await this.db.operatingHour.findUnique({
+      where: { operatingHourId: id },
+      select: { courtId: true }
+    });
+
+    if (!operatingHour) {
+      throw new AppError(404, "Operating hour not found", "OPERATING_HOUR_NOT_FOUND");
+    }
+
+    await this.assertCanManageCourt(operatingHour.courtId, actor);
+  }
+
+  private async assertCanManagePricingRule(id: string, actor?: ActorContext): Promise<void> {
+    if (!this.isFieldManagerOnly(actor)) {
+      return;
+    }
+
+    const pricingRule = await this.db.pricingRule.findUnique({
+      where: { pricingRuleId: id },
+      select: { courtId: true }
+    });
+
+    if (!pricingRule) {
+      throw new AppError(404, "Pricing rule not found", "PRICING_RULE_NOT_FOUND");
+    }
+
+    await this.assertCanManageCourt(pricingRule.courtId, actor);
   }
 
   private async assertCourtExists(courtId: string): Promise<void> {

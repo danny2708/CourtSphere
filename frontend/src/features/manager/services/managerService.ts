@@ -217,7 +217,7 @@ export async function managerCancelBooking(
 }
 
 export async function listManagerCourts(): Promise<ManagerCourtViewModel[]> {
-  const response = await apiRequest<CourtsResponse>("/api/courts", { auth: true, method: "GET" });
+  const response = await apiRequest<CourtsResponse>("/api/courts?managedOnly=true", { auth: true, method: "GET" });
   return extractCourts(response).map(mapCourt);
 }
 

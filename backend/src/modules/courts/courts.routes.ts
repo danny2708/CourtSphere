@@ -13,6 +13,7 @@ import {
   createPricingRuleSchema,
   idParamSchema,
   listCourtsQuerySchema,
+  updateCourtManagersSchema,
   updateCourtSchema,
   updateCourtStatusSchema,
   updateCourtTypeSchema,
@@ -81,39 +82,46 @@ export function createCourtsRouter(controller: CourtsController = courtsControll
     validateRequest({ params: idParamSchema, body: updateCourtStatusSchema }),
     asyncHandler(controller.updateCourtStatus)
   );
+  router.put(
+    "/admin/courts/:id/managers",
+    requireAuth,
+    requireRole(["ADMIN"]),
+    validateRequest({ params: idParamSchema, body: updateCourtManagersSchema }),
+    asyncHandler(controller.updateCourtManagers)
+  );
 
   router.get(
     "/admin/courts/:courtId/operating-hours",
     requireAuth,
-    requireRole(["FIELD_MANAGER", "ADMIN"]),
+    requireRole(["ADMIN"]),
     validateRequest({ params: courtIdParamSchema }),
     asyncHandler(controller.listOperatingHours)
   );
   router.post(
     "/admin/courts/:courtId/operating-hours",
     requireAuth,
-    requireRole(["FIELD_MANAGER", "ADMIN"]),
+    requireRole(["ADMIN"]),
     validateRequest({ params: courtIdParamSchema, body: createOperatingHourSchema }),
     asyncHandler(controller.createOperatingHour)
   );
   router.put(
     "/admin/operating-hours/:id",
     requireAuth,
-    requireRole(["FIELD_MANAGER", "ADMIN"]),
+    requireRole(["ADMIN"]),
     validateRequest({ params: idParamSchema, body: updateOperatingHourSchema }),
     asyncHandler(controller.updateOperatingHour)
   );
   router.patch(
     "/admin/operating-hours/:id/status",
     requireAuth,
-    requireRole(["FIELD_MANAGER", "ADMIN"]),
+    requireRole(["ADMIN"]),
     validateRequest({ params: idParamSchema, body: updateEntityStatusSchema }),
     asyncHandler(controller.updateOperatingHourStatus)
   );
   router.delete(
     "/admin/operating-hours/:id",
     requireAuth,
-    requireRole(["FIELD_MANAGER", "ADMIN"]),
+    requireRole(["ADMIN"]),
     validateRequest({ params: idParamSchema }),
     asyncHandler(controller.deleteOperatingHour)
   );

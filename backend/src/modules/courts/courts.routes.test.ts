@@ -184,7 +184,7 @@ describe("courts routes", () => {
     expect(createOperatingHour).not.toHaveBeenCalled();
   });
 
-  it("allows FIELD_MANAGER to create operating hours", async () => {
+  it("forbids FIELD_MANAGER from creating operating hours", async () => {
     const { app, createOperatingHour } = createMockController();
 
     const response = await request(app)
@@ -197,8 +197,9 @@ describe("courts routes", () => {
         slotDurationMinutes: 60
       });
 
-    expect(response.status).toBe(201);
-    expect(createOperatingHour).toHaveBeenCalledOnce();
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("FORBIDDEN");
+    expect(createOperatingHour).not.toHaveBeenCalled();
   });
 
   it("rejects pricing rules with negative prices", async () => {
@@ -235,16 +236,16 @@ describe("courts routes", () => {
     expect(createPricingRule).toHaveBeenCalledOnce();
   });
 
-  it("allows FIELD_MANAGER to delete operating hours", async () => {
+  it("forbids FIELD_MANAGER from deleting operating hours", async () => {
     const { app, deleteOperatingHour } = createMockController();
 
     const response = await request(app)
       .delete(`/api/admin/operating-hours/${operatingHourId}`)
       .set("Authorization", bearerToken(["FIELD_MANAGER"]));
 
-    expect(response.status).toBe(200);
-    expect(response.body.operatingHour).toMatchObject({ id: operatingHourId });
-    expect(deleteOperatingHour).toHaveBeenCalledOnce();
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("FORBIDDEN");
+    expect(deleteOperatingHour).not.toHaveBeenCalled();
   });
 
   it("allows ADMIN to delete pricing rules and forbids USER", async () => {

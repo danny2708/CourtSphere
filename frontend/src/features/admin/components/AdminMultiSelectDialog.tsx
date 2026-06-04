@@ -3,6 +3,7 @@ import { type FormEvent, useState } from "react";
 import { Button } from "../../../components/common/Button";
 
 type AdminMultiSelectDialogProps<TValue extends string> = {
+  allowEmpty?: boolean;
   defaultValues?: TValue[];
   emptyMessage?: string;
   label: string;
@@ -13,6 +14,7 @@ type AdminMultiSelectDialogProps<TValue extends string> = {
 };
 
 export function AdminMultiSelectDialog<TValue extends string>({
+  allowEmpty = false,
   defaultValues = [],
   emptyMessage = "Không có lựa chọn khả dụng.",
   label,
@@ -36,7 +38,7 @@ export function AdminMultiSelectDialog<TValue extends string>({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (values.length === 0) {
+    if (!allowEmpty && values.length === 0) {
       setError("Vui lòng chọn ít nhất một mục.");
       return;
     }
@@ -77,7 +79,7 @@ export function AdminMultiSelectDialog<TValue extends string>({
           <Button disabled={isSubmitting} variant="secondary" onClick={onClose}>
             Đóng
           </Button>
-          <Button disabled={isSubmitting || options.length === 0} type="submit">
+          <Button disabled={isSubmitting || (!allowEmpty && options.length === 0)} type="submit">
             {isSubmitting ? "Đang lưu..." : "Lưu"}
           </Button>
         </div>

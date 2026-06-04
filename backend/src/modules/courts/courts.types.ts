@@ -3,6 +3,7 @@ import type { CourtStatus, EntityStatus } from "@prisma/client";
 export type ListCourtsQuery = {
   keyword?: string;
   courtTypeId?: string;
+  managedOnly?: boolean;
   status?: CourtStatus;
 };
 
@@ -29,6 +30,15 @@ export type UpdateCourtInput = Partial<CreateCourtInput>;
 export type UpdateCourtStatusInput = {
   status: CourtStatus;
   reason?: string;
+};
+
+export type ActorContext = {
+  actorUserId: string;
+  roles: string[];
+};
+
+export type UpdateCourtManagersInput = {
+  managerUserIds: string[];
 };
 
 export type CreateOperatingHourInput = {

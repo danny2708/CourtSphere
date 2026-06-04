@@ -156,6 +156,10 @@ function isAdmin(roles: string[]): boolean {
   return roles.includes("ADMIN");
 }
 
+function isFieldManagerOnly(audit: AuditContext): boolean {
+  return audit.roles.includes("FIELD_MANAGER") && !isAdmin(audit.roles);
+}
+
 function toRefundDto(refund: RefundWithRelations) {
   return {
     id: refund.refundId,
@@ -590,6 +594,7 @@ export class RefundsService {
           }
 
           this.assertManagerCanCancelBooking(currentOrder.bookingStatus);
+          await this.assertCanManageOrderCourts(tx, currentOrder, audit);
 
           const adminActor = isAdmin(audit.roles);
           const newStatus = adminActor
@@ -728,6 +733,43 @@ export class RefundsService {
       "Booking order cannot be cancelled by manager/admin in its current status",
       "BOOKING_CANNOT_BE_CANCELLED_BY_MANAGER"
     );
+  }
+
+  private async assertCanManageOrderCourts(
+    tx: Prisma.TransactionClient,
+    order: ManagerCancelOrder,
+    audit: AuditContext
+  ): Promise<void> {
+    if (!isFieldManagerOnly(audit)) {
+      return;
+    }
+
+    const courtIds = [
+      ...new Set(
+        order.items
+          .filter((item) => managerCancellableItemStatuses.includes(item.bookingStatus))
+          .map((item) => item.courtId)
+      )
+    ];
+
+    if (courtIds.length === 0) {
+      return;
+    }
+
+    const assignmentCount = await tx.courtManagerAssignment.count({
+      where: {
+        userId: audit.actorUserId,
+        courtId: { in: courtIds }
+      }
+    });
+
+    if (assignmentCount !== courtIds.length) {
+      throw new AppError(
+        403,
+        "Field manager is not assigned to every court in this booking",
+        "COURT_MANAGER_ASSIGNMENT_REQUIRED"
+      );
+    }
   }
 
   private async createAuditLog(

@@ -47,6 +47,14 @@ export type AdminCourtType = {
   status: EntityStatus;
 };
 
+export type AdminCourtManager = {
+  id: string;
+  fullName: string;
+  email: string;
+  accountStatus?: AccountStatus;
+  assignedAt?: string;
+};
+
 export type AdminCourt = {
   id: string;
   courtName: string;
@@ -54,6 +62,7 @@ export type AdminCourt = {
   imageUrl?: string | null;
   status: CourtStatus;
   courtType?: AdminCourtType | null;
+  assignedManagers?: AdminCourtManager[];
   operatingHours?: AdminOperatingHour[];
   pricingRules?: AdminPricingRule[];
 };

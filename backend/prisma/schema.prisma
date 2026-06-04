@@ -153,6 +153,8 @@ model User {
   createdPricingRules         PricingRule[]
   updatedBookingRules         BookingRule[]
   updatedPriorityPolicies     PriorityPolicy[]
+  managedCourtAssignments     CourtManagerAssignment[]    @relation("CourtManagerAssignments")
+  assignedCourtManagers       CourtManagerAssignment[]    @relation("CourtManagerAssignedBy")
 
   @@index([priorityGroupId])
   @@index([accountStatus])
@@ -208,6 +210,7 @@ model Court {
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
   courtType            CourtType            @relation(fields: [courtTypeId], references: [courtTypeId])
+  managerAssignments   CourtManagerAssignment[]
   operatingHours       OperatingHour[]
   pricingRules         PricingRule[]
   bookingItems         BookingItem[]
@@ -217,6 +220,22 @@ model Court {
   @@index([courtTypeId])
   @@index([status])
   @@map("courts")
+}
+
+model CourtManagerAssignment {
+  courtId          String   @map("court_id") @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  assignedByUserId String?  @map("assigned_by_user_id") @db.Uuid
+  assignedAt       DateTime @default(now()) @map("assigned_at")
+
+  court      Court @relation(fields: [courtId], references: [courtId], onDelete: Cascade)
+  user       User  @relation("CourtManagerAssignments", fields: [userId], references: [userId], onDelete: Cascade)
+  assignedBy User? @relation("CourtManagerAssignedBy", fields: [assignedByUserId], references: [userId])
+
+  @@id([courtId, userId])
+  @@index([userId])
+  @@index([assignedByUserId])
+  @@map("court_manager_assignments")
 }
 
 model OperatingHour {
