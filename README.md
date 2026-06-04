@@ -17,6 +17,57 @@ Runtime choices:
 
 Prisma is intentionally pinned to major `6` for stable compatibility with the current `schema.prisma` workflow in the project spec. Prisma `7.x` is not used in this foundation module.
 
+## Run With Docker
+
+The repository includes Docker setup for PostgreSQL, backend, and frontend.
+
+Requirements:
+
+- Docker Desktop or Docker Engine with Compose support
+
+Start the full stack:
+
+```bash
+docker compose up --build
+```
+
+Services:
+
+| Service | URL |
+| --- | --- |
+| Frontend | `http://localhost:5173` |
+| Backend API | `http://localhost:3000` |
+| Swagger UI | `http://localhost:3000/api-docs` |
+| OpenAPI JSON | `http://localhost:3000/openapi.json` |
+| PostgreSQL | `localhost:5432` |
+
+On startup, the backend container waits for PostgreSQL, then runs:
+
+```bash
+npx prisma migrate deploy
+npx prisma db seed
+npm run dev
+```
+
+This means teammates can run the project with seed data without manually creating the database. The seed is idempotent, so restarting the stack is safe.
+
+Useful Docker commands:
+
+```bash
+docker compose logs -f backend
+docker compose logs -f frontend
+docker compose down
+docker compose down -v
+```
+
+Use `docker compose down -v` only when you want to delete the Docker PostgreSQL data volume and start from a fresh seeded database.
+
+Docker environment defaults:
+
+- Backend container uses `DATABASE_URL=postgresql://postgres:123456@postgres:5432/courtsphere?schema=public`.
+- Frontend container uses `VITE_API_BASE_URL=http://localhost:3000`.
+- Uploaded court images are stored in the `courtsphere_uploads` Docker volume and served from `http://localhost:3000/uploads/...`.
+
 ### Commands
 
 ```bash
