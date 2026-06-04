@@ -610,6 +610,24 @@ async function seedCourts(courtTypes: Awaited<ReturnType<typeof seedCourtTypes>>
   };
 }
 
+async function seedCourtManagerAssignments(managerUserId: string, courts: Awaited<ReturnType<typeof seedCourts>>) {
+  for (const court of Object.values(courts)) {
+    await prisma.courtManagerAssignment.upsert({
+      where: {
+        courtId_userId: {
+          courtId: court.courtId,
+          userId: managerUserId
+        }
+      },
+      update: {},
+      create: {
+        courtId: court.courtId,
+        userId: managerUserId
+      }
+    });
+  }
+}
+
 async function seedOperatingHours(courtId: string, input: {
   weekdayOpenTime?: string;
   weekdayCloseTime?: string;
@@ -2015,6 +2033,7 @@ async function main() {
 
   const courtTypes = await seedCourtTypes();
   const courts = await seedCourts(courtTypes);
+  await seedCourtManagerAssignments(users.managerUser.userId, courts);
 
   await Promise.all([
     seedOperatingHours(courts.footballA.courtId),

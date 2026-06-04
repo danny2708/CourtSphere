@@ -15,6 +15,15 @@ export async function createPayment(bookingOrderId: string, payload: CreatePayme
   return response.payment;
 }
 
+export async function cancelPaymentForBooking(bookingOrderId: string): Promise<PaymentDetail> {
+  const response = await apiRequest<{ payment: PaymentDetail }>(`/api/bookings/${bookingOrderId}/payments/cancel`, {
+    auth: true,
+    method: "POST"
+  });
+
+  return response.payment;
+}
+
 export async function handleMomoPaymentReturn(payload: MomoPaymentReturnPayload): Promise<PaymentDetail> {
   const response = await apiRequest<{ payment: PaymentDetail }>("/api/payments/callback/momo", {
     method: "POST",

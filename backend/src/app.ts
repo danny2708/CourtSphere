@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import cors from "cors";
 import express from "express";
 
@@ -15,6 +17,7 @@ import paymentsRouter from "./modules/payments/payments.routes";
 import reportsRouter from "./modules/reports/reports.routes";
 import refundsRouter from "./modules/refunds/refunds.routes";
 import rulesRouter from "./modules/rules/rules.routes";
+import uploadsRouter from "./modules/uploads/uploads.routes";
 import usersRouter from "./modules/users/users.routes";
 import violationsRouter from "./modules/violations/violations.routes";
 import waitlistRouter from "./modules/waitlist/waitlist.routes";
@@ -41,6 +44,7 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 app.use(requestLogger);
 
+app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 app.use(openApiRouter);
 app.use("/health", healthRouter);
 app.use("/api/auth", authRouter);
@@ -53,6 +57,7 @@ app.use("/api", paymentsRouter);
 app.use("/api", refundsRouter);
 app.use("/api", managerRouter);
 app.use("/api/admin", rulesRouter);
+app.use("/api/admin/uploads", uploadsRouter);
 app.use("/api/admin", usersRouter);
 app.use("/api/admin", violationsRouter);
 app.use("/api/admin", reportsRouter);

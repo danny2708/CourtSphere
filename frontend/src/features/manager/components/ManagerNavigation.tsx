@@ -14,7 +14,7 @@ const managerNavItems = [
 
 export function ManagerNavigation() {
   return (
-    <nav className="manager-nav" aria-label="Điều hướng quản lý sân">
+    <nav className="manager-nav" aria-label="?i?u h??ng qu?n l? s?n">
       {managerNavItems.map((item) => {
         const Icon = item.icon;
 

@@ -10,7 +10,7 @@ export function AdminPageHeader({ actions, description, title }: AdminPageHeader
   return (
     <section className="listing-header admin-header">
       <div>
-        <p className="eyebrow">Admin</p>
+        <p className="eyebrow">Quản trị</p>
         <h1>{title}</h1>
         <p>{description}</p>
       </div>

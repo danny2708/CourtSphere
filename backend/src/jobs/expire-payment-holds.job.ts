@@ -16,10 +16,7 @@ import { waitlistService, type WaitlistService } from "../modules/waitlist/waitl
 import type { JobRunOptions, JobRunResult } from "./jobs.types";
 
 const jobName = "expire-payment-holds";
-const expirableOrderStatuses: BookingStatus[] = [
-  BookingStatus.PENDING_PAYMENT,
-  BookingStatus.PAYMENT_PROCESSING
-];
+const expirableOrderStatuses: BookingStatus[] = [BookingStatus.PENDING_PAYMENT];
 const expirableItemStatuses: BookingStatus[] = [
   BookingStatus.PENDING_PAYMENT,
   BookingStatus.PAYMENT_PROCESSING

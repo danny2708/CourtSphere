@@ -198,6 +198,9 @@ function createTx(input: {
     bookingRule: {
       findFirst: vi.fn().mockResolvedValue(input.bookingRule ?? bookingRule())
     },
+    courtManagerAssignment: {
+      findUnique: vi.fn().mockResolvedValue({ courtId })
+    },
     systemSetting: {
       findUnique: vi.fn().mockResolvedValue({ settingValue: "1" })
     },
@@ -343,6 +346,18 @@ describe("ManagerService", () => {
         }
       })
     );
+  });
+
+  it("rejects field manager operations for unassigned courts", async () => {
+    const tx = createTx({
+      item: buildItem()
+    });
+    tx.courtManagerAssignment.findUnique.mockResolvedValue(null);
+    const { service } = createService({ tx });
+
+    await expect(service.checkInBookingItem(bookingItemId, audit)).rejects.toMatchObject({
+      code: "COURT_MANAGER_ASSIGNMENT_REQUIRED"
+    });
   });
 
   it("does not check in when the booking order is not paid", async () => {

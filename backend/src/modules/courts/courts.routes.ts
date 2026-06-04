@@ -13,6 +13,7 @@ import {
   createPricingRuleSchema,
   idParamSchema,
   listCourtsQuerySchema,
+  updateCourtManagersSchema,
   updateCourtSchema,
   updateCourtStatusSchema,
   updateCourtTypeSchema,
@@ -81,6 +82,13 @@ export function createCourtsRouter(controller: CourtsController = courtsControll
     validateRequest({ params: idParamSchema, body: updateCourtStatusSchema }),
     asyncHandler(controller.updateCourtStatus)
   );
+  router.put(
+    "/admin/courts/:id/managers",
+    requireAuth,
+    requireRole(["ADMIN"]),
+    validateRequest({ params: idParamSchema, body: updateCourtManagersSchema }),
+    asyncHandler(controller.updateCourtManagers)
+  );
 
   router.get(
     "/admin/courts/:courtId/operating-hours",
@@ -110,6 +118,13 @@ export function createCourtsRouter(controller: CourtsController = courtsControll
     validateRequest({ params: idParamSchema, body: updateEntityStatusSchema }),
     asyncHandler(controller.updateOperatingHourStatus)
   );
+  router.delete(
+    "/admin/operating-hours/:id",
+    requireAuth,
+    requireRole(["ADMIN"]),
+    validateRequest({ params: idParamSchema }),
+    asyncHandler(controller.deleteOperatingHour)
+  );
 
   router.get(
     "/admin/courts/:courtId/pricing-rules",
@@ -138,6 +153,13 @@ export function createCourtsRouter(controller: CourtsController = courtsControll
     requireRole(["ADMIN"]),
     validateRequest({ params: idParamSchema, body: updateEntityStatusSchema }),
     asyncHandler(controller.updatePricingRuleStatus)
+  );
+  router.delete(
+    "/admin/pricing-rules/:id",
+    requireAuth,
+    requireRole(["ADMIN"]),
+    validateRequest({ params: idParamSchema }),
+    asyncHandler(controller.deletePricingRule)
   );
 
   return router;

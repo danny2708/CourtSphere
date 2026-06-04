@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Clock, CreditCard, ShieldCheck } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { Button } from "../../components/common/Button";
+import { EmptyState } from "../../components/common/EmptyState";
 import { CourtGrid } from "../../components/courts/CourtGrid";
 import { CourtFilterDrawer } from "../../components/filters/CourtFilterDrawer";
 import { SearchFilterBar } from "../../components/layout/SearchFilterBar";
+import { buildCourtTypeSummaries, CourtTypeSelection, filterCourtTypes } from "../../features/courts/components/CourtTypeSelection";
 import { listCourts } from "../../features/courts/services/courtService";
 import type { CourtDetailViewModel } from "../../features/courts/types/court-detail.types";
 import { defaultCourtFilters, filterCourts } from "../../features/courts/utils/courtFilters";
@@ -13,29 +14,6 @@ import { buildCourtDetailPath, ROUTE_PATHS } from "../../routes/route-paths";
 import { useAuthStore } from "../../stores/auth.store";
 import { useToastStore } from "../../stores/toast.store";
 import type { CourtFilterState } from "../../types/court.types";
-
-const summaryItems = [
-  {
-    icon: CalendarDays,
-    label: "Giữ chỗ",
-    value: "PENDING_PAYMENT"
-  },
-  {
-    icon: CreditCard,
-    label: "Thanh toán",
-    value: "100%"
-  },
-  {
-    icon: ShieldCheck,
-    label: "Xác nhận",
-    value: "Payment success"
-  },
-  {
-    icon: Clock,
-    label: "Check-in",
-    value: "Manager/Admin"
-  }
-] as const;
 
 export function HomePage() {
   const { addToast } = useToastStore();
@@ -47,6 +25,7 @@ export function HomePage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isLoadingCourts, setIsLoadingCourts] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
+  const [selectedCourtType, setSelectedCourtType] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -59,7 +38,7 @@ export function HomePage() {
         const loadedCourts = await listCourts();
 
         if (isMounted) {
-          setCourts(loadedCourts.slice(0, 4));
+          setCourts(loadedCourts);
         }
       } catch (error) {
         if (isMounted) {
@@ -80,10 +59,18 @@ export function HomePage() {
   }, []);
 
   const filteredCourts = useMemo(() => {
-    return filterCourts(courts, searchKeyword, filters);
-  }, [courts, filters, searchKeyword]);
+    const scopedFilters = selectedCourtType ? { ...filters, courtTypes: [selectedCourtType] } : filters;
+    return filterCourts(courts, searchKeyword, scopedFilters);
+  }, [courts, filters, searchKeyword, selectedCourtType]);
+  const courtTypeSummaries = useMemo(() => buildCourtTypeSummaries(courts), [courts]);
+  const visibleCourtTypes = useMemo(() => filterCourtTypes(courtTypeSummaries, searchKeyword), [courtTypeSummaries, searchKeyword]);
   const courtTypeOptions = useMemo(() => {
-    return Array.from(new Set(courts.map((court) => court.courtType))).sort((first, second) => first.localeCompare(second, "vi"));
+    return selectedCourtType ? [selectedCourtType] : courtTypeSummaries.map((courtType) => courtType.typeName);
+  }, [courtTypeSummaries, selectedCourtType]);
+  const areaOptions = useMemo(() => {
+    return Array.from(
+      new Set(courts.map((court) => court.area).filter((area): area is string => Boolean(area)))
+    ).sort((first, second) => first.localeCompare(second, "vi"));
   }, [courts]);
 
   const handleToggleFavorite = (courtId: string) => {
@@ -94,6 +81,18 @@ export function HomePage() {
 
   const handleBook = (courtId: string) => {
     navigate(buildCourtDetailPath(courtId));
+  };
+
+  const handleSelectCourtType = (courtType: string) => {
+    setSelectedCourtType(courtType);
+    setSearchKeyword("");
+    setFilters(defaultCourtFilters);
+  };
+
+  const handleBackToCourtTypes = () => {
+    setSelectedCourtType(null);
+    setSearchKeyword("");
+    setFilters(defaultCourtFilters);
   };
 
   const handleShare = (courtId: string) => {
@@ -109,50 +108,46 @@ export function HomePage() {
   return (
     <section className="page-stack">
       <div className="page-hero">
-        <p className="eyebrow">CourtSphere marketplace</p>
+        <p className="eyebrow">Chợ sân CourtSphere</p>
         <h1>Sân thể thao sẵn sàng cho lịch học và hoạt động đội nhóm</h1>
         <p>
-          Xin chào {user?.fullName ?? "bạn"}. Danh sách sân, trạng thái và giá đang được tải từ dữ liệu vận hành trong database.
+          Xin chào {user?.fullName ?? "bạn"}. Danh sách sân, trạng thái và giá đang được tải từ dữ liệu vận hành trong cơ sở dữ liệu.
         </p>
       </div>
 
-      <div className="summary-grid">
-        {summaryItems.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <article className="summary-card" key={item.label}>
-              <Icon aria-hidden="true" size={22} />
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </article>
-          );
-        })}
-      </div>
+      
 
       <SearchFilterBar
-        resultCount={filteredCourts.length}
+        placeholder={selectedCourtType ? `Tìm sân ${selectedCourtType}...` : "Tìm loại sân..."}
+        resultCount={selectedCourtType ? filteredCourts.length : visibleCourtTypes.length}
+        resultUnit={selectedCourtType ? "sân" : "loại sân"}
         value={searchKeyword}
-        onOpenFilter={() => setIsFilterOpen(true)}
-        onOpenMap={() => addToast({ type: "info", title: "Bản đồ", message: "Map view sẽ được triển khai ở module sau." })}
+        onOpenFilter={selectedCourtType ? () => setIsFilterOpen(true) : undefined}
+        onOpenMap={selectedCourtType ? () => addToast({ type: "info", title: "Bản đồ", message: "Chế độ xem bản đồ sẽ được triển khai ở module sau." }) : undefined}
         onSearchChange={setSearchKeyword}
-        onShowBooked={() => addToast({ type: "info", title: "Sân đã đặt", message: "Danh sách sân đã đặt sẽ dùng dữ liệu booking." })}
-        onShowFavorites={() => setFilters((currentFilters) => ({ ...currentFilters, favoritesOnly: !currentFilters.favoritesOnly }))}
+        onShowBooked={selectedCourtType ? () => addToast({ type: "info", title: "Sân đã đặt", message: "Danh sách sân đã đặt sẽ dùng dữ liệu đặt sân." }) : undefined}
+        onShowFavorites={selectedCourtType ? () => setFilters((currentFilters) => ({ ...currentFilters, favoritesOnly: !currentFilters.favoritesOnly })) : undefined}
       />
 
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Sân nổi bật</p>
-          <h2>Sân đang hoạt động</h2>
+          <p className="eyebrow">{selectedCourtType ? "Chọn sân" : "Chọn loại sân"}</p>
+          <h2>{selectedCourtType ? `Sân ${selectedCourtType}` : "Bạn muốn đặt loại sân nào?"}</h2>
         </div>
-        <Button variant="secondary" onClick={() => setSearchKeyword("")}>
-          Làm mới tìm kiếm
-        </Button>
+        {selectedCourtType ? (
+          <Button variant="secondary" onClick={handleBackToCourtTypes}>
+            Chọn loại sân khác
+          </Button>
+        ) : (
+          <Button variant="secondary" onClick={() => setSearchKeyword("")}>
+            Làm mới tìm kiếm
+          </Button>
+        )}
       </div>
 
       {isLoadingCourts ? <p role="status">Đang tải dữ liệu sân...</p> : null}
       {courtLoadError ? <p role="alert">{courtLoadError}</p> : null}
-      {!isLoadingCourts && !courtLoadError ? (
+      {!isLoadingCourts && !courtLoadError && selectedCourtType ? (
         <CourtGrid
           courts={filteredCourts}
           getCourtDetailPath={buildCourtDetailPath}
@@ -160,6 +155,12 @@ export function HomePage() {
           onShare={handleShare}
           onToggleFavorite={handleToggleFavorite}
         />
+      ) : null}
+      {!isLoadingCourts && !courtLoadError && !selectedCourtType && visibleCourtTypes.length ? (
+        <CourtTypeSelection courtTypes={visibleCourtTypes} onSelect={handleSelectCourtType} />
+      ) : null}
+      {!isLoadingCourts && !courtLoadError && !selectedCourtType && !visibleCourtTypes.length ? (
+        <EmptyState title="Chưa có loại sân phù hợp" message="Không tìm thấy loại sân theo từ khóa hiện tại." />
       ) : null}
 
       <div className="home-court-link">
@@ -169,6 +170,7 @@ export function HomePage() {
       </div>
 
       <CourtFilterDrawer
+        areas={areaOptions}
         courtTypes={courtTypeOptions}
         filters={filters}
         isOpen={isFilterOpen}

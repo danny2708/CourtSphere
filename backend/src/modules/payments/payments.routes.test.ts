@@ -28,6 +28,11 @@ function createMockController() {
       res.status(201).json({ payment: { id: paymentId, paymentStatus: "PROCESSING" } });
     }
   );
+  controller.cancelPaymentForBooking = vi.fn(
+    async (_req: Request, res: Response): Promise<void> => {
+      res.status(200).json({ payment: { id: paymentId, paymentStatus: "CANCELLED" } });
+    }
+  );
   controller.handleMockCallback = vi.fn(async (_req: Request, res: Response): Promise<void> => {
     res.status(200).json({ payment: { id: paymentId, paymentStatus: "SUCCESS" } });
   });
@@ -88,6 +93,22 @@ describe("payments routes", () => {
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("FORBIDDEN");
     expect(controller.createPaymentForBooking).not.toHaveBeenCalled();
+  });
+
+  it("allows USER to cancel an active payment session for own booking order", async () => {
+    const controller = createMockController();
+    const app = createTestApp(controller);
+
+    const response = await request(app)
+      .post(`/api/bookings/${bookingOrderId}/payments/cancel`)
+      .set("Authorization", bearerToken(["USER"]));
+
+    expect(response.status).toBe(200);
+    expect(response.body.payment).toEqual({
+      id: paymentId,
+      paymentStatus: "CANCELLED"
+    });
+    expect(controller.cancelPaymentForBooking).toHaveBeenCalledOnce();
   });
 
   it("allows public mock payment callback with valid payload shape", async () => {

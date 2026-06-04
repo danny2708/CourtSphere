@@ -6,7 +6,7 @@ export const defaultCourtFilters: CourtFilterState = {
   statuses: [],
   areas: [],
   priceRange: [0, 500000],
-  timeSlot: "",
+  timeSlots: [],
   favoritesOnly: false
 };
 
@@ -14,11 +14,7 @@ function normalize(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function matchesTimeSlot(court: CourtDetailViewModel, timeSlot: string): boolean {
-  if (!timeSlot) {
-    return true;
-  }
-
+function matchesOneTimeSlot(court: CourtDetailViewModel, timeSlot: string): boolean {
   if (timeSlot === "Sáng") {
     return Boolean(court.openTime && court.openTime <= "12:00");
   }
@@ -32,6 +28,10 @@ function matchesTimeSlot(court: CourtDetailViewModel, timeSlot: string): boolean
   }
 
   return true;
+}
+
+function matchesTimeSlots(court: CourtDetailViewModel, timeSlots: string[]): boolean {
+  return timeSlots.length === 0 || timeSlots.some((timeSlot) => matchesOneTimeSlot(court, timeSlot));
 }
 
 export function filterCourts(
@@ -51,7 +51,7 @@ export function filterCourts(
     const price = court.startingPrice ?? 0;
     const matchesPrice = price >= filters.priceRange[0] && price <= filters.priceRange[1];
 
-    return matchesKeyword && matchesType && matchesStatus && matchesArea && matchesFavorite && matchesPrice && matchesTimeSlot(court, filters.timeSlot);
+    return matchesKeyword && matchesType && matchesStatus && matchesArea && matchesFavorite && matchesPrice && matchesTimeSlots(court, filters.timeSlots);
   });
 }
 

@@ -1,12 +1,14 @@
 import type { Request, Response } from "express";
 
 import type {
+  ActorContext,
   CreateCourtInput,
   CreateCourtTypeInput,
   CreateOperatingHourInput,
   CreatePricingRuleInput,
   ListCourtsQuery,
   UpdateCourtInput,
+  UpdateCourtManagersInput,
   UpdateCourtStatusInput,
   UpdateCourtTypeInput,
   UpdateEntityStatusInput,
@@ -22,6 +24,13 @@ function routeParam(req: Request, key: string): string {
   }
 
   return value;
+}
+
+function actorContext(req: Request): ActorContext {
+  return {
+    actorUserId: req.user!.id,
+    roles: req.user!.roles
+  };
 }
 
 export class CourtsController {
@@ -50,7 +59,7 @@ export class CourtsController {
   };
 
   listCourts = async (req: Request, res: Response): Promise<void> => {
-    const courts = await this.service.listCourts(req.query as ListCourtsQuery);
+    const courts = await this.service.listCourts(req.query as ListCourtsQuery, actorContext(req));
     res.status(200).json({ courts });
   };
 
@@ -65,28 +74,42 @@ export class CourtsController {
   };
 
   updateCourt = async (req: Request, res: Response): Promise<void> => {
-    const court = await this.service.updateCourt(routeParam(req, "id"), req.body as UpdateCourtInput);
+    const court = await this.service.updateCourt(
+      routeParam(req, "id"),
+      req.body as UpdateCourtInput,
+      actorContext(req)
+    );
     res.status(200).json({ court });
   };
 
   updateCourtStatus = async (req: Request, res: Response): Promise<void> => {
     const court = await this.service.updateCourtStatus(
       routeParam(req, "id"),
-      req.user!.id,
+      actorContext(req),
       req.body as UpdateCourtStatusInput
     );
     res.status(200).json({ court });
   };
 
+  updateCourtManagers = async (req: Request, res: Response): Promise<void> => {
+    const court = await this.service.updateCourtManagers(
+      routeParam(req, "id"),
+      req.user!.id,
+      req.body as UpdateCourtManagersInput
+    );
+    res.status(200).json({ court });
+  };
+
   listOperatingHours = async (req: Request, res: Response): Promise<void> => {
-    const operatingHours = await this.service.listOperatingHours(routeParam(req, "courtId"));
+    const operatingHours = await this.service.listOperatingHours(routeParam(req, "courtId"), actorContext(req));
     res.status(200).json({ operatingHours });
   };
 
   createOperatingHour = async (req: Request, res: Response): Promise<void> => {
     const operatingHour = await this.service.createOperatingHour(
       routeParam(req, "courtId"),
-      req.body as CreateOperatingHourInput
+      req.body as CreateOperatingHourInput,
+      actorContext(req)
     );
     res.status(201).json({ operatingHour });
   };
@@ -94,7 +117,8 @@ export class CourtsController {
   updateOperatingHour = async (req: Request, res: Response): Promise<void> => {
     const operatingHour = await this.service.updateOperatingHour(
       routeParam(req, "id"),
-      req.body as UpdateOperatingHourInput
+      req.body as UpdateOperatingHourInput,
+      actorContext(req)
     );
     res.status(200).json({ operatingHour });
   };
@@ -102,20 +126,26 @@ export class CourtsController {
   updateOperatingHourStatus = async (req: Request, res: Response): Promise<void> => {
     const operatingHour = await this.service.updateOperatingHourStatus(
       routeParam(req, "id"),
-      req.body as UpdateEntityStatusInput
+      req.body as UpdateEntityStatusInput,
+      actorContext(req)
     );
     res.status(200).json({ operatingHour });
   };
 
+  deleteOperatingHour = async (req: Request, res: Response): Promise<void> => {
+    const operatingHour = await this.service.deleteOperatingHour(routeParam(req, "id"), actorContext(req));
+    res.status(200).json({ operatingHour });
+  };
+
   listPricingRules = async (req: Request, res: Response): Promise<void> => {
-    const pricingRules = await this.service.listPricingRules(routeParam(req, "courtId"));
+    const pricingRules = await this.service.listPricingRules(routeParam(req, "courtId"), actorContext(req));
     res.status(200).json({ pricingRules });
   };
 
   createPricingRule = async (req: Request, res: Response): Promise<void> => {
     const pricingRule = await this.service.createPricingRule(
       routeParam(req, "courtId"),
-      req.user!.id,
+      actorContext(req),
       req.body as CreatePricingRuleInput
     );
     res.status(201).json({ pricingRule });
@@ -124,7 +154,8 @@ export class CourtsController {
   updatePricingRule = async (req: Request, res: Response): Promise<void> => {
     const pricingRule = await this.service.updatePricingRule(
       routeParam(req, "id"),
-      req.body as UpdatePricingRuleInput
+      req.body as UpdatePricingRuleInput,
+      actorContext(req)
     );
     res.status(200).json({ pricingRule });
   };
@@ -132,8 +163,14 @@ export class CourtsController {
   updatePricingRuleStatus = async (req: Request, res: Response): Promise<void> => {
     const pricingRule = await this.service.updatePricingRuleStatus(
       routeParam(req, "id"),
-      req.body as UpdateEntityStatusInput
+      req.body as UpdateEntityStatusInput,
+      actorContext(req)
     );
+    res.status(200).json({ pricingRule });
+  };
+
+  deletePricingRule = async (req: Request, res: Response): Promise<void> => {
+    const pricingRule = await this.service.deletePricingRule(routeParam(req, "id"), actorContext(req));
     res.status(200).json({ pricingRule });
   };
 }

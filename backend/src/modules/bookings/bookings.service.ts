@@ -17,6 +17,7 @@ import {
   bookingConflictService,
   type BookingConflictService
 } from "../availability/booking-conflict.service";
+import { selectMostSpecificPricingRule } from "../courts/pricing-rule-selection";
 import {
   notificationsService,
   type NotificationsService
@@ -24,6 +25,12 @@ import {
 import { refundsService, type RefundsService } from "../refunds/refunds.service";
 import { RulesRepository, rulesRepository } from "../rules/rules.repository";
 import { violationsService, type ViolationsService } from "../violations/violations.service";
+import { waitlistService, type WaitlistService } from "../waitlist/waitlist.service";
+import {
+  getVietnamIsoWeekday,
+  startOfVietnamDay,
+  vietnamMinutesFromDate
+} from "../../utils/vietnam-time";
 import type {
   CancelBookingInput,
   CreateBookingInput,
@@ -129,26 +136,13 @@ function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60_000);
 }
 
-function startOfUtcDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
-
 function minutesBetween(start: Date, end: Date): number {
   return Math.floor((end.getTime() - start.getTime()) / 60_000);
-}
-
-function getIsoWeekday(date: Date): number {
-  const day = date.getUTCDay();
-  return day === 0 ? 7 : day;
 }
 
 function minutesFromTime(time: string): number {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
-}
-
-function utcMinutesFromDate(date: Date): number {
-  return date.getUTCHours() * 60 + date.getUTCMinutes();
 }
 
 function decimalToNumber(value: Prisma.Decimal): number {
@@ -296,7 +290,8 @@ export class BookingsService {
     private readonly violations: ViolationsService = violationsService,
     private readonly nowProvider: () => Date = () => new Date(),
     private readonly codeGenerator: (now: Date) => string = defaultBookingCode,
-    private readonly notifications: NotificationsService = notificationsService
+    private readonly notifications: NotificationsService = notificationsService,
+    private readonly waitlist: WaitlistService = waitlistService
   ) {}
 
   async createBookingHold(userId: string, input: CreateBookingInput) {
@@ -355,7 +350,7 @@ export class BookingsService {
               slotDurationMinutes: operatingHour.slotDurationMinutes,
               pricingRules: court.pricingRules,
               userPriorityGroupId: user.priorityGroupId,
-              weekday: getIsoWeekday(item.startDatetime)
+              weekday: getVietnamIsoWeekday(item.startDatetime)
             });
 
             preparedItems.push({
@@ -524,8 +519,22 @@ export class BookingsService {
           let paymentStatus = currentOrder.paymentStatus;
           let refundable = false;
 
-          if (currentOrder.bookingStatus === BookingStatus.PENDING_PAYMENT) {
+          if (
+            currentOrder.bookingStatus === BookingStatus.PENDING_PAYMENT ||
+            currentOrder.bookingStatus === BookingStatus.PAYMENT_PROCESSING
+          ) {
             paymentStatus = PaymentStatus.CANCELLED;
+            await tx.payment.updateMany({
+              where: {
+                bookingOrderId: currentOrder.bookingOrderId,
+                paymentStatus: {
+                  in: [PaymentStatus.INITIATED, PaymentStatus.PROCESSING]
+                }
+              },
+              data: {
+                paymentStatus: PaymentStatus.CANCELLED
+              }
+            });
           } else if (currentOrder.bookingStatus === BookingStatus.CONFIRMED) {
             const isOnTimeCancellation = this.isCancellationWindowOpen(
               earliestItemStart(currentOrder),
@@ -624,6 +633,18 @@ export class BookingsService {
             content: `Booking ${currentOrder.bookingCode} was cancelled.`
           });
 
+          for (const item of cancellableItems) {
+            await this.waitlist.notifyNextForSlotInTransaction(
+              tx,
+              {
+                courtId: item.courtId,
+                startDatetime: item.startDatetime,
+                endDatetime: item.endDatetime
+              },
+              now
+            );
+          }
+
           return this.getBookingOrderById(tx, updatedOrder.bookingOrderId);
         },
         {
@@ -686,7 +707,7 @@ export class BookingsService {
   }
 
   private getOperatingHourOrThrow(court: CourtForBooking, startDatetime: Date): OperatingHourForBooking {
-    const weekday = getIsoWeekday(startDatetime);
+    const weekday = getVietnamIsoWeekday(startDatetime);
     const operatingHour = court.operatingHours.find(
       (hour) => hour.weekday === weekday && hour.status === EntityStatus.ACTIVE
     );
@@ -703,8 +724,8 @@ export class BookingsService {
     endDatetime: Date,
     operatingHour: OperatingHourForBooking
   ): void {
-    const startMinutes = utcMinutesFromDate(startDatetime);
-    const endMinutes = utcMinutesFromDate(endDatetime);
+    const startMinutes = vietnamMinutesFromDate(startDatetime);
+    const endMinutes = vietnamMinutesFromDate(endDatetime);
     const openMinutes = minutesFromTime(operatingHour.openTime);
     const closeMinutes = minutesFromTime(operatingHour.closeTime);
 
@@ -718,7 +739,7 @@ export class BookingsService {
     endDatetime: Date,
     operatingHour: OperatingHourForBooking
   ): void {
-    const startOffset = utcMinutesFromDate(startDatetime) - minutesFromTime(operatingHour.openTime);
+    const startOffset = vietnamMinutesFromDate(startDatetime) - minutesFromTime(operatingHour.openTime);
     const durationMinutes = minutesBetween(startDatetime, endDatetime);
 
     if (
@@ -757,8 +778,8 @@ export class BookingsService {
       return;
     }
 
-    const today = startOfUtcDay(now);
-    if (startOfUtcDay(startDatetime) > addDays(today, advanceBookingDays)) {
+    const today = startOfVietnamDay(now);
+    if (startOfVietnamDay(startDatetime) > addDays(today, advanceBookingDays)) {
       throw new AppError(
         400,
         "Booking is outside the user's advance booking window",
@@ -775,7 +796,7 @@ export class BookingsService {
     maxBookingsPerDay: number
   ): Promise<void> {
     const uniqueDayStarts = [
-      ...new Set(items.map((item) => startOfUtcDay(item.startDatetime).toISOString()))
+      ...new Set(items.map((item) => startOfVietnamDay(item.startDatetime).toISOString()))
     ].map((value) => new Date(value));
 
     for (const dayStart of uniqueDayStarts) {
@@ -924,8 +945,8 @@ export class BookingsService {
     userPriorityGroupId: string | null;
     weekday: number;
   }): PricingRuleForBooking {
-    const slotStartMinutes = utcMinutesFromDate(input.startDatetime);
-    const slotEndMinutes = utcMinutesFromDate(input.endDatetime);
+    const slotStartMinutes = vietnamMinutesFromDate(input.startDatetime);
+    const slotEndMinutes = vietnamMinutesFromDate(input.endDatetime);
     const matchingRules = input.pricingRules.filter((rule) => {
       const ruleStartMinutes = minutesFromTime(rule.startTime);
       const ruleEndMinutes = minutesFromTime(rule.endTime);
@@ -945,11 +966,10 @@ export class BookingsService {
       );
     });
 
-    const userSpecificRule = matchingRules.find(
-      (rule) => rule.priorityGroupId === input.userPriorityGroupId
-    );
-    const defaultRule = matchingRules.find((rule) => rule.priorityGroupId === null);
-    const selectedRule = userSpecificRule ?? defaultRule;
+    const selectedRule = selectMostSpecificPricingRule(matchingRules, {
+      userPriorityGroupId: input.userPriorityGroupId,
+      weekday: input.weekday
+    });
 
     if (!selectedRule) {
       throw new AppError(400, "No pricing rule covers the requested slot", "PRICING_RULE_NOT_FOUND");

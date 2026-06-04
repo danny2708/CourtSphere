@@ -75,6 +75,7 @@ export async function apiRequest<TResponse>(path: string, options: ApiRequestOpt
   }
 
   const response = await fetch(buildUrl(path), {
+    cache: options.cache ?? "no-store",
     ...options,
     headers,
     body: requestBody

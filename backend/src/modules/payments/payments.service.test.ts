@@ -142,6 +142,14 @@ function createMomoGateway(overrides: Partial<MomoPaymentGateway> = {}) {
   } as unknown as MomoPaymentGateway;
 }
 
+function bookingRuleModel(holdMinutes = 10) {
+  return {
+    bookingRule: {
+      findFirst: vi.fn().mockResolvedValue({ holdMinutes })
+    }
+  };
+}
+
 function createService(input: {
   tx?: unknown;
   payment?: unknown;
@@ -178,6 +186,7 @@ function createService(input: {
 describe("PaymentsService", () => {
   it("allows owner to create payment for a pending-payment booking order", async () => {
     const tx = {
+      ...bookingRuleModel(),
       bookingOrder: {
         findFirst: vi.fn().mockResolvedValue(buildOrder({ payments: [] })),
         update: vi.fn().mockResolvedValue({})
@@ -251,6 +260,7 @@ describe("PaymentsService", () => {
   it("creates a MoMo payment session when requested", async () => {
     const momoGateway = createMomoGateway();
     const tx = {
+      ...bookingRuleModel(),
       bookingOrder: {
         findFirst: vi.fn().mockResolvedValue(buildOrder({ payments: [] })),
         update: vi.fn().mockResolvedValue({})
@@ -357,25 +367,49 @@ describe("PaymentsService", () => {
     });
   });
 
-  it("does not create payment after the hold expires", async () => {
+  it("creates a new payment session after a previous payment deadline expires", async () => {
     const tx = {
+      ...bookingRuleModel(),
       bookingOrder: {
         findFirst: vi.fn().mockResolvedValue(
           buildOrder({
             holdExpiresAt: new Date("2026-05-19T23:59:00.000Z"),
-            payments: []
+            bookingStatus: BookingStatus.PAYMENT_PROCESSING,
+            paymentStatus: PaymentStatus.PROCESSING,
+            payments: [buildPayment()]
           })
-        )
+        ),
+        update: vi.fn().mockResolvedValue({})
+      },
+      payment: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        create: vi.fn().mockResolvedValue({ paymentId })
       }
     };
     const { service } = createService({ tx });
 
     await expect(
       service.createPaymentForBooking(userId, bookingOrderId, { amount: 50000 })
-    ).rejects.toMatchObject({
-      statusCode: 409,
-      code: "BOOKING_HOLD_EXPIRED"
+    ).resolves.toMatchObject({
+      id: paymentId,
+      paymentStatus: PaymentStatus.PROCESSING
     });
+    expect(tx.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          paymentStatus: PaymentStatus.EXPIRED
+        }
+      })
+    );
+    expect(tx.bookingOrder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentStatus: PaymentStatus.PROCESSING,
+          holdExpiresAt: new Date("2026-05-20T00:10:00.000Z")
+        })
+      })
+    );
+    expect(tx.payment.create).toHaveBeenCalledOnce();
   });
 
   it("confirms booking order and all pending items on successful callback", async () => {
@@ -607,6 +641,91 @@ describe("PaymentsService", () => {
           userId,
           bookingOrderId,
           notificationType: NotificationType.SYSTEM
+        })
+      })
+    );
+  });
+
+  it("cancels an active payment session and reopens the booking order for payment", async () => {
+    const tx = {
+      bookingOrder: {
+        findFirst: vi.fn().mockResolvedValue(
+          buildOrder({
+            bookingStatus: BookingStatus.PAYMENT_PROCESSING,
+            paymentStatus: PaymentStatus.PROCESSING,
+            payments: [buildPayment()],
+            items: [
+              buildItem({
+                bookingStatus: BookingStatus.PAYMENT_PROCESSING
+              })
+            ]
+          })
+        ),
+        update: vi.fn().mockResolvedValue({})
+      },
+      payment: {
+        update: vi.fn().mockResolvedValue({})
+      },
+      bookingItem: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 })
+      },
+      bookingOrderStatusHistory: {
+        create: vi.fn().mockResolvedValue({})
+      },
+      bookingItemStatusHistory: {
+        create: vi.fn().mockResolvedValue({})
+      }
+    };
+    const { service } = createService({
+      tx,
+      payment: buildPayment({
+        paymentStatus: PaymentStatus.CANCELLED,
+        bookingOrder: buildOrder({
+          bookingStatus: BookingStatus.PENDING_PAYMENT,
+          paymentStatus: PaymentStatus.CANCELLED,
+          items: [
+            buildItem({
+              bookingStatus: BookingStatus.PENDING_PAYMENT
+            })
+          ]
+        })
+      })
+    });
+
+    const payment = await service.cancelPaymentForBooking(userId, bookingOrderId);
+
+    expect(payment.paymentStatus).toBe(PaymentStatus.CANCELLED);
+    expect(tx.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentStatus: PaymentStatus.CANCELLED,
+          rawCallback: expect.objectContaining({
+            source: "USER_CANCEL_PAYMENT_SESSION"
+          })
+        })
+      })
+    );
+    expect(tx.bookingOrder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          bookingStatus: BookingStatus.PENDING_PAYMENT,
+          paymentStatus: PaymentStatus.CANCELLED
+        }
+      })
+    );
+    expect(tx.bookingItem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          bookingStatus: BookingStatus.PENDING_PAYMENT
+        }
+      })
+    );
+    expect(tx.bookingOrderStatusHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          oldStatus: BookingStatus.PAYMENT_PROCESSING,
+          newStatus: BookingStatus.PENDING_PAYMENT,
+          actionType: "USER_CANCEL_PAYMENT_SESSION"
         })
       })
     );

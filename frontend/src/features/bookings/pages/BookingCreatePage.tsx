@@ -11,6 +11,7 @@ import { AvailabilitySlotPicker } from "../../courts/components/AvailabilitySlot
 import { CourtPolicyPanel } from "../../courts/components/CourtPolicyPanel";
 import { getCourtAvailability } from "../../courts/services/availabilityService";
 import { getCourtById } from "../../courts/services/courtService";
+import { joinWaitlist } from "../../courts/services/waitlistService";
 import type { AvailabilitySlotViewModel, CourtAvailabilityViewModel } from "../../courts/types/availability.types";
 import type { CourtDetailViewModel } from "../../courts/types/court-detail.types";
 import { dateFromIsoOrDefault, toDateInputValue } from "../../courts/utils/dateUtils";
@@ -20,6 +21,11 @@ import { getErrorMessage } from "../../../utils/format-error";
 import { BookingSummaryCard } from "../components/BookingSummaryCard";
 import { createBooking } from "../services/bookingService";
 import { createBookingFormSchema } from "../schemas/bookingSchemas";
+import { readBookingSelection } from "../utils/bookingSelectionStorage";
+
+function hasSlotStarted(slot: AvailabilitySlotViewModel): boolean {
+  return new Date(slot.startDatetime).getTime() <= Date.now();
+}
 
 export function BookingCreatePage() {
   const [searchParams] = useSearchParams();
@@ -29,15 +35,30 @@ export function BookingCreatePage() {
   const courtId = searchParams.get("courtId") ?? "";
   const initialStart = searchParams.get("start");
   const initialEnd = searchParams.get("end");
+  const selectionId = searchParams.get("selectionId");
   const [availability, setAvailability] = useState<CourtAvailabilityViewModel | null>(null);
   const [court, setCourt] = useState<CourtDetailViewModel | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [joiningWaitlistSlotId, setJoiningWaitlistSlotId] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const [selectedSlotsFromSelection, setSelectedSlotsFromSelection] = useState<AvailabilitySlotViewModel[]>([]);
   const [selectedDate, setSelectedDate] = useState(searchParams.get("date") ?? dateFromIsoOrDefault(initialStart));
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const selection = readBookingSelection(selectionId);
+
+    if (!selection || selection.courtId !== courtId || selection.slots.length === 0) {
+      setSelectedSlotsFromSelection([]);
+      return;
+    }
+
+    setSelectedSlotsFromSelection(selection.slots);
+    setSelectedDate(dateFromIsoOrDefault(selection.slots[0]?.startDatetime ?? null));
+  }, [courtId, selectionId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -112,8 +133,20 @@ export function BookingCreatePage() {
     () => availability?.slots.find((slot) => slot.id === selectedSlotId) ?? null,
     [availability?.slots, selectedSlotId]
   );
+  const hasStoredSelection = selectedSlotsFromSelection.length > 0;
+  const selectedSlotsForSummary = selectedSlotsFromSelection.length > 0 ? selectedSlotsFromSelection : selectedSlot ? [selectedSlot] : [];
+  const hasStartedSelectedSlot = selectedSlotsForSummary.some(hasSlotStarted);
 
   const handleSelectSlot = (slot: AvailabilitySlotViewModel) => {
+    if (hasSlotStarted(slot)) {
+      addToast({
+        type: "warning",
+        title: "Khung giờ đã bắt đầu",
+        message: "Không thể đặt lịch cho khung giờ đã bắt đầu hoặc đã qua."
+      });
+      return;
+    }
+
     if (!slot.isAvailable) {
       addToast({
         type: "warning",
@@ -124,12 +157,55 @@ export function BookingCreatePage() {
     }
 
     setSelectedSlotId(slot.id);
+    setSelectedSlotsFromSelection([]);
+  };
+
+  const handleDateChange = (nextDate: string) => {
+    setSelectedDate(nextDate);
+    setSelectedSlotId(null);
+    setSelectedSlotsFromSelection([]);
+  };
+
+  const handleJoinWaitlist = async (slot: AvailabilitySlotViewModel) => {
+    if (!availability?.policy.canJoinWaitlist) {
+      addToast({
+        type: "warning",
+        title: "Không thể tham gia hàng chờ",
+        message: "Nhóm tài khoản hiện tại chưa được phép tham gia hàng chờ."
+      });
+      return;
+    }
+
+    setJoiningWaitlistSlotId(slot.id);
+    try {
+      await joinWaitlist({
+        courtId: slot.courtId,
+        startDatetime: slot.startDatetime,
+        endDatetime: slot.endDatetime
+      });
+
+      addToast({
+        type: "success",
+        title: "Đã tham gia hàng chờ",
+        message: `${slot.startTimeText} - ${slot.endTimeText}. Hệ thống sẽ thông báo khi khung giờ được mở lại.`
+      });
+    } catch (waitlistError) {
+      addToast({
+        type: "error",
+        title: "Không thể tham gia hàng chờ",
+        message: getErrorMessage(waitlistError)
+      });
+    } finally {
+      setJoiningWaitlistSlotId(null);
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!court || !selectedSlot) {
+    const selectedSlots = selectedSlotsFromSelection.length > 0 ? selectedSlotsFromSelection : selectedSlot ? [selectedSlot] : [];
+
+    if (!court || selectedSlots.length === 0) {
       setError("Vui lòng chọn sân và khung giờ còn trống.");
       return;
     }
@@ -139,15 +215,27 @@ export function BookingCreatePage() {
       return;
     }
 
-    const parsedValues = createBookingFormSchema.safeParse({
-      courtId: court.id,
-      startDatetime: selectedSlot.startDatetime,
-      endDatetime: selectedSlot.endDatetime,
-      note
-    });
+    if (selectedSlots.some(hasSlotStarted)) {
+      setSelectedSlotsFromSelection((currentSlots) => currentSlots.filter((slot) => !hasSlotStarted(slot)));
+      setSelectedSlotId((currentSlotId) =>
+        selectedSlot && currentSlotId === selectedSlot.id && hasSlotStarted(selectedSlot) ? null : currentSlotId
+      );
+      setError("Khung giờ đã bắt đầu hoặc đã qua. Vui lòng chọn khung giờ khác.");
+      return;
+    }
 
-    if (!parsedValues.success) {
-      setError(parsedValues.error.issues[0]?.message ?? "Thông tin đặt sân chưa hợp lệ.");
+    const parsedSlots = selectedSlots.map((slot) =>
+      createBookingFormSchema.safeParse({
+        courtId: court.id,
+        startDatetime: slot.startDatetime,
+        endDatetime: slot.endDatetime,
+        note
+      })
+    );
+    const invalidSlot = parsedSlots.find((result) => !result.success);
+
+    if (invalidSlot && !invalidSlot.success) {
+      setError(invalidSlot.error.issues[0]?.message ?? "Thông tin đặt sân chưa hợp lệ.");
       return;
     }
 
@@ -156,14 +244,12 @@ export function BookingCreatePage() {
 
     try {
       const booking = await createBooking({
-        items: [
-          {
-            courtId: parsedValues.data.courtId,
-            startDatetime: parsedValues.data.startDatetime,
-            endDatetime: parsedValues.data.endDatetime
-          }
-        ],
-        note: parsedValues.data.note
+        items: selectedSlots.map((slot) => ({
+          courtId: court.id,
+          startDatetime: slot.startDatetime,
+          endDatetime: slot.endDatetime
+        })),
+        note: note.trim() ? note.trim() : undefined
       });
 
       addToast({ type: "success", title: "Đã tạo giữ chỗ", message: "Vui lòng thanh toán trong thời gian giữ chỗ." });
@@ -207,20 +293,31 @@ export function BookingCreatePage() {
             </div>
 
             {error ? <p className="form-alert" role="alert">{error}</p> : null}
+            {!error && hasStartedSelectedSlot ? (
+              <p className="form-alert" role="alert">
+                Khung giờ đã bắt đầu hoặc đã qua. Vui lòng chọn khung giờ khác.
+              </p>
+            ) : null}
+            {!hasStoredSelection ? (
+              <>
+                <AvailabilityDatePicker
+                  error={dateError}
+                  minDate={todayDate}
+                  value={selectedDate}
+                  onChange={handleDateChange}
+                />
 
-            <AvailabilityDatePicker
-              error={dateError}
-              minDate={todayDate}
-              value={selectedDate}
-              onChange={setSelectedDate}
-            />
-
-            {availability ? (
-              <AvailabilitySlotPicker
-                selectedSlotId={selectedSlotId}
-                slots={availability.slots}
-                onSelectSlot={handleSelectSlot}
-              />
+                {availability ? (
+                  <AvailabilitySlotPicker
+                    canJoinWaitlist={court?.status === "ACTIVE" && Boolean(availability.policy.canJoinWaitlist)}
+                    joiningWaitlistSlotId={joiningWaitlistSlotId}
+                    selectedSlotId={selectedSlotId}
+                    slots={availability.slots}
+                    onJoinWaitlist={handleJoinWaitlist}
+                    onSelectSlot={handleSelectSlot}
+                  />
+                ) : null}
+              </>
             ) : null}
 
             <label className="form-field">
@@ -233,7 +330,11 @@ export function BookingCreatePage() {
               />
             </label>
 
-            <Button disabled={isSubmitting || !selectedSlot || court?.status !== "ACTIVE"} size="lg" type="submit">
+            <Button
+              disabled={isSubmitting || selectedSlotsForSummary.length === 0 || hasStartedSelectedSlot || court?.status !== "ACTIVE"}
+              size="lg"
+              type="submit"
+            >
               <CalendarClock aria-hidden="true" size={18} />
               {isSubmitting ? "Đang tạo giữ chỗ..." : "Tạo giữ chỗ"}
             </Button>
@@ -241,7 +342,7 @@ export function BookingCreatePage() {
         </form>
 
         <aside className="booking-side-panel">
-          <BookingSummaryCard court={court} policy={availability?.policy} slot={selectedSlot} />
+          <BookingSummaryCard court={court} policy={availability?.policy} slots={selectedSlotsForSummary} />
           {availability ? <CourtPolicyPanel policy={availability.policy} /> : null}
         </aside>
       </div>

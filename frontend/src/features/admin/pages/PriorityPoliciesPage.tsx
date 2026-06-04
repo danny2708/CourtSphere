@@ -7,9 +7,10 @@ import { LoadingState } from "../../../components/common/LoadingState";
 import { useToastStore } from "../../../stores/toast.store";
 import { getErrorMessage } from "../../../utils/format-error";
 import { entityStatusLabel, getStatusLabel } from "../../../utils/status-label";
-import { AdminDataTable, type AdminColumn } from "../components/AdminDataTable";
+import { AdminDataTable, type AdminAdvancedFilter, type AdminColumn } from "../components/AdminDataTable";
 import { AdminNavigation } from "../components/AdminNavigation";
 import { AdminPageHeader } from "../components/AdminPageHeader";
+import { AdminRowActions } from "../components/AdminRowActions";
 import { AdminTextFormDialog } from "../components/AdminTextFormDialog";
 import { listPriorityPolicies, updatePriorityPolicy } from "../services/adminService";
 import type { AdminPriorityPolicy } from "../types/admin.types";
@@ -50,7 +51,7 @@ export function PriorityPoliciesPage() {
         maxBookingsPerDay: Number(values.maxBookingsPerDay),
         priorityRank: Number(values.priorityRank)
       });
-      addToast({ message: "Priority policy đã được cập nhật.", title: "Thành công", type: "success" });
+      addToast({ message: "Chính sách ưu tiên đã được cập nhật.", title: "Thành công", type: "success" });
       setActivePolicy(null);
       setReloadKey((value) => value + 1);
     } catch (saveError) {
@@ -59,39 +60,75 @@ export function PriorityPoliciesPage() {
   }
 
   const columns: Array<AdminColumn<AdminPriorityPolicy>> = [
-    { header: "Policy", key: "policy", render: (policy) => <strong>{policy.policyName ?? policy.id.slice(0, 8)}</strong> },
-    { header: "Group", key: "group", render: (policy) => policy.priorityGroup?.groupName ?? policy.priorityGroupId },
-    { header: "Rank", key: "rank", render: (policy) => policy.priorityRank },
-    { header: "Advance", key: "advance", render: (policy) => policy.advanceBookingDays },
-    { header: "Quota", key: "quota", render: (policy) => policy.maxBookingsPerDay ?? "N/A" },
+    { header: "Chính sách", key: "policy", render: (policy) => <strong>{policy.policyName ?? policy.id.slice(0, 8)}</strong> },
+    { header: "Nhóm", key: "group", render: (policy) => policy.priorityGroup?.groupName ?? policy.priorityGroupId },
+    { header: "Thứ hạng", key: "rank", render: (policy) => policy.priorityRank },
+    { header: "Số ngày đặt trước", key: "advance", render: (policy) => policy.advanceBookingDays },
+    { header: "Giới hạn/ngày", key: "quota", render: (policy) => policy.maxBookingsPerDay ?? "Không áp dụng" },
     {
-      header: "Status",
+      header: "Trạng thái",
       key: "status",
       render: (policy) => <Badge tone={policy.status === "ACTIVE" ? "success" : "neutral"}>{getStatusLabel(entityStatusLabel, policy.status ?? "ACTIVE")}</Badge>
     },
-    { header: "Thao tác", key: "actions", render: (policy) => <Button size="sm" onClick={() => setActivePolicy(policy)}>Sửa</Button> }
+    {
+      header: "Thao tác",
+      key: "actions",
+      render: (policy) => (
+        <AdminRowActions
+          actions={[
+            { label: "Sửa", onSelect: () => setActivePolicy(policy), tone: "primary" }
+          ]}
+        />
+      )
+    }
+  ];
+  const priorityGroupOptions = [...new Map(
+    policies
+      .map((policy) => {
+        const id = policy.priorityGroup?.id ?? policy.priorityGroupId;
+        const label = policy.priorityGroup?.groupName ?? policy.priorityGroup?.groupCode ?? policy.priorityGroupId;
+
+        return [id, { label, value: id }] as const;
+      })
+  ).values()];
+  const advancedFilters: Array<AdminAdvancedFilter<AdminPriorityPolicy>> = [
+    {
+      key: "status",
+      label: "Trạng thái",
+      options: [
+        { label: entityStatusLabel.ACTIVE, value: "ACTIVE" },
+        { label: entityStatusLabel.INACTIVE, value: "INACTIVE" }
+      ],
+      getValue: (policy) => policy.status ?? "ACTIVE"
+    },
+    {
+      key: "priorityGroup",
+      label: "Nhóm ưu tiên",
+      options: priorityGroupOptions,
+      getValue: (policy) => policy.priorityGroup?.id ?? policy.priorityGroupId
+    }
   ];
 
   return (
     <div className="admin-page">
       <AdminNavigation />
-      <AdminPageHeader title="Priority policies" description="Cấu hình quota và khả năng đặt trước theo nhóm ưu tiên." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
-      {isLoading ? <LoadingState message="Đang tải priority policies..." /> : null}
-      {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được priority policies" onAction={() => setReloadKey((value) => value + 1)} /> : null}
-      {!isLoading && !error ? <AdminDataTable columns={columns} getRowKey={(policy) => policy.id} rows={policies} /> : null}
+      <AdminPageHeader title="Chính sách ưu tiên" description="Cấu hình giới hạn và khả năng đặt trước theo nhóm ưu tiên." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
+      {isLoading ? <LoadingState message="Đang tải chính sách ưu tiên..." /> : null}
+      {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được chính sách ưu tiên" onAction={() => setReloadKey((value) => value + 1)} /> : null}
+      {!isLoading && !error ? <AdminDataTable advancedFilters={advancedFilters} columns={columns} getRowKey={(policy) => policy.id} rows={policies} /> : null}
       {activePolicy ? (
         <AdminTextFormDialog
           fields={[
-            { key: "priorityRank", label: "Priority rank", required: true, type: "number" },
+            { key: "priorityRank", label: "Thứ hạng ưu tiên", required: true, type: "number" },
             { key: "advanceBookingDays", label: "Số ngày đặt trước", required: true, type: "number" },
-            { key: "maxBookingsPerDay", label: "Quota/ngày", required: true, type: "number" }
+            { key: "maxBookingsPerDay", label: "Giới hạn đặt sân/ngày", required: true, type: "number" }
           ]}
           initialValues={{
             advanceBookingDays: activePolicy.advanceBookingDays,
             maxBookingsPerDay: activePolicy.maxBookingsPerDay,
             priorityRank: activePolicy.priorityRank
           }}
-          title="Cập nhật priority policy"
+          title="Cập nhật chính sách ưu tiên"
           onClose={() => setActivePolicy(null)}
           onSubmit={handleSave}
         />

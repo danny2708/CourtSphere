@@ -47,6 +47,14 @@ export type AdminCourtType = {
   status: EntityStatus;
 };
 
+export type AdminCourtManager = {
+  id: string;
+  fullName: string;
+  email: string;
+  accountStatus?: AccountStatus;
+  assignedAt?: string;
+};
+
 export type AdminCourt = {
   id: string;
   courtName: string;
@@ -54,6 +62,9 @@ export type AdminCourt = {
   imageUrl?: string | null;
   status: CourtStatus;
   courtType?: AdminCourtType | null;
+  assignedManagers?: AdminCourtManager[];
+  operatingHours?: AdminOperatingHour[];
+  pricingRules?: AdminPricingRule[];
 };
 
 export type AdminOperatingHour = {
@@ -70,7 +81,8 @@ export type AdminPricingRule = {
   startTime: string;
   endTime: string;
   applicableDay?: number | null;
-  priceAmount: number;
+  priceAmount: number | string;
+  priorityOrder?: number;
   priorityGroupId?: string | null;
   priorityGroup?: AdminPriorityGroup | null;
   effectiveFrom?: string | null;
@@ -171,6 +183,7 @@ export type AdminViolation = {
 };
 
 export type AdminOverviewReport = {
+  dateRange?: AdminReportDateRange;
   totalBookingOrders?: number;
   totalBookingItems?: number;
   grossRevenue?: number;
@@ -185,13 +198,94 @@ export type AdminOverviewReport = {
   violationCount?: number;
 };
 
+export type AdminReportDateRange = {
+  fromDate?: string;
+  toDate?: string;
+};
+
+export type AdminBookingReport = {
+  dateRange?: AdminReportDateRange;
+  groupBy?: "day" | "month";
+  buckets?: Array<{
+    period: string;
+    bookingOrdersCount: number;
+    bookingItemsCount: number;
+  }>;
+};
+
+export type AdminRevenueReport = {
+  dateRange?: AdminReportDateRange;
+  groupBy?: "day" | "month";
+  buckets?: Array<{
+    period: string;
+    grossRevenue: number;
+    refundAmount: number;
+    netRevenue: number;
+    successPaymentCount: number;
+    successRefundCount: number;
+  }>;
+  totals?: {
+    grossRevenue: number;
+    refundAmount: number;
+    netRevenue: number;
+    successPaymentCount: number;
+    successRefundCount: number;
+  };
+};
+
+export type AdminCourtUsageReport = {
+  dateRange?: AdminReportDateRange;
+  courts?: Array<{
+    courtId: string;
+    courtName: string;
+    bookingItemCount: number;
+    totalBookedMinutes: number;
+    completedCount: number;
+    noShowCount: number;
+    cancelledCount: number;
+  }>;
+};
+
+export type AdminRatesReport = {
+  dateRange?: AdminReportDateRange;
+  cancellationRate?: number;
+  refundRate?: number;
+  noShowRate?: number;
+  paymentExpiredRate?: number;
+  waitlistExpiredRate?: number;
+  counts?: {
+    totalBookingItems?: number;
+    cancelledBookingItems?: number;
+    noShowBookingItems?: number;
+    totalBookingOrders?: number;
+    paymentExpiredOrders?: number;
+    successPayments?: number;
+    successRefunds?: number;
+    totalWaitlistEntries?: number;
+    expiredWaitlistEntries?: number;
+  };
+};
+
+export type AdminViolatingUsersReport = {
+  dateRange?: AdminReportDateRange;
+  users?: Array<{
+    userId: string;
+    fullName: string;
+    email: string;
+    violationCount: number;
+    totalPenaltyPoints: number;
+    currentViolationPoints: number;
+    bookingPermissionStatus: BookingPermissionStatus;
+  }>;
+};
+
 export type AdminReportBundle = {
   overview?: AdminOverviewReport;
-  bookings?: unknown;
-  revenue?: unknown;
-  courtUsage?: unknown;
-  rates?: unknown;
-  violations?: unknown;
+  bookings?: AdminBookingReport;
+  revenue?: AdminRevenueReport;
+  courtUsage?: AdminCourtUsageReport;
+  rates?: AdminRatesReport;
+  violations?: AdminViolatingUsersReport;
 };
 
 export type AdminConfirmDialogState =

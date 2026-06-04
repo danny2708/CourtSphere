@@ -12,15 +12,15 @@ import { getBookingRules, updateBookingRules } from "../services/adminService";
 import type { AdminBookingRules } from "../types/admin.types";
 
 const numericFields: Array<{ key: keyof AdminBookingRules; label: string; min: number }> = [
-  { key: "maxBookingsPerDay", label: "Max bookings per day", min: 1 },
-  { key: "maxDurationMinutes", label: "Max duration minutes", min: 1 },
-  { key: "holdMinutes", label: "Hold minutes", min: 1 },
-  { key: "cancelBeforeHours", label: "Cancel before hours", min: 0 },
-  { key: "lateCheckinMinutes", label: "Late check-in minutes", min: 0 },
-  { key: "violationThreshold", label: "Violation threshold", min: 0 },
-  { key: "bookingBanDays", label: "Booking ban days", min: 0 },
-  { key: "refundRateUserOnTime", label: "User on-time refund rate", min: 0 },
-  { key: "refundRateManagerFault", label: "Manager fault refund rate", min: 0 }
+  { key: "maxBookingsPerDay", label: "Số lượt đặt tối đa mỗi ngày", min: 1 },
+  { key: "maxDurationMinutes", label: "Thời lượng tối đa mỗi lượt", min: 1 },
+  { key: "holdMinutes", label: "Thời gian giữ chỗ", min: 1 },
+  { key: "cancelBeforeHours", label: "Số giờ phải hủy trước", min: 0 },
+  { key: "lateCheckinMinutes", label: "Số phút check-in muộn", min: 0 },
+  { key: "violationThreshold", label: "Ngưỡng điểm vi phạm", min: 0 },
+  { key: "bookingBanDays", label: "Số ngày khóa quyền đặt sân", min: 0 },
+  { key: "refundRateUserOnTime", label: "Tỷ lệ hoàn tiền khi người dùng hủy đúng hạn", min: 0 },
+  { key: "refundRateManagerFault", label: "Tỷ lệ hoàn tiền khi lỗi từ quản lý", min: 0 }
 ];
 
 export function BookingRulesPage() {
@@ -63,10 +63,10 @@ export function BookingRulesPage() {
     setIsSaving(true);
     try {
       await updateBookingRules(Object.fromEntries(numericFields.map((field) => [field.key, Number(formValues[field.key])])));
-      addToast({ message: "Booking rules đã được cập nhật.", title: "Thành công", type: "success" });
+      addToast({ message: "Quy tắc đặt sân đã được cập nhật.", title: "Thành công", type: "success" });
       setReloadKey((value) => value + 1);
     } catch (saveError) {
-      addToast({ message: getErrorMessage(saveError), title: "Không thể lưu rules", type: "error" });
+      addToast({ message: getErrorMessage(saveError), title: "Không thể lưu quy tắc", type: "error" });
     } finally {
       setIsSaving(false);
     }
@@ -75,9 +75,9 @@ export function BookingRulesPage() {
   return (
     <div className="admin-page">
       <AdminNavigation />
-      <AdminPageHeader title="Booking rules" description="Cấu hình giới hạn đặt sân, giữ chỗ, hủy, check-in muộn, refund và vi phạm." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
-      {isLoading ? <LoadingState message="Đang tải booking rules..." /> : null}
-      {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được booking rules" onAction={() => setReloadKey((value) => value + 1)} /> : null}
+      <AdminPageHeader title="Quy tắc đặt sân" description="Cấu hình giới hạn đặt sân, giữ chỗ, hủy, check-in muộn, hoàn tiền và vi phạm." actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>} />
+      {isLoading ? <LoadingState message="Đang tải quy tắc đặt sân..." /> : null}
+      {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được quy tắc đặt sân" onAction={() => setReloadKey((value) => value + 1)} /> : null}
       {!isLoading && !error ? (
         <Card as="section" className="admin-form-card">
           <div className="admin-form-grid">
@@ -94,7 +94,7 @@ export function BookingRulesPage() {
             ))}
           </div>
           <Button disabled={isSaving} onClick={handleSubmit}>
-            {isSaving ? "Đang lưu..." : "Lưu booking rules"}
+            {isSaving ? "Đang lưu..." : "Lưu quy tắc đặt sân"}
           </Button>
         </Card>
       ) : null}

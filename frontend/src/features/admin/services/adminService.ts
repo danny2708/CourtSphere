@@ -1,20 +1,25 @@
 import { apiRequest } from "../../../api/client";
 import type {
   AccountStatus,
+  AdminBookingReport,
   AdminBookingRules,
   AdminCourt,
   AdminCourtType,
+  AdminCourtUsageReport,
   AdminOperatingHour,
   AdminOverviewReport,
   AdminPayment,
   AdminPricingRule,
   AdminPriorityGroup,
   AdminPriorityPolicy,
+  AdminRatesReport,
   AdminRefund,
   AdminReportBundle,
+  AdminRevenueReport,
   AdminRoleName,
   AdminUser,
   AdminViolation,
+  AdminViolatingUsersReport,
   BookingPermissionStatus,
   CourtStatus,
   EntityStatus,
@@ -22,6 +27,12 @@ import type {
 } from "../types/admin.types";
 
 type RecordValue = string | number | boolean | null | undefined;
+
+type AdminTrendReportQuery = {
+  fromDate?: string;
+  toDate?: string;
+  groupBy?: "day" | "month";
+};
 
 function toQueryString(query: Record<string, RecordValue>): string {
   const params = new URLSearchParams();
@@ -106,11 +117,12 @@ export async function getAdminOverview(): Promise<AdminOverviewReport> {
   return pickObject<AdminOverviewReport>(response, ["overview"]) ?? {};
 }
 
-export async function getAdminReportsBundle(): Promise<AdminReportBundle> {
+export async function getAdminReportsBundle(options: { trend?: AdminTrendReportQuery } = {}): Promise<AdminReportBundle> {
+  const trendQuery = toQueryString(options.trend ?? {});
   const [overview, bookings, revenue, courtUsage, rates, violations] = await Promise.all([
     getRecord("/api/admin/reports/overview"),
-    getRecord("/api/admin/reports/bookings"),
-    getRecord("/api/admin/reports/revenue"),
+    getRecord(`/api/admin/reports/bookings${trendQuery}`),
+    getRecord(`/api/admin/reports/revenue${trendQuery}`),
     getRecord("/api/admin/reports/courts/usage"),
     getRecord("/api/admin/reports/rates"),
     getRecord("/api/admin/reports/violations")
@@ -118,11 +130,11 @@ export async function getAdminReportsBundle(): Promise<AdminReportBundle> {
 
   return {
     overview: pickObject<AdminOverviewReport>(overview, ["overview"]) ?? undefined,
-    bookings: bookings.report,
-    revenue: revenue.report,
-    courtUsage: courtUsage.report,
-    rates: rates.report,
-    violations: violations.report
+    bookings: bookings.report as AdminBookingReport | undefined,
+    revenue: revenue.report as AdminRevenueReport | undefined,
+    courtUsage: courtUsage.report as AdminCourtUsageReport | undefined,
+    rates: rates.report as AdminRatesReport | undefined,
+    violations: violations.report as AdminViolatingUsersReport | undefined
   };
 }
 
@@ -166,16 +178,40 @@ export async function listAdminCourts(query: Record<string, RecordValue> = {}): 
   return pickArray<AdminCourt>(response, ["courts"]);
 }
 
-export function createCourt(payload: { courtName: string; courtTypeId: string; description?: string; imageUrl?: string }) {
-  return apiRequest("/api/admin/courts", { auth: true, body: payload, method: "POST" });
+export async function createCourt(payload: { courtName: string; courtTypeId: string; description?: string; imageUrl?: string }): Promise<AdminCourt> {
+  const response = await apiRequest<{ court: AdminCourt }>("/api/admin/courts", { auth: true, body: payload, method: "POST" });
+  return response.court;
 }
 
-export function updateCourt(id: string, payload: Partial<{ courtName: string; courtTypeId: string; description: string; imageUrl: string }>) {
-  return apiRequest(`/api/admin/courts/${id}`, { auth: true, body: payload, method: "PUT" });
+export async function updateCourt(id: string, payload: Partial<{ courtName: string; courtTypeId: string; description: string; imageUrl: string }>): Promise<AdminCourt> {
+  const response = await apiRequest<{ court: AdminCourt }>(`/api/admin/courts/${id}`, { auth: true, body: payload, method: "PUT" });
+  return response.court;
+}
+
+export async function updateCourtManagers(id: string, managerUserIds: string[]): Promise<AdminCourt> {
+  const response = await apiRequest<{ court: AdminCourt }>(`/api/admin/courts/${id}/managers`, {
+    auth: true,
+    body: { managerUserIds },
+    method: "PUT"
+  });
+  return response.court;
 }
 
 export function updateCourtStatus(id: string, status: CourtStatus, reason: string) {
   return apiRequest(`/api/admin/courts/${id}/status`, { auth: true, body: { reason, status }, method: "PATCH" });
+}
+
+export async function uploadCourtImage(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.set("image", file);
+
+  const response = await apiRequest<{ file: { url: string } }>("/api/admin/uploads/images", {
+    auth: true,
+    body: formData,
+    method: "POST"
+  });
+
+  return response.file.url;
 }
 
 export async function listOperatingHours(courtId: string): Promise<AdminOperatingHour[]> {
@@ -195,6 +231,10 @@ export function updateOperatingHourStatus(id: string, status: EntityStatus) {
   return apiRequest(`/api/admin/operating-hours/${id}/status`, { auth: true, body: { status }, method: "PATCH" });
 }
 
+export function deleteOperatingHour(id: string) {
+  return apiRequest(`/api/admin/operating-hours/${id}`, { auth: true, method: "DELETE" });
+}
+
 export async function listPricingRules(courtId: string): Promise<AdminPricingRule[]> {
   const response = await getRecord(`/api/admin/courts/${courtId}/pricing-rules`);
   return pickArray<AdminPricingRule>(response, ["pricingRules"]);
@@ -210,6 +250,10 @@ export function updatePricingRule(id: string, payload: Partial<Omit<AdminPricing
 
 export function updatePricingRuleStatus(id: string, status: EntityStatus) {
   return apiRequest(`/api/admin/pricing-rules/${id}/status`, { auth: true, body: { status }, method: "PATCH" });
+}
+
+export function deletePricingRule(id: string) {
+  return apiRequest(`/api/admin/pricing-rules/${id}`, { auth: true, method: "DELETE" });
 }
 
 export async function getBookingRules(): Promise<AdminBookingRules | null> {

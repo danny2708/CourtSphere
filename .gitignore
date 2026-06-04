@@ -9,6 +9,11 @@ coverage/
 backend/coverage/
 frontend/coverage/
 
+backend/seed-reports-demo.ts
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+
 .env
 .env.*
 !.env.example

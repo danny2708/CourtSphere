@@ -27,7 +27,7 @@ const dashboardItems = [
   {
     description: "Xử lý CHECKIN_EXPIRED bằng no-show hoặc override check-in muộn.",
     icon: UserX,
-    title: "No-show",
+    title: "Vắng mặt",
     to: ROUTE_PATHS.managerNoShow
   },
   {

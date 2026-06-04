@@ -364,6 +364,9 @@ describe("RefundsService", () => {
       priorityPolicy: {
         findFirst: vi.fn().mockResolvedValue(null)
       },
+      courtManagerAssignment: {
+        count: vi.fn().mockResolvedValue(1)
+      },
       refund: {
         findFirst: vi.fn().mockResolvedValue(null),
         create: vi.fn().mockResolvedValue({ refundId })

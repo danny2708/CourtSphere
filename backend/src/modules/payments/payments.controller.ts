@@ -30,6 +30,12 @@ export class PaymentsController {
     res.status(201).json({ payment });
   };
 
+  cancelPaymentForBooking = async (req: Request, res: Response): Promise<void> => {
+    const payment = await this.service.cancelPaymentForBooking(req.user!.id, routeParam(req, "id"));
+
+    res.status(200).json({ payment });
+  };
+
   handleMockCallback = async (req: Request, res: Response): Promise<void> => {
     const payment = await this.service.handleMockCallback(req.body as MockPaymentCallbackInput);
 

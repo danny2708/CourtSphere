@@ -10,6 +10,8 @@ import { createCourtsRouter } from "./courts.routes";
 const userId = "00000000-0000-4000-8000-000000000001";
 const courtTypeId = "00000000-0000-4000-8000-000000000002";
 const courtId = "00000000-0000-4000-8000-000000000003";
+const operatingHourId = "00000000-0000-4000-8000-000000000004";
+const pricingRuleId = "00000000-0000-4000-8000-000000000005";
 
 const tokenService = new TokenService();
 
@@ -49,10 +51,16 @@ function createMockController() {
     res.status(200).json({ court: { id: req.params.id, status: req.body.status } });
   });
   controller.createOperatingHour = vi.fn(async (_req: Request, res: Response): Promise<void> => {
-    res.status(201).json({ operatingHour: { id: "00000000-0000-4000-8000-000000000004" } });
+    res.status(201).json({ operatingHour: { id: operatingHourId } });
   });
   controller.createPricingRule = vi.fn(async (_req: Request, res: Response): Promise<void> => {
-    res.status(201).json({ pricingRule: { id: "00000000-0000-4000-8000-000000000005" } });
+    res.status(201).json({ pricingRule: { id: pricingRuleId } });
+  });
+  controller.deleteOperatingHour = vi.fn(async (req: Request, res: Response): Promise<void> => {
+    res.status(200).json({ operatingHour: { id: req.params.id } });
+  });
+  controller.deletePricingRule = vi.fn(async (req: Request, res: Response): Promise<void> => {
+    res.status(200).json({ pricingRule: { id: req.params.id } });
   });
 
   return {
@@ -62,7 +70,9 @@ function createMockController() {
     createCourt: controller.createCourt,
     updateCourtStatus: controller.updateCourtStatus,
     createOperatingHour: controller.createOperatingHour,
-    createPricingRule: controller.createPricingRule
+    createPricingRule: controller.createPricingRule,
+    deleteOperatingHour: controller.deleteOperatingHour,
+    deletePricingRule: controller.deletePricingRule
   };
 }
 
@@ -174,6 +184,24 @@ describe("courts routes", () => {
     expect(createOperatingHour).not.toHaveBeenCalled();
   });
 
+  it("forbids FIELD_MANAGER from creating operating hours", async () => {
+    const { app, createOperatingHour } = createMockController();
+
+    const response = await request(app)
+      .post(`/api/admin/courts/${courtId}/operating-hours`)
+      .set("Authorization", bearerToken(["FIELD_MANAGER"]))
+      .send({
+        weekday: 1,
+        openTime: "07:00",
+        closeTime: "23:00",
+        slotDurationMinutes: 60
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("FORBIDDEN");
+    expect(createOperatingHour).not.toHaveBeenCalled();
+  });
+
   it("rejects pricing rules with negative prices", async () => {
     const { app, createPricingRule } = createMockController();
 
@@ -189,6 +217,51 @@ describe("courts routes", () => {
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe("VALIDATION_ERROR");
     expect(createPricingRule).not.toHaveBeenCalled();
+  });
+
+  it("allows ADMIN to create all-day pricing rules", async () => {
+    const { app, createPricingRule } = createMockController();
+
+    const response = await request(app)
+      .post(`/api/admin/courts/${courtId}/pricing-rules`)
+      .set("Authorization", bearerToken(["ADMIN"]))
+      .send({
+        startTime: "08:00",
+        endTime: "10:00",
+        applicableDay: null,
+        priceAmount: 100000
+      });
+
+    expect(response.status).toBe(201);
+    expect(createPricingRule).toHaveBeenCalledOnce();
+  });
+
+  it("forbids FIELD_MANAGER from deleting operating hours", async () => {
+    const { app, deleteOperatingHour } = createMockController();
+
+    const response = await request(app)
+      .delete(`/api/admin/operating-hours/${operatingHourId}`)
+      .set("Authorization", bearerToken(["FIELD_MANAGER"]));
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("FORBIDDEN");
+    expect(deleteOperatingHour).not.toHaveBeenCalled();
+  });
+
+  it("allows ADMIN to delete pricing rules and forbids USER", async () => {
+    const { app, deletePricingRule } = createMockController();
+
+    const adminResponse = await request(app)
+      .delete(`/api/admin/pricing-rules/${pricingRuleId}`)
+      .set("Authorization", bearerToken(["ADMIN"]));
+    const userResponse = await request(app)
+      .delete(`/api/admin/pricing-rules/${pricingRuleId}`)
+      .set("Authorization", bearerToken(["USER"]));
+
+    expect(adminResponse.status).toBe(200);
+    expect(adminResponse.body.pricingRule).toMatchObject({ id: pricingRuleId });
+    expect(userResponse.status).toBe(403);
+    expect(deletePricingRule).toHaveBeenCalledOnce();
   });
 
   it("does not expose hard-delete routes for courts or court types", async () => {

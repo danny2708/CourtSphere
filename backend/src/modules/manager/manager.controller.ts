@@ -31,7 +31,8 @@ export class ManagerController {
 
   getTodaySchedule = async (req: Request, res: Response): Promise<void> => {
     const bookingItems = await this.service.getTodaySchedule(
-      req.query as unknown as ManagerTodayScheduleQuery
+      req.query as unknown as ManagerTodayScheduleQuery,
+      auditContext(req)
     );
 
     res.status(200).json({ bookingItems });

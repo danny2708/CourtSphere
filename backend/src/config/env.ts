@@ -1,5 +1,21 @@
-import "dotenv/config";
+import fs from "node:fs";
+import path from "node:path";
+
+import dotenv from "dotenv";
 import { z } from "zod";
+
+const envFileCandidates = [
+  path.resolve(process.cwd(), ".env"),
+  path.resolve(process.cwd(), "backend/.env"),
+  path.resolve(__dirname, "../../.env"),
+  path.resolve(__dirname, "../../../.env")
+];
+
+for (const envFile of envFileCandidates) {
+  if (fs.existsSync(envFile)) {
+    dotenv.config({ path: envFile, quiet: true });
+  }
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -7,7 +23,7 @@ const envSchema = z.object({
   DATABASE_URL: z
     .string()
     .url()
-    .default("postgresql://postgres:postgres@localhost:5432/courtsphere?schema=public"),
+    .default("postgresql://postgres:postgres@127.0.0.1:5432/courtsphere?schema=public"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   JWT_ACCESS_SECRET: z.string().min(32).default("local-development-jwt-secret-change-me"),

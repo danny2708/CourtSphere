@@ -16,11 +16,11 @@ import type { AdminOverviewReport } from "../types/admin.types";
 import { formatMoney } from "../utils/adminFormat";
 
 const quickLinks = [
-  { icon: UsersRound, label: "Users", to: ROUTE_PATHS.adminUsers },
-  { icon: MapPinned, label: "Courts", to: ROUTE_PATHS.adminCourts },
-  { icon: CreditCard, label: "Payments", to: ROUTE_PATHS.adminPayments },
-  { icon: Undo2, label: "Refunds", to: ROUTE_PATHS.adminRefunds },
-  { icon: FileWarning, label: "Violations", to: ROUTE_PATHS.adminViolations }
+  { icon: UsersRound, label: "Người dùng", to: ROUTE_PATHS.adminUsers },
+  { icon: MapPinned, label: "Sân", to: ROUTE_PATHS.adminCourts },
+  { icon: CreditCard, label: "Thanh toán", to: ROUTE_PATHS.adminPayments },
+  { icon: Undo2, label: "Hoàn tiền", to: ROUTE_PATHS.adminRefunds },
+  { icon: FileWarning, label: "Vi phạm", to: ROUTE_PATHS.adminViolations }
 ];
 
 function getNetRevenue(overview: AdminOverviewReport): number | undefined {
@@ -74,23 +74,23 @@ export function AdminDashboardPage() {
     <div className="admin-page">
       <AdminNavigation />
       <AdminPageHeader
-        title="Admin dashboard"
-        description="Theo dõi booking, doanh thu, refund, no-show và dữ liệu vận hành cốt lõi."
+        title="Tổng quan quản trị"
+        description="Theo dõi đặt sân, doanh thu, hoàn tiền, vắng mặt và dữ liệu vận hành cốt lõi."
         actions={<Button onClick={() => setReloadKey((value) => value + 1)}>Tải lại</Button>}
       />
 
-      {isLoading ? <LoadingState message="Đang tải dashboard..." /> : null}
-      {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được dashboard" onAction={() => setReloadKey((value) => value + 1)} /> : null}
+      {isLoading ? <LoadingState message="Đang tải tổng quan..." /> : null}
+      {error && !isLoading ? <ErrorState actionLabel="Tải lại" message={error} title="Không tải được tổng quan" onAction={() => setReloadKey((value) => value + 1)} /> : null}
 
       {overview && !isLoading && !error ? (
         <>
           <div className="admin-stat-grid">
             <AdminStatCard label="Tổng đơn" value={overview.totalBookingOrders ?? 0} />
-            <AdminStatCard label="Booking items" value={overview.totalBookingItems ?? 0} />
+            <AdminStatCard label="Lượt sân" value={overview.totalBookingItems ?? 0} />
             <AdminStatCard label="Doanh thu ròng" value={formatMoney(getNetRevenue(overview))} />
-            <AdminStatCard label="Refund success" value={formatMoney(overview.totalRefundAmount)} />
-            <AdminStatCard label="No-show" value={overview.totalNoShow ?? 0} />
-            <AdminStatCard label="Sân active" value={overview.activeCourts ?? 0} />
+            <AdminStatCard label="Đã hoàn tiền" value={formatMoney(overview.totalRefundAmount)} />
+            <AdminStatCard label="Vắng mặt" value={overview.totalNoShow ?? 0} />
+            <AdminStatCard label="Sân hoạt động" value={overview.activeCourts ?? 0} />
           </div>
 
           <div className="admin-dashboard-links">
