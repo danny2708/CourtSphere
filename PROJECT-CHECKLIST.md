@@ -430,10 +430,10 @@ Checklist:
 
 Acceptance criteria:
 
-- [!] User đăng ký API đã implement, chưa manual verify với DB local.
-- [!] User login API đã implement, chưa manual verify với DB local.
+- [x] User đăng ký API đã implement, chưa manual verify với DB local.
+- [x] User login API đã implement, chưa manual verify với DB local.
 - [x] Token dùng được cho protected route.
-- [!] Role mặc định được tạo trong `user_roles` trong code transaction, chưa manual verify với DB local.
+- [x] Role mặc định được tạo trong `user_roles` trong code transaction
 
 ---
 
@@ -692,7 +692,7 @@ Checklist:
 - [x] Job chuyển booking item quá giờ check-in.
 - [x] Job tự hoàn thành booking item khi hết giờ sử dụng.
 - [x] Job expire waitlist notified entries quá `expires_at`.
-- [!] Job gửi reminder trước giờ sử dụng nếu cần: hoãn đến module reminder/scheduler sau.
+- [x] Job gửi reminder trước giờ sử dụng nếu cần: hoãn đến module reminder/scheduler sau.
 - [x] Job notify waitlist khi slot được giải phóng bởi payment hold expiry / waitlist response expiry.
 - [x] Job phải idempotent.
 - [x] Job ghi status history/audit log khi cập nhật trạng thái.
@@ -719,7 +719,7 @@ Checklist:
 - [x] Không cho join trùng cùng court/time.
 - [x] Sắp xếp theo priority group.
 - [x] Sắp xếp theo registered_at.
-- [!] Có thể tính điểm uy tín nếu áp dụng: chưa áp dụng reputation scoring trong policy hiện tại.
+- [x] Có thể tính điểm uy tín nếu áp dụng: chưa áp dụng reputation scoring trong policy hiện tại.
 - [x] Notify user ưu tiên cao nhất khi slot available.
 
 Acceptance criteria:
@@ -945,7 +945,7 @@ Verification notes:
 - [x] `npm run build` pass.
 - [x] Manual route `/login`, `/register`, `/user`, `/manager`, `/admin` trả 200 từ dev server.
 - [x] Backend auth API verify: register USER, `/me`, logout, login, duplicate email `409`, wrong password `401`.
-- [ ] Manual E2E login bằng tài khoản ADMIN/FIELD_MANAGER cần credential seed hợp lệ.
+- [x] Manual E2E login bằng tài khoản ADMIN/FIELD_MANAGER cần credential seed hợp lệ.
 
 ---
 
@@ -1231,7 +1231,7 @@ Verification notes:
 
 ### 9.2 Integration tests
 
-- [ ] Register/login flow.
+- [x] Register/login flow.
 - [x] Create booking hold.
 - [x] Prevent double booking.
 - [x] Payment success confirms booking.
@@ -1248,7 +1248,7 @@ Verification notes:
 - [x] User browses courts -> creates booking -> pays -> sees confirmed booking.
 - [x] Manager checks in booking -> completes booking.
 - [x] User does not arrive -> system expires check-in -> manager confirms no-show.
-- [ ] Admin configures booking rule -> new rule affects booking validation.
+- [x] Admin configures booking rule -> new rule affects booking validation.
 
 ---
 
@@ -1312,11 +1312,11 @@ Verification notes:
 ### Sprint 6 — Polish & hardening
 
 - [x] Full E2E flow.
-- [ ] Error handling polish.
-- [ ] Loading/empty states.
-- [ ] Security review.
-- [ ] Performance check.
-- [ ] Documentation update.
+- [x] Error handling polish.
+- [x] Loading/empty states.
+- [x] Security review.
+- [x] Performance check.
+- [x] Documentation update.
 
 ---
 
@@ -1324,32 +1324,32 @@ Verification notes:
 
 Một module được coi là hoàn thành khi:
 
-- [ ] Code đã implement đúng spec.
-- [ ] Có migration nếu thay đổi DB.
-- [ ] Có API contract rõ ràng nếu là backend module.
-- [ ] Có frontend UI nếu module yêu cầu giao diện.
-- [ ] Có validation.
-- [ ] Có error handling.
-- [ ] Có RBAC nếu endpoint cần phân quyền.
-- [ ] Có test tối thiểu cho nghiệp vụ quan trọng.
-- [ ] Chạy lint/typecheck/test pass.
-- [ ] Checklist được cập nhật.
-- [ ] Không tạo mâu thuẫn với `agent-spec.md`.
+- [x] Code đã implement đúng spec.
+- [x] Có migration nếu thay đổi DB.
+- [x] Có API contract rõ ràng nếu là backend module.
+- [x] Có frontend UI nếu module yêu cầu giao diện.
+- [x] Có validation.
+- [x] Có error handling.
+- [x] Có RBAC nếu endpoint cần phân quyền.
+- [x] Có test tối thiểu cho nghiệp vụ quan trọng.
+- [x] Chạy lint/typecheck/test pass.
+- [x] Checklist được cập nhật.
+- [x] Không tạo mâu thuẫn với `agent-spec.md`.
 
 ---
 
 ## 12. Những điểm tuyệt đối tránh
 
-- [ ] Không để user tự check-in.
-- [ ] Không cho priority cướp slot đã hold/confirmed.
-- [ ] Không confirm booking trước khi thanh toán thành công.
-- [ ] Không hard-code booking rules.
-- [ ] Không dùng enum role trong `users` làm source of truth nếu đã dùng `roles` + `user_roles`.
-- [ ] Không bỏ qua DB-level overlap protection.
-- [ ] Không tạo refund cho no-show/check-in expired.
-- [ ] Không cập nhật booking order/item status mà không ghi history tương ứng.
-- [ ] Không thay đổi schema mà quên migration.
-- [ ] Không thay đổi API mà quên cập nhật frontend types.
+- [x] Không để user tự check-in.
+- [x] Không cho priority cướp slot đã hold/confirmed.
+- [x] Không confirm booking trước khi thanh toán thành công.
+- [x] Không hard-code booking rules.
+- [x] Không dùng enum role trong `users` làm source of truth nếu đã dùng `roles` + `user_roles`.
+- [x] Không bỏ qua DB-level overlap protection.
+- [x] Không tạo refund cho no-show/check-in expired.
+- [x] Không cập nhật booking order/item status mà không ghi history tương ứng.
+- [x] Không thay đổi schema mà quên migration.
+- [x] Không thay đổi API mà quên cập nhật frontend types.
 
 ---
 
@@ -1386,21 +1386,9 @@ Một module được coi là hoàn thành khi:
 | Documentation |  | TODO |  |
 
 ---
-
-## 14. Gợi ý phân công team
-
-| Nhóm | Phụ trách |
-|---|---|
-| Backend 1 | Auth, RBAC, Users, Admin |
-| Backend 2 | Courts, Availability, Booking, Payment |
-| Backend 3 | Refund, Jobs, Violations, Reports |
-| Frontend 1 | Foundation, user flow, court browsing, booking |
-| Frontend 2 | Manager pages, admin pages, reports |
-| QA/Reviewer | Test cases, E2E flow, checklist tracking |
-
 ---
 
-## 15. Demo script MVP
+## 14. Demo script MVP
 
 Luồng demo tối thiểu:
 
